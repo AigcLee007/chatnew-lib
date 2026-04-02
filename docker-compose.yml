@@ -1,0 +1,15 @@
+services:
+  chatvip:
+    build: .
+    container_name: chatvip-ai-chat
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATA_FILE=/app/data/announcement.json
+      # 建议在服务器上改成你自己的管理员密钥
+      - ADMIN_KEY=sk-change-this-admin-key
+    volumes:
+      - ./data:/app/data

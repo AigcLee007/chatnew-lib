@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================
+   移动端视口锁定 - 防止键盘弹出导致布局抖动
+   ========================================= */
+@layer base {
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+:root {
+  /* Light Mode */
+  --background: 255 255 255;
+  --foreground: 9 9 11;
+  --card: 244 244 245;
+  --card-foreground: 9 9 11;
+  --popover: 255 255 255;
+  --popover-foreground: 9 9 11;
+  --primary: 24 24 27;
+  --primary-foreground: 250 250 250;
+  --muted: 244 244 245;
+  --muted-foreground: 113 113 122;
+  --accent: 244 244 245;
+  --accent-foreground: 24 24 27;
+  --border: 228 228 231;
+  --input: 228 228 231;
+  --ring: 24 24 27;
+  
+  --bg-gradient: radial-gradient(circle at 50% 0%, rgba(244, 244, 245, 1) 0%, rgba(255, 255, 255, 1) 100%);
+}
+
+.dark {
+  /* Dark Mode */
+  --background: 9 9 11;
+  --foreground: 250 250 250;
+  --card: 24 24 27;
+  --card-foreground: 250 250 250;
+  --popover: 24 24 27;
+  --popover-foreground: 250 250 250;
+  --primary: 250 250 250;
+  --primary-foreground: 9 9 11;
+  --muted: 39 39 42;
+  --muted-foreground: 161 161 170;
+  --accent: 39 39 42;
+  --accent-foreground: 250 250 250;
+  --border: 39 39 42;
+  --input: 39 39 42;
+  --ring: 212 212 216;
+
+  --bg-gradient: radial-gradient(circle at 50% -20%, rgba(31, 31, 34, 1) 0%, rgba(9, 9, 11, 1) 100%);
+}
+
+body {
+  background-color: rgb(var(--background));
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
+  transition: background-color 0.5s ease, color 0.5s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+/* =========================================
+   修复：全局文字选中样式 (Selection Fix)
+   ========================================= */
+
+/* 1. 默认（白昼模式）下的选中样式：蓝底白字 */
+::selection {
+  background-color: #2563eb !important; /* 鲜艳的蓝色 */
+  color: #ffffff !important; /* 纯白色文字 */
+  text-shadow: none !important;
+}
+
+/* 2. 黑夜模式下的选中样式：浅蓝底黑字 (对比度最高) */
+.dark ::selection {
+  background-color: #60a5fa !important; /* 浅蓝色背景 */
+  color: #000000 !important; /* 纯黑色文字 */
+}
+
+/* 3. 特别修复：针对输入框 (textarea/input) 的选中样式 */
+textarea::selection,
+input::selection {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+.dark textarea::selection,
+.dark input::selection {
+  background-color: #93c5fd !important; /* 非常浅的蓝色 */
+  color: #000000 !important;
+}
+
+/* =========================================
+   自定义美化滚动条 (Modern Scrollbar)
+   ========================================= */
+
+/* 1. 轨道与整体宽度 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 2. 滑块样式 (默认半透明) */
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+/* 3. 悬停时滑块加深 */
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* 4. 暗色模式适配 */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 5. 兼容性支持 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
