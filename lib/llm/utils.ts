@@ -1,14 +1,51 @@
-/**
+﻿/**
  * Shared utilities for LLM providers
  */
 
-// ============================================================================
-// Fetch with Retry (tested utility)
-// ============================================================================
+function extractErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const p = payload as Record<string, any>;
+  return (
+    p?.error?.message ||
+    p?.message ||
+    p?.detail ||
+    null
+  );
+}
+
+async function buildResponseError(response: Response): Promise<Error> {
+  const status = response.status;
+  const statusText = response.statusText || 'Unknown';
+
+  let bodyText = '';
+  let detail = '';
+  try {
+    bodyText = await response.text();
+    if (bodyText) {
+      try {
+        const parsed = JSON.parse(bodyText);
+        detail = extractErrorMessage(parsed) || JSON.stringify(parsed).slice(0, 240);
+      } catch {
+        detail = bodyText.slice(0, 240);
+      }
+    }
+  } catch {
+    // ignore body parse failures
+  }
+
+  const suffix = detail ? ` - ${detail}` : '';
+
+  if (status === 401) return new Error(`API Key 无效或未授权 (401)${suffix}`);
+  if (status === 403) return new Error(`API Key 无权限访问该模型 (403)${suffix}`);
+  if (status === 404) return new Error(`模型或接口不存在 (404)${suffix}`);
+  if (status === 429) return new Error(`额度不足或触发限流 (429)${suffix}`);
+  if (status >= 500) return new Error(`服务器内部错误: ${status}${suffix}`);
+
+  return new Error(`请求失败: ${status} ${statusText}${suffix}`);
+}
 
 /**
- * Fetch with automatic retry on server errors (5xx).
- * Does NOT retry on auth errors (401, 403, 404, 429).
+ * Fetch with automatic retry on non-fatal failures.
  */
 export async function fetchWithRetry(
   url: string,
@@ -19,19 +56,9 @@ export async function fetchWithRetry(
   try {
     const response = await fetch(url, options);
 
-    // Auth Errors - throw immediately, no retry
-    if (response.status === 401)
-      throw new Error('API Key 无效或未授权 (401)。请检查设置中的 Key。');
-    if (response.status === 403)
-      throw new Error('您的 API Key 没有权限访问此模型 (403)。');
-    if (response.status === 404)
-      throw new Error('所选模型不存在或 API 端点错误 (404)。');
-    if (response.status === 429)
-      throw new Error('账户余额不足或已达速率限制 (429)。请检查额度。');
-
-    // Server Errors - may retry
-    if (!response.ok && response.status >= 500) {
-      throw new Error(`服务器内部错误: ${response.status}`);
+    if (!response.ok) {
+      const err = await buildResponseError(response);
+      throw err;
     }
 
     return response;
@@ -39,11 +66,12 @@ export async function fetchWithRetry(
     const error = err as Error & { name?: string; message?: string };
     if (error.name === 'AbortError') throw err;
 
+    const msg = error.message || '';
     const isFatal =
-      error.message?.includes('401') ||
-      error.message?.includes('403') ||
-      error.message?.includes('404') ||
-      error.message?.includes('429');
+      msg.includes('(401)') ||
+      msg.includes('(403)') ||
+      msg.includes('(404)') ||
+      msg.includes('(429)');
 
     if (!isFatal && retries > 0) {
       console.warn(
@@ -53,32 +81,19 @@ export async function fetchWithRetry(
       await new Promise((resolve) => setTimeout(resolve, delay));
       return fetchWithRetry(url, options, retries - 1, delay * 1.5);
     }
+
     throw err;
   }
 }
 
-// ============================================================================
-// API Key Validation
-// ============================================================================
-
-/**
- * Validate API key format
- */
 export function validateApiKey(apiKey: string): void {
   if (!apiKey || !apiKey.startsWith('sk-')) {
-    throw new Error('API Key 未配置或格式错误。请在设置中输入 sk- 开头的 Key。');
+    throw new Error('API Key 未配置或格式错误，请在设置中输入 sk- 开头的 Key。');
   }
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 export const API_BASE = 'https://api.aittco.com/v1';
 
-/**
- * Get display name for model (remove -preview, -v suffixes)
- */
 export function getModelDisplayName(modelId: string): string {
   return modelId
     .replace(/-preview-v$/, '')
@@ -86,16 +101,12 @@ export function getModelDisplayName(modelId: string): string {
     .replace(/-v$/, '');
 }
 
-/**
- * Build core system identity based on model
- */
 export function buildCoreSystemIdentity(modelId: string): string {
   const displayName = getModelDisplayName(modelId);
-  
-  // Determine if it's a Gemini or GPT model
+
   const isGemini = modelId.includes('gemini');
   const isGPT = modelId.includes('gpt');
-  
+
   let identityLine: string;
   if (isGemini) {
     identityLine = `You are ${displayName}, a large language model (LLM) developed by Google DeepMind.`;
@@ -126,5 +137,4 @@ export function buildCoreSystemIdentity(modelId: string): string {
 - Respond in the same language the user uses`;
 }
 
-// Legacy export for backward compatibility (will be removed)
 export const CORE_SYSTEM_IDENTITY = buildCoreSystemIdentity('AI-Assistant');

@@ -69,6 +69,45 @@ export const ChatInterface: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sendLockRef = useRef(false);
+
+  const estimateMessageTokens = (msg: Message): number => {
+    const contentTokens = countTokens(msg.content || '');
+    const attachmentTokens =
+      msg.attachments?.reduce((sum, att) => {
+        if (att.type === 'image' || att.included === false) return sum;
+        if (typeof att.tokenCount === 'number' && att.tokenCount > 0) return sum + att.tokenCount;
+        return sum + countTokens(att.content || '');
+      }, 0) || 0;
+    return contentTokens + attachmentTokens;
+  };
+
+  const buildContextWindow = (allMessages: Message[], model: ModelId): Message[] => {
+    // Use 75% of official context limits to reduce timeout risk while
+    // preserving as much history as possible.
+    const GPT_CONTEXT_LIMIT = 1_050_000;
+    const GEMINI_CONTEXT_LIMIT = 1_000_000;
+    const SAFETY_RATIO = 0.75;
+    const TOKEN_BUDGET = model.includes('gpt')
+      ? Math.floor(GPT_CONTEXT_LIMIT * SAFETY_RATIO)   // 787,500
+      : Math.floor(GEMINI_CONTEXT_LIMIT * SAFETY_RATIO); // 750,000
+    const MAX_MESSAGES = 80;
+    const recent = allMessages.slice(-MAX_MESSAGES);
+
+    let used = 0;
+    const selected: Message[] = [];
+    for (let i = recent.length - 1; i >= 0; i--) {
+      const msg = recent[i];
+      const t = estimateMessageTokens(msg);
+      const isNewest = i === recent.length - 1;
+      if (!isNewest && used + t > TOKEN_BUDGET) continue;
+      selected.push(msg);
+      used += t;
+      if (used >= TOKEN_BUDGET) break;
+    }
+
+    return selected.reverse();
+  };
 
   // Reset textarea height for both desktop and mobile layouts.
   const resetTextareaHeight = () => {
@@ -146,10 +185,12 @@ export const ChatInterface: React.FC = () => {
     
     await addMessage(newUserMsg);
 
+    const contextMessages = buildContextWindow([...history, newUserMsg], store.defaultModel);
+
     await startStream({
       apiKey: store.apiKey,
       model: store.defaultModel,
-      messages: [...history, newUserMsg],
+      messages: contextMessages,
       attachments: newUserMsg.attachments || [],
       userSystemPrompt: store.userSystemPrompt,
       sessionId: newUserMsg.sessionId,
@@ -176,10 +217,13 @@ export const ChatInterface: React.FC = () => {
     // 娓呯┖褰撳墠娑堟伅鍐呭
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: '' } : m));
 
+    const regenModel = (targetMsg.model as ModelId) || store.defaultModel;
+    const contextMessages = buildContextWindow(history, regenModel);
+
     await startStream({
       apiKey: store.apiKey,
-      model: store.defaultModel,
-      messages: history,
+      model: regenModel,
+      messages: contextMessages,
       attachments: lastUserMsg.attachments || [],
       userSystemPrompt: store.userSystemPrompt,
       sessionId: targetMsg.sessionId,
@@ -204,10 +248,13 @@ export const ChatInterface: React.FC = () => {
     // Clear current assistant message before continuing generation.
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: '' } : m));
 
+    const continueModel = (targetMsg.model as ModelId) || store.defaultModel;
+    const contextMessages = buildContextWindow(history, continueModel);
+
     await startStream({
       apiKey: store.apiKey,
-      model: store.defaultModel,
-      messages: history,
+      model: continueModel,
+      messages: contextMessages,
       attachments: [],
       userSystemPrompt: store.userSystemPrompt,
       sessionId: targetMsg.sessionId,
@@ -220,6 +267,8 @@ export const ChatInterface: React.FC = () => {
 
 
   const handleSend = async () => {
+    if (sendLockRef.current) return;
+    sendLockRef.current = true;
     try {
       const activeAttachments = store.attachments.filter(a => a.included !== false);
       if ((!store.input.trim() && activeAttachments.length === 0) || isStreaming) return;
@@ -313,10 +362,12 @@ export const ChatInterface: React.FC = () => {
 
         const safeHistory = isNewSession ? [] : messages;
 
+        const contextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+
         await startStream({
           apiKey: store.apiKey,
           model: store.defaultModel,
-          messages: [...safeHistory, userMsg],
+          messages: contextMessages,
           attachments: userMsg.attachments || [],
           userSystemPrompt: store.userSystemPrompt,
           sessionId,
@@ -350,10 +401,12 @@ export const ChatInterface: React.FC = () => {
 
         const safeHistory = isNewSession ? [] : messages;
 
+        const contextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+
         await startStream({
           apiKey: store.apiKey,
           model: store.defaultModel,
-          messages: [...safeHistory, userMsg],
+          messages: contextMessages,
           attachments: userMsg.attachments || [],
           userSystemPrompt: store.userSystemPrompt,
           sessionId,
@@ -368,6 +421,8 @@ export const ChatInterface: React.FC = () => {
       console.error('发送失败:', err);
       alert(`发送出错\n${err.message || err}\n\n提示：如果你在使用无痕模式，请切换到普通模式，因为无痕模式可能会阻止保存历史记录。`);
       store.setLoading(false); // 纭繚 Loading 鐘舵€佽閲嶇疆
+    } finally {
+      sendLockRef.current = false;
     }
   };
 

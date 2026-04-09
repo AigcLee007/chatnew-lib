@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GeminiNative Provider - Implementation for Google Gemini Native API
  * Uses Google's generativelanguage API directly for Gemini-specific features
  * Supports native web search via googleSearch tool
@@ -6,7 +6,7 @@
 
 import { ChatOptions, UsageStats } from '../types';
 import { BaseProvider } from './BaseProvider';
-import { validateApiKey } from '../utils';
+import { fetchWithRetry, validateApiKey } from '../utils';
 
 // ============================================================================
 // Gemini Native API Types
@@ -32,6 +32,9 @@ interface GeminiTool {
 interface GeminiGenerationConfig {
   temperature?: number;
   maxOutputTokens?: number;
+  thinkingConfig?: {
+    thinkingBudget?: number;
+  };
 }
 
 interface GeminiRequestBody {
@@ -42,7 +45,7 @@ interface GeminiRequestBody {
 
 interface GeminiStreamPart {
   text?: string;
-  thought?: string;
+  thought?: boolean;
 }
 
 interface GeminiGroundingChunk {
@@ -110,12 +113,12 @@ export class GeminiNativeProvider extends BaseProvider {
     try {
       validateApiKey(apiKey);
 
-      // --- 模型 ID 映射 ---
+      // --- 妯″瀷 ID 鏄犲皠 ---
       let apiModel = model as string;
       if (model === 'gemini-3.1-flash-preview' as any) {
         apiModel = 'gemini-3.1-flash-lite-preview';
       }
-      // 0. 清洗历史消息，确保以 user 结尾
+      // 0. 娓呮礂鍘嗗彶娑堟伅锛岀‘淇濅互 user 缁撳熬
       // ========================================================================
       let validMessages = [...messages];
       while (validMessages.length > 0 && validMessages[validMessages.length - 1].role !== 'user') {
@@ -123,7 +126,7 @@ export class GeminiNativeProvider extends BaseProvider {
       }
 
       // ========================================================================
-      // 1. 提取 System Prompt
+      // 1. 鎻愬彇 System Prompt
       // ========================================================================
       const systemMessages = validMessages.filter(m => m.role === 'system');
       const systemFromMessages = systemMessages.map(m => m.content).join('\n\n');
@@ -131,13 +134,12 @@ export class GeminiNativeProvider extends BaseProvider {
       const fullSystemPrompt = [systemContext, systemFromMessages].filter(Boolean).join('\n\n');
 
       // ========================================================================
-      // 2. 过滤出对话历史 (User & Assistant)
+      // 2. 杩囨护鍑哄璇濆巻鍙?(User & Assistant)
       // ========================================================================
       let conversationMessages = validMessages.filter(m => m.role !== 'system');
 
       // ========================================================================
-      // 3. 将 System Prompt 注入到第一条 User 消息中
-      // ========================================================================
+      // 3. 灏?System Prompt 娉ㄥ叆鍒扮涓€鏉?User 娑堟伅涓?      // ========================================================================
       if (fullSystemPrompt && conversationMessages.length > 0) {
         const firstMsg = conversationMessages[0];
         if (firstMsg.role === 'user') {
@@ -165,7 +167,7 @@ export class GeminiNativeProvider extends BaseProvider {
       }
 
       // ========================================================================
-      // 4. 转换为 Gemini 格式
+      // 4. 杞崲涓?Gemini 鏍煎紡
       // ========================================================================
       const contents: GeminiContent[] = conversationMessages
         .map(msg => {
@@ -213,7 +215,7 @@ export class GeminiNativeProvider extends BaseProvider {
         .filter(c => c.parts.length > 0);
       
       // ========================================================================
-      // 5. 验证消息
+      // 5. 楠岃瘉娑堟伅
       // ========================================================================
       if (contents.length === 0) {
         throw new Error('No valid messages to send');
@@ -232,7 +234,7 @@ export class GeminiNativeProvider extends BaseProvider {
       // Build generation config
       const generationConfig: GeminiGenerationConfig = {
         temperature: 0.7,
-        maxOutputTokens: 24576,  // 约 24K tokens
+        maxOutputTokens: 8192,
       };
 
       // Build request body
@@ -246,16 +248,15 @@ export class GeminiNativeProvider extends BaseProvider {
         requestBody.tools = [{ googleSearch: {} }];
       }
 
-      // Enable thinking for gemini-3.1-pro-preview
+      // Disable explicit heavy thinking budget by default to avoid
+      // memory overload on long prompts.
       const isProModel = model === ('gemini-3.1-pro-preview' as any);
       if (isProModel) {
-        // Pro 模型启用思考模式
-        (requestBody as any).generationConfig = {
+        requestBody.generationConfig = {
           ...generationConfig,
-          maxOutputTokens: 24576,  // 约 24K tokens
-          thinking_config: {
-            thinking_budget: 8192
-          }
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         };
       }
 
@@ -264,19 +265,52 @@ export class GeminiNativeProvider extends BaseProvider {
 
 
 
-      // Send request
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-        signal,
-      });
+      const sendRequest = (body: GeminiRequestBody, retries = 2) =>
+        fetchWithRetry(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+            signal,
+          },
+          retries,
+          1200
+        );
+
+      let response: Response;
+      try {
+        response = await sendRequest(requestBody, 2);
+      } catch (primaryErr) {
+        const primaryMsg =
+          primaryErr instanceof Error ? (primaryErr.message || '').toLowerCase() : String(primaryErr).toLowerCase();
+        const isOverloaded = primaryMsg.includes('503') || primaryMsg.includes('system memory overloaded');
+        if (!isOverloaded) throw primaryErr;
+
+        const fallbackBody: GeminiRequestBody = {
+          ...requestBody,
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 4096,
+            ...(isProModel
+              ? {
+                  thinkingConfig: {
+                    thinkingBudget: 0,
+                  },
+                }
+              : {}),
+          },
+        };
+        delete fallbackBody.tools;
+
+        response = await sendRequest(fallbackBody, 1);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gemini API 请求失败: ${response.status} - ${errorText.slice(0, 500)}`);
+        throw new Error(`Gemini API 璇锋眰澶辫触: ${response.status} - ${errorText.slice(0, 500)}`);
       }
 
       if (!response.body) {
@@ -288,7 +322,7 @@ export class GeminiNativeProvider extends BaseProvider {
     } catch (err: unknown) {
       const error = err as Error & { name?: string };
       if (error.name === 'AbortError') {
-        onChunk('\n\n**[已停止]**');
+        onChunk('\n\n**[宸插仠姝**');
         onComplete();
         return;
       }
@@ -346,15 +380,17 @@ export class GeminiNativeProvider extends BaseProvider {
                 }
               }
 
-              // Extract text and thinking from parts
+              // Extract text and thinking from parts.
+              // Gemini returns `thought: true` as a flag on thought parts.
+              // The actual content is still in `text`.
               const parts = json.candidates?.[0]?.content?.parts || [];
               for (const part of parts) {
-                // Handle thinking content
-                if (part.thought) {
-                  onChunk(part.thought, true);
-                }
-                // Handle regular text
-                if (part.text) {
+                if (!part.text) continue;
+
+                // Route thought content to thinking panel only.
+                if (part.thought === true) {
+                  onChunk(part.text, true);
+                } else {
                   onChunk(part.text, false);
                 }
               }
@@ -375,14 +411,45 @@ export class GeminiNativeProvider extends BaseProvider {
       } catch (readError: unknown) {
         const error = readError as Error & { name?: string };
         if (error.name === 'AbortError') throw readError;
-        onChunk('\n\n**[网络中断]**', false);
+        onChunk('\n\n**[缃戠粶涓柇]**', false);
         throw readError;
       }
     }
 
-    // 如果有搜索来源，在回复末尾添加引用
+    // Flush tail chunk in case stream doesn't end with '\n'.
+    const tail = buffer.trim();
+    if (tail.startsWith('data: ')) {
+      const dataStr = tail.replace('data: ', '').trim();
+      if (dataStr && dataStr !== '[DONE]') {
+        try {
+          const json: GeminiStreamResponse = JSON.parse(dataStr);
+
+          const parts = json.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (!part.text) continue;
+            if (part.thought === true) {
+              onChunk(part.text, true);
+            } else {
+              onChunk(part.text, false);
+            }
+          }
+
+          if (json.usageMetadata) {
+            finalUsage = {
+              prompt_tokens: json.usageMetadata.promptTokenCount || 0,
+              completion_tokens: json.usageMetadata.candidatesTokenCount || 0,
+              total_tokens: json.usageMetadata.totalTokenCount || 0,
+            };
+          }
+        } catch {
+          // Ignore malformed tail chunk.
+        }
+      }
+    }
+
+    // If web grounding sources exist, append citations at the end.
     if (groundingSources.length > 0) {
-      let sourcesText = '\n\n---\n**📚 参考来源：**\n';
+      let sourcesText = '\n\n---\n**馃摎 鍙傝€冩潵婧愶細**\n';
       groundingSources.forEach((source, index) => {
         sourcesText += `${index + 1}. [${source.title}](${source.uri})\n`;
       });
@@ -392,3 +459,5 @@ export class GeminiNativeProvider extends BaseProvider {
     onComplete(finalUsage);
   }
 }
+
+

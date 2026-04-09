@@ -188,19 +188,19 @@ CodeBlock.displayName = 'CodeBlock';
 // 2. 静态 Markdown 组件配置 - 提取到组件外部避免重复创建
 // ----------------------------------------------------------------------
 const createMarkdownComponents = (isUser: boolean): Components => ({
-  p: ({children}) => <p className={`mb-3 last:mb-0 leading-7 ${isUser ? '!text-inherit' : 'text-foreground/90'}`}>{children}</p>,
+  p: ({children}) => <p className={`${isUser ? 'mb-[18px] last:mb-0 leading-[1.9] !text-inherit' : 'text-foreground/95'}`}>{children}</p>,
   
-  h1: ({children}) => <h1 className={`text-xl font-bold mt-4 mb-2 ${isUser ? '!text-inherit' : ''}`}>{children}</h1>,
-  h2: ({children}) => <h2 className={`text-lg font-bold mt-4 mb-2 ${isUser ? '!text-inherit' : ''}`}>{children}</h2>,
-  h3: ({children}) => <h3 className={`text-base font-bold mt-3 mb-1 ${isUser ? '!text-inherit' : ''}`}>{children}</h3>,
+  h1: ({children}) => <h1 className={`${isUser ? 'text-[1.55em] font-bold mt-7 mb-3 leading-[1.45] !text-inherit' : ''}`}>{children}</h1>,
+  h2: ({children}) => <h2 className={`${isUser ? 'text-[1.35em] font-bold mt-6 mb-3 leading-[1.5] !text-inherit' : ''}`}>{children}</h2>,
+  h3: ({children}) => <h3 className={`${isUser ? 'text-[1.15em] font-bold mt-5 mb-2 leading-[1.55] !text-inherit' : ''}`}>{children}</h3>,
   
-  ul: ({children}) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
-  ol: ({children}) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
+  ul: ({children}) => <ul className={`${isUser ? 'list-disc pl-6 my-3 space-y-2 leading-[1.9]' : ''}`}>{children}</ul>,
+  ol: ({children}) => <ol className={`${isUser ? 'list-decimal pl-6 my-3 space-y-2 leading-[1.9]' : ''}`}>{children}</ol>,
   li: ({children}) => <li className={`pl-1 ${isUser ? '!text-inherit' : ''}`}>{children}</li>,
   
   strong: ({children}) => <strong className={`font-bold ${isUser ? '!text-inherit' : ''}`}>{children}</strong>,
 
-  blockquote: ({children}) => <blockquote className={`border-l-2 pl-4 py-1 my-3 italic rounded-r-lg ${
+  blockquote: ({children}) => <blockquote className={`border-l-2 pl-4 py-2 ${isUser ? 'my-4' : ''} italic rounded-r-lg ${
     isUser 
       ? 'border-primary-foreground/50 bg-primary-foreground/10 !text-inherit opacity-90' 
       : 'border-primary/50 bg-muted/20 text-muted-foreground'
@@ -370,7 +370,7 @@ const MessageBubbleInner: React.FC<Props> = ({ message, isStreaming, onRegenerat
 
   return (
     <div className={`flex w-full mb-8 ${isUser ? 'justify-end' : 'justify-start'} group animate-in slide-in-from-bottom-2 duration-500`}>
-      <div className={`flex max-w-full md:max-w-[85%] lg:max-w-[75%] gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      <div className={`flex max-w-full ${isUser ? 'md:max-w-[85%] lg:max-w-[75%]' : 'md:max-w-[92%] lg:max-w-[86%]'} gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         
         {/* 头像 */}
         <div className={`flex-shrink-0 mt-1 w-8 h-8 rounded-full flex items-center justify-center shadow-sm border select-none ${
@@ -519,7 +519,7 @@ const MessageBubbleInner: React.FC<Props> = ({ message, isStreaming, onRegenerat
 
                 {/* 正文 Markdown 渲染 */}
                 {bodyContent && (
-                  <div className={`prose-aittco max-w-none break-words ${isUser ? '!text-inherit' : ''}`}>
+                  <div className={`prose-aittco break-words ${isUser ? 'max-w-none !text-inherit' : 'max-w-[84ch] assistant-readable'}`}>
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm, remarkMath]}
                       rehypePlugins={[rehypeKatex]}

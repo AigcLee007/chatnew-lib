@@ -139,3 +139,59 @@ input::selection {
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
+
+.assistant-readable {
+  display: block;
+  max-width: 84ch;
+  font-size: 17px;
+  line-height: 1.9;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-wrap: pretty;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  color: rgb(var(--foreground) / 0.95);
+}
+
+.assistant-readable > p {
+  margin: 0 0 18px;
+}
+
+.assistant-readable > h1,
+.assistant-readable > h2,
+.assistant-readable > h3,
+.assistant-readable > h4 {
+  margin: 22px 0 12px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: rgb(var(--foreground));
+}
+
+.assistant-readable > ul,
+.assistant-readable > ol {
+  margin: 0 0 18px;
+  padding-left: 1.45rem;
+}
+
+.assistant-readable > ul > li,
+.assistant-readable > ol > li {
+  margin-bottom: 8px;
+}
+
+.assistant-readable > blockquote,
+.assistant-readable > table,
+.assistant-readable > pre,
+.assistant-readable > div {
+  margin: 0 0 18px;
+}
+
+.assistant-readable strong {
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .assistant-readable {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+}

@@ -1,6 +1,5 @@
-/**
+﻿/**
  * OpenAI Provider - Implementation for OpenAI-compatible models (GPT, etc.)
- * Standard OpenAI API format with system messages and temperature
  */
 
 import {
@@ -12,10 +11,6 @@ import {
 import { BaseProvider } from './BaseProvider';
 import { fetchWithRetry, validateApiKey, API_BASE } from '../utils';
 
-// ============================================================================
-// OpenAI Provider Implementation
-// ============================================================================
-
 export class OpenAIProvider extends BaseProvider {
   readonly name = 'OpenAI';
 
@@ -23,65 +18,59 @@ export class OpenAIProvider extends BaseProvider {
     return modelId.includes('gpt');
   }
 
-  /**
-   * Stream chat completion with standard OpenAI format
-   */
   async streamChat(options: ChatOptions): Promise<void> {
     const {
       apiKey,
       model,
       messages,
-      attachments,
       userSystemPrompt,
       signal,
       onChunk,
       onComplete,
       onError,
-      isWebSearchEnabled,
     } = options;
 
     try {
       validateApiKey(apiKey);
 
-      // Build messages - buildApiMessages now handles ALL attachment types
       const systemContext = this.buildSystemContext(userSystemPrompt, model);
       const apiMessages = this.buildApiMessages(messages, systemContext);
 
-      // Build request body with temperature (OpenAI supports it)
-      // 提高输出限制到 16384，减少截断问题（GPT 模型限制通常较低）
-      const requestBody: ChatCompletionRequestBody = {
-        model: model,
+      const primaryBody: ChatCompletionRequestBody = {
+        model,
         messages: apiMessages,
         stream: true,
         stream_options: { include_usage: true },
         temperature: 0.7,
-        max_tokens: 16384,
+        // Keep conservative for compatibility across relay routes.
+        max_tokens: 8192,
       };
 
-      // Note: Web search for OpenAI-compatible models via Aittco is not supported via tools
-      // The tools parameter may cause the API to not respond
-
-      // Send request
-      const response = await fetchWithRetry(
-        `${API_BASE}/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(requestBody),
-          signal,
+      let response: Response;
+      try {
+        response = await this.sendRequest(apiKey, primaryBody, signal);
+      } catch (primaryErr) {
+        if (!this.shouldRetryWithCompatibilityPayload(primaryErr)) {
+          throw primaryErr;
         }
-      );
+
+        // Some keys/routes reject stream_options or max_tokens and return 5xx.
+        const fallbackBody: ChatCompletionRequestBody = {
+          model,
+          messages: apiMessages,
+          stream: true,
+          temperature: 0.7,
+        };
+
+        response = await this.sendRequest(apiKey, fallbackBody, signal, 1);
+      }
 
       if (!response.ok) {
-        throw new Error(`API 请求失败: ${response.status} ${response.statusText}`);
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
       if (!response.body) throw new Error('No response body');
 
-      // Stream response
       await this.processStream(response.body, onChunk, onComplete);
     } catch (err: unknown) {
       const error = err as Error & { name?: string };
@@ -94,16 +83,44 @@ export class OpenAIProvider extends BaseProvider {
     }
   }
 
-  // ============================================================================
-  // Private Helper Methods
-  // ============================================================================
+  private async sendRequest(
+    apiKey: string,
+    body: ChatCompletionRequestBody,
+    signal?: AbortSignal,
+    retries = 2
+  ): Promise<Response> {
+    return fetchWithRetry(
+      `${API_BASE}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      },
+      retries
+    );
+  }
 
-  /**
-   * Process streaming response
-   */
+  private shouldRetryWithCompatibilityPayload(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg) return false;
+
+    const isServerError = /\b5\d{2}\b/.test(msg);
+    const mightBeCompatibilityIssue =
+      msg.includes('stream_options') ||
+      msg.includes('max_tokens') ||
+      msg.includes('unsupported') ||
+      msg.includes('invalid_request');
+
+    return isServerError || mightBeCompatibilityIssue;
+  }
+
   private async processStream(
     body: ReadableStream<Uint8Array>,
-    onChunk: (chunk: string) => void,
+    onChunk: (chunk: string, isThinking?: boolean) => void,
     onComplete: (usage?: UsageStats) => void
   ): Promise<void> {
     const reader = body.getReader();
@@ -141,9 +158,10 @@ export class OpenAIProvider extends BaseProvider {
               const delta = json.choices?.[0]?.delta;
               const text = delta?.content || '';
               const reasoning = delta?.reasoning_content || '';
-              if (text || reasoning) onChunk(reasoning + text);
+              if (reasoning) onChunk(reasoning, true);
+              if (text) onChunk(text, false);
             } catch {
-              /* Ignore parse errors */
+              // Ignore malformed chunk.
             }
           }
         }
@@ -152,6 +170,31 @@ export class OpenAIProvider extends BaseProvider {
         if (error.name === 'AbortError') throw readError;
         onChunk('\n\n**[网络中断]**');
         throw readError;
+      }
+    }
+
+    // Flush tail chunk in case stream doesn't end with '\n'.
+    const tail = buffer.trim();
+    if (tail.startsWith('data: ')) {
+      const dataStr = tail.replace('data: ', '').trim();
+      if (dataStr && dataStr !== '[DONE]') {
+        try {
+          const json: StreamChunkResponse = JSON.parse(dataStr);
+          if (json.usage) {
+            finalUsage = {
+              prompt_tokens: json.usage.prompt_tokens || 0,
+              completion_tokens: json.usage.completion_tokens || 0,
+              total_tokens: json.usage.total_tokens || 0,
+            };
+          }
+          const delta = json.choices?.[0]?.delta;
+          const text = delta?.content || '';
+          const reasoning = delta?.reasoning_content || '';
+          if (reasoning) onChunk(reasoning, true);
+          if (text) onChunk(text, false);
+        } catch {
+          // Ignore malformed tail chunk.
+        }
       }
     }
 

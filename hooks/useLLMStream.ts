@@ -1,12 +1,17 @@
 /**
  * useLLMStream Hook
- * 职责：处理与 LLM 的流式通信、Token 统计和中止控制
+ * Responsibilities:
+ * - Stream chat responses
+ * - Track usage stats
+ * - Support stop/abort
+ * - Dynamic fallback: retry once with smaller context budget on timeout/5xx
  */
 
 import { useState, useRef, useCallback } from 'react';
 import { streamChatCompletion, generateImage, UsageStats } from '../lib/api-client';
 import { saveMessage } from '../lib/db';
 import { Message, ModelId, Attachment } from '../types';
+import { countTokens } from '../lib/token';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface StreamParams {
@@ -16,8 +21,8 @@ export interface StreamParams {
   attachments: Attachment[];
   userSystemPrompt: string;
   sessionId: string;
-  existingMsgId?: string; // 用于重新生成时复用已有消息 ID
-  isWebSearchEnabled?: boolean; // 联网搜索开关
+  existingMsgId?: string;
+  isWebSearchEnabled?: boolean;
   onMessageCreated?: (msg: Message) => void;
   onMessageUpdate?: (msgId: string, content: string, thinkingContent?: string) => void;
   onComplete?: (msg: Message) => void;
@@ -42,7 +47,13 @@ export interface UseLLMStreamReturn {
   startStream: (params: StreamParams) => Promise<void>;
   startImageGeneration: (params: ImageGenerateParams) => Promise<void>;
   stopStream: () => void;
-  resetUsage: () => void; // 🛡️ 新增：重置 Token 统计
+  resetUsage: () => void;
+}
+
+interface AttemptResult {
+  completed: boolean;
+  usage?: UsageStats;
+  error: Error | null;
 }
 
 export function useLLMStream(): UseLLMStreamReturn {
@@ -50,12 +61,10 @@ export function useLLMStream(): UseLLMStreamReturn {
   const [lastUsage, setLastUsage] = useState<{ prompt: number; completion: number } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 🛡️ 重置 Token 统计（用于新建/切换会话时清空幽灵数据）
   const resetUsage = useCallback(() => {
     setLastUsage(null);
   }, []);
 
-  // 停止流式生成
   const stopStream = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -64,113 +73,207 @@ export function useLLMStream(): UseLLMStreamReturn {
     }
   }, []);
 
-  // 开始流式对话
-  const startStream = useCallback(async (params: StreamParams) => {
-    const {
-      apiKey,
-      model,
-      messages,
-      attachments,
-      userSystemPrompt,
-      sessionId,
-      existingMsgId,
-      isWebSearchEnabled,
-      onMessageCreated,
-      onMessageUpdate,
-      onComplete,
-      onError,
-    } = params;
-
-    setIsStreaming(true);
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    const botMsgId = existingMsgId || uuidv4();
-    const botMsg: Message = {
-      id: botMsgId,
-      sessionId,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-      model,
-    };
-
-    // 只有新消息才通知创建
-    if (!existingMsgId) {
-      onMessageCreated?.(botMsg);
-    }
-
-    let fullResponse = '';
-    let fullThinking = '';
-    
-    // 流式输出缓冲机制 - 让输出更丝滑
-    let pendingUpdate = false;
-    const flushUpdate = () => {
-      if (pendingUpdate) {
-        onMessageUpdate?.(botMsgId, fullResponse, fullThinking || undefined);
-        pendingUpdate = false;
-      }
-    };
-    
-    // 使用 requestAnimationFrame 节流更新，约 60fps
-    const scheduleUpdate = () => {
-      if (!pendingUpdate) {
-        pendingUpdate = true;
-        requestAnimationFrame(flushUpdate);
-      }
-    };
-
-    await streamChatCompletion(
-      apiKey,
-      model,
-      messages,
-      attachments,
-      userSystemPrompt,
-      abortController.signal,
-      // onChunk - 使用缓冲机制
-      (chunk, isThinking) => {
-        if (isThinking) {
-          fullThinking += chunk;
-        } else {
-          fullResponse += chunk;
-        }
-        scheduleUpdate();
-      },
-      // onComplete
-      (usage?: UsageStats) => {
-        // 确保最后的内容被刷新
-        flushUpdate();
-        
-        setIsStreaming(false);
-        abortControllerRef.current = null;
-        if (usage) {
-          setLastUsage({
-            prompt: usage.prompt_tokens || 0,
-            completion: usage.completion_tokens || 0,
-          });
-        }
-        const finalMsg: Message = { 
-          ...botMsg, 
-          content: fullResponse,
-          ...(fullThinking && { thinkingContent: fullThinking }),
-        };
-        saveMessage(finalMsg);
-        onComplete?.(finalMsg);
-      },
-      // onError
-      (err: Error) => {
-        setIsStreaming(false);
-        abortControllerRef.current = null;
-        if (err.name !== 'AbortError') {
-          const errorMsg = `\n\n> ⚠️ **生成失败**: ${err.message || '未知错误'}`;
-          onError?.(botMsgId, fullResponse + errorMsg);
-        }
-      },
-      isWebSearchEnabled || false
-    );
+  const estimateMessageTokens = useCallback((msg: Message): number => {
+    const contentTokens = countTokens(msg.content || '');
+    const attachmentTokens =
+      msg.attachments?.reduce((sum, att) => {
+        if (att.type === 'image' || att.included === false) return sum;
+        if (typeof att.tokenCount === 'number' && att.tokenCount > 0) return sum + att.tokenCount;
+        return sum + countTokens(att.content || '');
+      }, 0) || 0;
+    return contentTokens + attachmentTokens;
   }, []);
 
-  // 开始图片生成
+  const trimMessagesByRatio = useCallback(
+    (allMessages: Message[], model: ModelId, ratio: number): Message[] => {
+      const GPT_CONTEXT_LIMIT = 1_050_000;
+      const GEMINI_CONTEXT_LIMIT = 1_000_000;
+      const tokenBudget = Math.floor((model.includes('gpt') ? GPT_CONTEXT_LIMIT : GEMINI_CONTEXT_LIMIT) * ratio);
+
+      let used = 0;
+      const selected: Message[] = [];
+      for (let i = allMessages.length - 1; i >= 0; i--) {
+        const msg = allMessages[i];
+        const tokens = estimateMessageTokens(msg);
+        const isNewest = i === allMessages.length - 1;
+        if (!isNewest && used + tokens > tokenBudget) continue;
+        selected.push(msg);
+        used += tokens;
+        if (used >= tokenBudget) break;
+      }
+
+      return selected.reverse();
+    },
+    [estimateMessageTokens]
+  );
+
+  const isRetryableStreamError = useCallback((err: Error): boolean => {
+    if (!err || err.name === 'AbortError') return false;
+    const msg = (err.message || '').toLowerCase();
+    if (!msg) return false;
+
+    const timeoutLike =
+      msg.includes('timeout') ||
+      msg.includes('timed out') ||
+      msg.includes('etimedout') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('network');
+
+    const server5xxLike = /\b5\d{2}\b/.test(msg) || msg.includes('服务器内部错误');
+    return timeoutLike || server5xxLike;
+  }, []);
+
+  const toFriendlyError = useCallback((err: Error): string => {
+    const message = (err.message || '未知错误').trim();
+    if (message.toLowerCase() === 'failed to fetch') {
+      return '网络连接失败（Failed to fetch）。可能是网络不稳定、代理/防火墙拦截、上游服务短时不可达，或线上 Nginx 对流式接口启用了缓冲。';
+    }
+    return message;
+  }, []);
+
+  const startStream = useCallback(
+    async (params: StreamParams) => {
+      const {
+        apiKey,
+        model,
+        messages,
+        attachments,
+        userSystemPrompt,
+        sessionId,
+        existingMsgId,
+        isWebSearchEnabled,
+        onMessageCreated,
+        onMessageUpdate,
+        onComplete,
+        onError,
+      } = params;
+
+      setIsStreaming(true);
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      const botMsgId = existingMsgId || uuidv4();
+      const botMsg: Message = {
+        id: botMsgId,
+        sessionId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        model,
+      };
+
+      if (!existingMsgId) {
+        onMessageCreated?.(botMsg);
+      }
+
+      let fullResponse = '';
+      let fullThinking = '';
+
+      const runAttempt = async (attemptMessages: Message[], attemptLabel: string): Promise<AttemptResult> => {
+        let completed = false;
+        let usage: UsageStats | undefined;
+        let streamError: Error | null = null;
+
+        await streamChatCompletion(
+          apiKey,
+          model,
+          attemptMessages,
+          attachments,
+          userSystemPrompt,
+          abortController.signal,
+          (chunk, isThinking) => {
+            if (isThinking) {
+              fullThinking += chunk;
+            } else {
+              fullResponse += chunk;
+            }
+            onMessageUpdate?.(botMsgId, fullResponse, fullThinking || undefined);
+          },
+          (u?: UsageStats) => {
+            completed = true;
+            usage = u;
+          },
+          (err: Error) => {
+            streamError = err;
+            console.warn(`[LLM ${attemptLabel}] stream failed:`, err?.message || err);
+          },
+          isWebSearchEnabled || false
+        );
+
+        return { completed, usage, error: streamError };
+      };
+
+      try {
+        // Attempt 1: normal flow (caller already uses 75% context budget).
+        const first = await runAttempt(messages, 'attempt-1');
+
+        if (first.completed) {
+          if (first.usage) {
+            setLastUsage({
+              prompt: first.usage.prompt_tokens || 0,
+              completion: first.usage.completion_tokens || 0,
+            });
+          }
+          const finalMsg: Message = {
+            ...botMsg,
+            content: fullResponse,
+            ...(fullThinking && { thinkingContent: fullThinking }),
+          };
+          await saveMessage(finalMsg);
+          onComplete?.(finalMsg);
+          return;
+        }
+
+        // Attempt 2: dynamic downgrade to 60% budget if timeout or 5xx.
+        if (first.error && isRetryableStreamError(first.error)) {
+          const downgradedMessages = trimMessagesByRatio(messages, model, 0.6);
+          console.warn(
+            `[Context Downgrade] retrying once with 60% budget for ${model}: ${messages.length} -> ${downgradedMessages.length} messages`
+          );
+
+          fullResponse = '';
+          fullThinking = '';
+          onMessageUpdate?.(botMsgId, '', undefined);
+
+          const second = await runAttempt(downgradedMessages, 'attempt-2');
+          if (second.completed) {
+            if (second.usage) {
+              setLastUsage({
+                prompt: second.usage.prompt_tokens || 0,
+                completion: second.usage.completion_tokens || 0,
+              });
+            }
+            const finalMsg: Message = {
+              ...botMsg,
+              content: fullResponse,
+              ...(fullThinking && { thinkingContent: fullThinking }),
+            };
+            await saveMessage(finalMsg);
+            onComplete?.(finalMsg);
+            return;
+          }
+
+          const fallbackError = second.error || first.error;
+          if (fallbackError && fallbackError.name !== 'AbortError') {
+            const errorMsg = `\n\n> ⚠️ **生成失败**: ${toFriendlyError(fallbackError)}`;
+            onError?.(botMsgId, fullResponse + errorMsg);
+          }
+          return;
+        }
+
+        // Non-retryable error.
+        if (first.error && first.error.name !== 'AbortError') {
+          const errorMsg = `\n\n> ⚠️ **生成失败**: ${toFriendlyError(first.error)}`;
+          onError?.(botMsgId, fullResponse + errorMsg);
+        }
+      } finally {
+        setIsStreaming(false);
+        abortControllerRef.current = null;
+      }
+    },
+    [isRetryableStreamError, toFriendlyError, trimMessagesByRatio]
+  );
+
   const startImageGeneration = useCallback(async (params: ImageGenerateParams) => {
     const {
       apiKey,
@@ -191,7 +294,7 @@ export function useLLMStream(): UseLLMStreamReturn {
       id: botMsgId,
       sessionId,
       role: 'assistant',
-      content: '🎨 正在调用 Gemini 2.5 绘图...',
+      content: '正在调用 Gemini 2.5 绘图...',
       timestamp: Date.now(),
       model,
     };
@@ -202,7 +305,6 @@ export function useLLMStream(): UseLLMStreamReturn {
 
     try {
       const b64Image = await generateImage(apiKey, prompt, model, attachments);
-
       const finalContent = `已为您生成图片：\n> ${prompt}`;
       const imageAttachment: Attachment = {
         id: uuidv4(),

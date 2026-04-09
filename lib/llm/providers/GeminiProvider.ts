@@ -261,7 +261,7 @@ export class GeminiProvider extends BaseProvider {
    */
   private async processStream(
     body: ReadableStream<Uint8Array>,
-    onChunk: (chunk: string) => void,
+    onChunk: (chunk: string, isThinking?: boolean) => void,
     onComplete: (usage?: UsageStats) => void
   ): Promise<void> {
     const reader = body.getReader();
@@ -301,7 +301,8 @@ export class GeminiProvider extends BaseProvider {
               const delta = json.choices?.[0]?.delta;
               const text = delta?.content || '';
               const reasoning = delta?.reasoning_content || '';
-              if (text || reasoning) onChunk(reasoning + text);
+              if (reasoning) onChunk(reasoning, true);
+              if (text) onChunk(text, false);
             } catch {
               /* Ignore parse errors */
             }
@@ -312,6 +313,31 @@ export class GeminiProvider extends BaseProvider {
         if (error.name === 'AbortError') throw readError;
         onChunk('\n\n**[网络中断]**');
         throw readError;
+      }
+    }
+
+    // Flush tail chunk in case stream doesn't end with '\n'.
+    const tail = buffer.trim();
+    if (tail.startsWith('data: ')) {
+      const dataStr = tail.replace('data: ', '').trim();
+      if (dataStr && dataStr !== '[DONE]') {
+        try {
+          const json: StreamChunkResponse = JSON.parse(dataStr);
+          if (json.usage) {
+            finalUsage = {
+              prompt_tokens: json.usage.prompt_tokens || 0,
+              completion_tokens: json.usage.completion_tokens || 0,
+              total_tokens: json.usage.total_tokens || 0,
+            };
+          }
+          const delta = json.choices?.[0]?.delta;
+          const text = delta?.content || '';
+          const reasoning = delta?.reasoning_content || '';
+          if (reasoning) onChunk(reasoning, true);
+          if (text) onChunk(text, false);
+        } catch {
+          // Ignore malformed tail chunk.
+        }
       }
     }
 
