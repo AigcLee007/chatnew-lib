@@ -197,7 +197,7 @@ export class GeminiProvider extends BaseProvider {
   /**
    * Generate image using Gemini's native API
    */
-  async generateImage(options: ImageGenerationOptions): Promise<string> {
+  async generateImage(options: ImageGenerationOptions) {
     const { apiKey, prompt, model = 'gemini-2.5-flash-image', attachments = [] } = options;
 
     try {
@@ -245,7 +245,9 @@ export class GeminiProvider extends BaseProvider {
         throw new Error('API 返回的数据格式异常，未找到图片数据');
       }
 
-      return b64Image;
+      return {
+        images: [`data:image/png;base64,${b64Image}`],
+      };
     } catch (err: unknown) {
       console.error('Image Gen Error:', err);
       throw err;

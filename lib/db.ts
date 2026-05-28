@@ -1,5 +1,5 @@
 ﻿import Dexie, { Table } from 'dexie';
-import { Message, Session, Prompt, ModelId } from '../types';
+import { DocumentChunk, DocumentStore, Message, Session, Prompt, ModelId, ResearchPlan } from '../types';
 
 const safeUuid = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -14,6 +14,9 @@ class AittcoChatDB extends Dexie {
   sessions!: Table<Session>;
   messages!: Table<Message>;
   prompts!: Table<Prompt>;
+  researchPlans!: Table<ResearchPlan>;
+  documentStores!: Table<DocumentStore>;
+  documentChunks!: Table<DocumentChunk>;
 
   constructor() {
     super('AittcoChatDB');
@@ -34,6 +37,16 @@ class AittcoChatDB extends Dexie {
       sessions: 'id, updatedAt, model',
       messages: 'id, sessionId, timestamp',
       prompts: 'id, title, createdAt',
+    });
+
+    // v4: store large parsed documents and persistent research plans outside messages
+    this.version(4).stores({
+      sessions: 'id, updatedAt, model',
+      messages: 'id, sessionId, timestamp',
+      prompts: 'id, title, createdAt',
+      researchPlans: 'id, sessionId, updatedAt',
+      documentStores: 'id, createdAt',
+      documentChunks: 'id, documentId, index',
     });
   }
 }
@@ -61,4 +74,31 @@ export const createSession = async (title: string, model: ModelId) => {
   };
   await db.sessions.add(session);
   return id;
+};
+
+export const saveResearchPlanRecord = async (plan: ResearchPlan) => {
+  await db.researchPlans.put(plan);
+};
+
+export const getResearchPlanBySession = async (sessionId: string) => {
+  return db.researchPlans.where('sessionId').equals(sessionId).first();
+};
+
+export const deleteResearchPlanBySession = async (sessionId: string) => {
+  const plans = await db.researchPlans.where('sessionId').equals(sessionId).toArray();
+  await db.researchPlans.bulkDelete(plans.map((plan) => plan.id));
+};
+
+export const saveDocumentRecord = async (doc: DocumentStore, chunks: DocumentChunk[]) => {
+  await db.transaction('rw', db.documentStores, db.documentChunks, async () => {
+    await db.documentStores.put(doc);
+    await db.documentChunks.where('documentId').equals(doc.id).delete();
+    if (chunks.length > 0) {
+      await db.documentChunks.bulkPut(chunks);
+    }
+  });
+};
+
+export const getDocumentChunks = async (documentId: string) => {
+  return db.documentChunks.where('documentId').equals(documentId).sortBy('index');
 };

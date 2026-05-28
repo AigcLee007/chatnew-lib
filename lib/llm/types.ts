@@ -3,7 +3,7 @@
  * Strategy Pattern for decoupling model implementations
  */
 
-import { Message, Attachment, ModelId } from '../../types';
+import { Message, Attachment, GptImage2Params, ImageGenerationResult, ModelId } from '../../types';
 
 // ============================================================================
 // Usage Statistics
@@ -40,6 +40,7 @@ export interface ImageGenerationOptions {
   prompt: string;
   model?: string;
   attachments?: Attachment[];
+  params?: GptImage2Params;
 }
 
 // ============================================================================
@@ -61,7 +62,7 @@ export interface ILLMProvider {
   streamChat(options: ChatOptions): Promise<void>;
   
   /** Generate image (optional - not all providers support this) */
-  generateImage?(options: ImageGenerationOptions): Promise<string>;
+  generateImage?(options: ImageGenerationOptions): Promise<ImageGenerationResult>;
 }
 
 // ============================================================================

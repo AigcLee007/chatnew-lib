@@ -1,5 +1,5 @@
 ﻿import { StateCreator } from 'zustand';
-import { ModelId, Prompt } from '../../types';
+import { ModelId, Prompt, WorkMode } from '../../types';
 
 export type Theme = 'light' | 'dark';
 
@@ -47,12 +47,14 @@ export interface SettingsSlice {
   apiKey: string;
   defaultModel: ModelId;
   userSystemPrompt: string;
+  workMode: WorkMode;
   theme: Theme;
   prompts: Prompt[];
 
   setApiKey: (key: string) => void;
   setModel: (model: ModelId) => void;
   setUserSystemPrompt: (prompt: string) => void;
+  setWorkMode: (mode: WorkMode) => void;
   toggleTheme: () => void;
   addPrompt: (prompt: Prompt) => void;
   removePrompt: (id: string) => void;
@@ -68,11 +70,16 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
           const storedModel = localStorage.getItem('aittco_model');
           if (storedModel === 'gpt-5.2-all') return 'gpt-5.4';
           if (storedModel === 'gpt-5.2-thinking') return 'gpt-5.3-codex';
+          if (storedModel === 'gemini-2.5-flash-image') return 'gpt-image-2';
           return (storedModel as ModelId) || 'gemini-3.1-flash-preview';
         })()
       : 'gemini-3.1-flash-preview',
   userSystemPrompt:
     typeof localStorage !== 'undefined' ? localStorage.getItem('aittco_system_prompt') || '' : '',
+  workMode:
+    typeof localStorage !== 'undefined'
+      ? ((localStorage.getItem('aittco_work_mode') as WorkMode) || 'chat')
+      : 'chat',
   theme:
     typeof localStorage !== 'undefined'
       ? (localStorage.getItem('aittco_theme') as Theme) || 'dark'
@@ -100,6 +107,8 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
       ? 'gpt-5.4'
       : model === ('gpt-5.2-thinking' as ModelId)
       ? 'gpt-5.3-codex'
+      : model === ('gemini-2.5-flash-image' as ModelId)
+      ? 'gpt-image-2'
       : model;
     localStorage.setItem('aittco_model', migratedModel);
     set({ defaultModel: migratedModel });
@@ -108,6 +117,11 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
   setUserSystemPrompt: (prompt) => {
     localStorage.setItem('aittco_system_prompt', prompt);
     set({ userSystemPrompt: prompt });
+  },
+
+  setWorkMode: (mode) => {
+    localStorage.setItem('aittco_work_mode', mode);
+    set({ workMode: mode });
   },
 
   toggleTheme: () =>

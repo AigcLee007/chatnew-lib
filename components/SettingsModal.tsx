@@ -41,7 +41,8 @@ const MODEL_OPTIONS: { id: ModelId; label: string; desc: string }[] = [
   { id: 'gemini-3.1-flash-preview', label: 'gemini-3.1-flash-preview', desc: '速度快，适合高频对话' },
   { id: 'gpt-5.4', label: 'Gpt-5.4', desc: '通用能力均衡' },
   { id: 'gpt-5.3-codex', label: 'Gpt-5.3-Codex', desc: '深度分析与复杂推理' },
-  { id: 'gemini-2.5-flash-image', label: 'gemini-2.5-flash-image', desc: '图像生成模型' },
+  { id: 'gpt-image-2', label: 'gpt-image-2', desc: 'OpenAI 生图模型' },
+  { id: 'claude-opus-4-6', label: 'claude-opus-4-6', desc: 'Anthropic Claude 高质量推理模型' },
 ];
 
 const PROMPT_PRESETS = [

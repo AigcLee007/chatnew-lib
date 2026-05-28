@@ -1,30 +1,35 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { db, createSession, saveMessage } from '../lib/db';
-import { processFile } from '../lib/file-processor';
+import { createSession, db, deleteResearchPlanBySession, getResearchPlanBySession, saveMessage, saveResearchPlanRecord } from '../lib/db';
+import { parseAttachmentWithMinerU, prepareAttachmentForPromptAsync, processFile } from '../lib/file-processor';
+import { advanceResearchPlan, buildModeSystemPrompt, createDefaultResearchPlan, shouldRegenerateDefaultResearchPlan } from '../lib/skill-prompts';
 import { countTokens } from '../lib/token';
-import { Message, ModelId } from '../types';
+import { Attachment, GptImage2Params, Message, ModelId, ResearchPlan, WorkMode } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useChatSession, useLLMStream } from '../hooks';
-import { 
-  Send, 
-  Paperclip, 
+import {
+  Send,
+  Paperclip,
   FileText,
   FileSpreadsheet,
   FileImage,
-  Moon, 
-  Sun, 
-  Sidebar as SidebarIcon, 
-  ChevronUp, 
-  AlertCircle, 
-  Square as SquareIcon, 
-  CheckSquare, 
+  Moon,
+  Sun,
+  Sidebar as SidebarIcon,
+  ChevronUp,
+  AlertCircle,
+  Square as SquareIcon,
+  CheckSquare,
   Globe,
   X,
   Search,
   ChevronDown,
-  Sparkles
+  BookOpen,
+  ClipboardList,
+  Palette,
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { NoticePopover } from './NoticePopover';
@@ -39,37 +44,96 @@ const safeUuid = (): string => {
   });
 };
 
+const isImageGenerationModel = (model: ModelId): boolean => model === 'gpt-image-2';
+const GPT_IMAGE2_IMAGE_LIMIT = 16;
+const DEFAULT_GPT_IMAGE2_PARAMS: GptImage2Params = {
+  size: 'auto',
+  aspectRatio: 'auto',
+  quality: 'auto',
+  outputFormat: 'png',
+  outputCompression: null,
+  moderation: 'auto',
+  n: 1,
+};
+
 export const ChatInterface: React.FC = () => {
   const store = useStore();
   const modelMenuRef = useRef<HTMLDivElement>(null);
-  
+
   // --- 浣跨敤鑷畾涔?Hooks ---
-  const { 
-    messages, 
-    setMessages, 
-    addMessage, 
-    updateMessageContent, 
+  const {
+    messages,
+    setMessages,
+    addMessage,
+    updateMessageContent,
     clearMessagesAfter,
-    prevMessagesLengthRef 
+    prevMessagesLengthRef
   } = useChatSession();
-  
-  const { 
-    isStreaming, 
-    lastUsage, 
-    startStream, 
-    startImageGeneration, 
-    stopStream 
+
+  const {
+    isStreaming,
+    lastUsage,
+    startStream,
+    startImageGeneration,
+    stopStream
   } = useLLMStream();
 
   // --- UI State ---
   const [showModelMenu, setShowModelMenu] = useState(false);
+  const [showModeGuide, setShowModeGuide] = useState(false);
   const [modelQuery, setModelQuery] = useState('');
+  const [researchPlan, setResearchPlan] = useState<ResearchPlan | null>(null);
+  const [gptImage2Params, setGptImage2Params] = useState<GptImage2Params>(DEFAULT_GPT_IMAGE2_PARAMS);
 
   // --- Refs ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const imagePromptRef = useRef<HTMLDivElement>(null);
+  const modeGuideRef = useRef<HTMLDivElement>(null);
   const sendLockRef = useRef(false);
+
+  const saveResearchPlan = async (plan: ResearchPlan | null) => {
+    setResearchPlan(plan);
+    if (!plan) return;
+    await saveResearchPlanRecord(plan);
+  };
+
+  useEffect(() => {
+    if (!store.currentSessionId) {
+      setResearchPlan(null);
+      return;
+    }
+
+    let cancelled = false;
+    getResearchPlanBySession(store.currentSessionId).then((plan) => {
+      if (cancelled) return;
+      if (plan && shouldRegenerateDefaultResearchPlan(plan, plan.goal)) {
+        const migratedPlan = createDefaultResearchPlan(store.currentSessionId!, plan.goal || '计划任务');
+        setResearchPlan(migratedPlan);
+        saveResearchPlanRecord(migratedPlan);
+        return;
+      }
+      setResearchPlan(plan || null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [store.currentSessionId]);
+
+  useEffect(() => {
+    if (isImageGenerationModel(store.defaultModel)) {
+      syncImagePromptDom(store.input);
+      resetImagePromptHeight();
+      return;
+    }
+    setGptImage2Params(DEFAULT_GPT_IMAGE2_PARAMS);
+  }, [store.defaultModel]);
+
+  useEffect(() => {
+    if (!isImageGenerationModel(store.defaultModel)) return;
+    syncImagePromptDom(store.input);
+  }, [store.input, store.defaultModel]);
 
   const estimateMessageTokens = (msg: Message): number => {
     const contentTokens = countTokens(msg.content || '');
@@ -87,8 +151,11 @@ export const ChatInterface: React.FC = () => {
     // preserving as much history as possible.
     const GPT_CONTEXT_LIMIT = 1_050_000;
     const GEMINI_CONTEXT_LIMIT = 1_000_000;
+    const CLAUDE_CONTEXT_LIMIT = 200_000;
     const SAFETY_RATIO = 0.75;
-    const TOKEN_BUDGET = model.includes('gpt')
+    const TOKEN_BUDGET = model.includes('claude')
+      ? Math.floor(CLAUDE_CONTEXT_LIMIT * SAFETY_RATIO)
+      : model.includes('gpt')
       ? Math.floor(GPT_CONTEXT_LIMIT * SAFETY_RATIO)   // 787,500
       : Math.floor(GEMINI_CONTEXT_LIMIT * SAFETY_RATIO); // 750,000
     const MAX_MESSAGES = 80;
@@ -118,6 +185,24 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const resetImagePromptHeight = () => {
+    if (imagePromptRef.current) {
+      imagePromptRef.current.style.height = '68px';
+      imagePromptRef.current.style.overflowY = 'auto';
+    }
+  };
+
+  const syncImagePromptDom = (value: string) => {
+    if (!imagePromptRef.current) return;
+    if (imagePromptRef.current.innerText !== value) {
+      imagePromptRef.current.innerText = value;
+    }
+  };
+
+  const updateGptImage2Param = <K extends keyof GptImage2Params>(key: K, value: GptImage2Params[K]) => {
+    setGptImage2Params((prev) => ({ ...prev, [key]: value }));
+  };
+
   // --- Token 浼扮畻 ---
   const activeAttachments = store.attachments.filter(a => a.included !== false);
   const fileTokens = activeAttachments.reduce((acc, att) => acc + (att.tokenCount || 0), 0);
@@ -143,6 +228,17 @@ export const ChatInterface: React.FC = () => {
     if (showModelMenu) document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showModelMenu]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!modeGuideRef.current) return;
+      if (!modeGuideRef.current.contains(event.target as Node)) {
+        setShowModeGuide(false);
+      }
+    };
+    if (showModeGuide) document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showModeGuide]);
 
   // 鏅鸿兘婊氬姩閫昏緫 - 绉诲姩绔櫧灞忎慨澶嶆牳蹇冿細浣跨敤 behavior: 'auto'
   useEffect(() => {
@@ -170,19 +266,19 @@ export const ChatInterface: React.FC = () => {
 
   const handleEditMessage = async (msgId: string, newContent: string) => {
     if (isStreaming) return;
-    
+
     const msgIndex = messages.findIndex(m => m.id === msgId);
     if (msgIndex === -1) return;
-    
+
     const history = await clearMessagesAfter(msgId);
     const oldMsg = messages[msgIndex];
-    
+
     const newUserMsg: Message = {
       ...oldMsg,
       content: newContent,
       timestamp: Date.now()
     };
-    
+
     await addMessage(newUserMsg);
 
     const contextMessages = buildContextWindow([...history, newUserMsg], store.defaultModel);
@@ -203,10 +299,10 @@ export const ChatInterface: React.FC = () => {
 
   const handleRegenerate = async (msgId: string) => {
     if (isStreaming) return;
-    
+
     const msgIndex = messages.findIndex(m => m.id === msgId);
     if (msgIndex === -1) return;
-    
+
     const targetMsg = messages[msgIndex];
     if (targetMsg.role !== 'assistant') return;
 
@@ -236,10 +332,10 @@ export const ChatInterface: React.FC = () => {
 
   const handleContinue = async (msgId: string) => {
     if (isStreaming) return;
-    
+
     const msgIndex = messages.findIndex(m => m.id === msgId);
     if (msgIndex === -1) return;
-    
+
     const targetMsg = messages[msgIndex];
     if (targetMsg.role !== 'assistant') return;
 
@@ -265,13 +361,58 @@ export const ChatInterface: React.FC = () => {
     });
   };
 
+  const prepareAttachmentsForModel = async (
+    attachments: Attachment[],
+    model: ModelId,
+    query: string
+  ): Promise<Attachment[]> => {
+    const converted: Attachment[] = [];
+    for (const att of attachments) {
+      if (att.type === 'image' && model.includes('gpt')) {
+        converted.push(await prepareAttachmentForPromptAsync(await parseAttachmentWithMinerU(att), query));
+        continue;
+      }
+
+      converted.push(await prepareAttachmentForPromptAsync(att, query));
+    }
+
+    return converted;
+  };
+
+  const prepareMessagesForModel = async (
+    sourceMessages: Message[],
+    model: ModelId,
+    query: string
+  ): Promise<Message[]> => {
+    if (isImageGenerationModel(model)) return sourceMessages;
+
+    const prepared: Message[] = [];
+    for (const msg of sourceMessages) {
+      if (!msg.attachments?.length) {
+        prepared.push(msg);
+        continue;
+      }
+
+      prepared.push({
+        ...msg,
+        attachments: await prepareAttachmentsForModel(msg.attachments, model, query),
+      });
+    }
+
+    return prepared;
+  };
 
   const handleSend = async () => {
     if (sendLockRef.current) return;
     sendLockRef.current = true;
     try {
       const activeAttachments = store.attachments.filter(a => a.included !== false);
-      if ((!store.input.trim() && activeAttachments.length === 0) || isStreaming) return;
+      if (isStreaming) return;
+      if (isImageGenerationModel(store.defaultModel)) {
+        if (!store.input.trim()) return;
+      } else if (!store.input.trim() && activeAttachments.length === 0) {
+        return;
+      }
 
       if (!store.apiKey || !store.apiKey.startsWith('sk-')) {
         const shouldOpen = confirm("⚠️ 未配置有效的 API Key。\n\n需要先配置 Key 才能开始对话。是否立即前往设置？");
@@ -300,6 +441,15 @@ export const ChatInterface: React.FC = () => {
         sessionId = await createSession(title, store.defaultModel);
       }
 
+      let planForPrompt = researchPlan;
+      if (store.workMode === 'planning' && sessionId && (!planForPrompt || shouldRegenerateDefaultResearchPlan(planForPrompt, store.input))) {
+        planForPrompt = createDefaultResearchPlan(sessionId, store.input || planForPrompt?.goal || '计划任务');
+        await saveResearchPlan(planForPrompt);
+      }
+
+      const modePrompt = buildModeSystemPrompt(store.workMode, planForPrompt);
+      const combinedSystemPrompt = [store.userSystemPrompt, modePrompt].filter(Boolean).join('\n\n');
+
       const userMsg: Message = {
         id: safeUuid(),
         sessionId,
@@ -310,13 +460,13 @@ export const ChatInterface: React.FC = () => {
       };
 
       if (isNewSession) {
-        if (store.defaultModel === 'gemini-2.5-flash-image') {
+        if (isImageGenerationModel(store.defaultModel)) {
           const botMsgId = safeUuid();
           const botMsg: Message = {
             id: botMsgId,
             sessionId,
             role: 'assistant',
-            content: '正在调用 Gemini 2.5 绘图...',
+            content: store.defaultModel === 'gpt-image-2' ? '正在调用 GPT-Image-2 生图...' : '正在调用图像模型...',
             timestamp: Date.now() + 1,
             model: store.defaultModel
           };
@@ -328,12 +478,15 @@ export const ChatInterface: React.FC = () => {
           store.setInput('');
           store.clearAttachments();
           resetTextareaHeight();
+          syncImagePromptDom('');
+          resetImagePromptHeight();
 
           await startImageGeneration({
             apiKey: store.apiKey,
             model: store.defaultModel,
             prompt: userMsg.content,
             attachments: userMsg.attachments || [],
+            params: { ...gptImage2Params, n: 1 },
             sessionId,
             existingMsgId: botMsgId,
             onComplete: (msg) => setMessages(prev => prev.map(m => m.id === msg.id ? msg : m)),
@@ -362,14 +515,17 @@ export const ChatInterface: React.FC = () => {
 
         const safeHistory = isNewSession ? [] : messages;
 
-        const contextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+        const rawContextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+        store.setLoading(true);
+        const contextMessages = await prepareMessagesForModel(rawContextMessages, store.defaultModel, store.input);
+        store.setLoading(false);
 
         await startStream({
           apiKey: store.apiKey,
           model: store.defaultModel,
           messages: contextMessages,
-          attachments: userMsg.attachments || [],
-          userSystemPrompt: store.userSystemPrompt,
+          attachments: contextMessages[contextMessages.length - 1]?.attachments || [],
+          userSystemPrompt: combinedSystemPrompt,
           sessionId,
           existingMsgId: botMsgId,
           isWebSearchEnabled: store.isWebSearchEnabled,
@@ -379,18 +535,24 @@ export const ChatInterface: React.FC = () => {
           onMessageUpdate: updateMessageContent,
           onError: (id, content) => updateMessageContent(id, content),
         });
+        if (store.workMode === 'planning' && planForPrompt) {
+          await saveResearchPlan(advanceResearchPlan(planForPrompt));
+        }
       } else {
         await addMessage(userMsg);
         store.setInput('');
         store.clearAttachments();
         resetTextareaHeight();
+        syncImagePromptDom('');
+        resetImagePromptHeight();
 
-        if (store.defaultModel === 'gemini-2.5-flash-image') {
+        if (isImageGenerationModel(store.defaultModel)) {
           await startImageGeneration({
             apiKey: store.apiKey,
             model: store.defaultModel,
             prompt: userMsg.content,
             attachments: userMsg.attachments || [],
+            params: { ...gptImage2Params, n: 1 },
             sessionId,
             onMessageCreated: (msg) => setMessages(prev => [...prev, msg]),
             onComplete: (msg) => setMessages(prev => prev.map(m => m.id === msg.id ? msg : m)),
@@ -401,20 +563,26 @@ export const ChatInterface: React.FC = () => {
 
         const safeHistory = isNewSession ? [] : messages;
 
-        const contextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+        const rawContextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+        store.setLoading(true);
+        const contextMessages = await prepareMessagesForModel(rawContextMessages, store.defaultModel, store.input);
+        store.setLoading(false);
 
         await startStream({
           apiKey: store.apiKey,
           model: store.defaultModel,
           messages: contextMessages,
-          attachments: userMsg.attachments || [],
-          userSystemPrompt: store.userSystemPrompt,
+          attachments: contextMessages[contextMessages.length - 1]?.attachments || [],
+          userSystemPrompt: combinedSystemPrompt,
           sessionId,
           isWebSearchEnabled: store.isWebSearchEnabled,
           onMessageCreated: (msg) => setMessages(prev => [...prev, msg]),
           onMessageUpdate: updateMessageContent,
           onError: (id, content) => updateMessageContent(id, content),
         });
+        if (store.workMode === 'planning' && planForPrompt) {
+          await saveResearchPlan(advanceResearchPlan(planForPrompt));
+        }
       }
     } catch (error: unknown) {
       const err = error as Error;
@@ -431,6 +599,14 @@ export const ChatInterface: React.FC = () => {
       store.setLoading(true);
       for (const file of Array.from(e.target.files) as File[]) {
         try {
+          if (isImageGenerationModel(store.defaultModel)) {
+            if (!file.type.startsWith('image/')) {
+              throw new Error('GPT-Image-2 仅支持上传图片作为参考图。');
+            }
+            if (store.attachments.length >= GPT_IMAGE2_IMAGE_LIMIT) {
+              throw new Error(`最多只能添加 ${GPT_IMAGE2_IMAGE_LIMIT} 张参考图。`);
+            }
+          }
           const att = await processFile(file);
           store.addAttachment(att);
         } catch (err: unknown) {
@@ -456,6 +632,9 @@ export const ChatInterface: React.FC = () => {
         if (file) {
           store.setLoading(true);
           try {
+            if (isImageGenerationModel(store.defaultModel) && store.attachments.length >= GPT_IMAGE2_IMAGE_LIMIT) {
+              throw new Error(`最多只能添加 ${GPT_IMAGE2_IMAGE_LIMIT} 张参考图。`);
+            }
             const att = await processFile(file);
             store.addAttachment(att);
           } catch (err: unknown) {
@@ -472,11 +651,17 @@ export const ChatInterface: React.FC = () => {
 
   const handleModelSelect = (e: React.MouseEvent, modelId: ModelId) => {
     e.stopPropagation();
+    const switchingImageMode = isImageGenerationModel(modelId) !== isImageGenerationModel(store.defaultModel);
     store.setModel(modelId);
+    if (switchingImageMode) {
+      store.clearAttachments();
+    }
     setShowModelMenu(false);
   };
 
-  const ModelLogo: React.FC<{ provider: 'GEMINI' | 'OPENAI'; className?: string }> = ({ provider, className }) => {
+  type ModelProvider = 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+
+  const ModelLogo: React.FC<{ provider: ModelProvider; className?: string }> = ({ provider, className }) => {
     if (provider === 'GEMINI') {
       return (
         <svg className={className} viewBox="0 0 28 28" fill="none" aria-hidden="true">
@@ -494,6 +679,11 @@ export const ChatInterface: React.FC = () => {
         </svg>
       );
     }
+    if (provider === 'ANTHROPIC') {
+      return (
+        <img src="/logo/claude-ai-icon.svg" alt="" className={className} aria-hidden="true" />
+      );
+    }
     return (
       <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path
@@ -508,7 +698,7 @@ export const ChatInterface: React.FC = () => {
     id: ModelId;
     name: string;
     desc: string;
-    provider: 'GEMINI' | 'OPENAI';
+    provider: ModelProvider;
   }> = [
     {
       id: 'gemini-3.1-flash-preview',
@@ -523,12 +713,6 @@ export const ChatInterface: React.FC = () => {
       provider: 'GEMINI',
     },
     {
-      id: 'gemini-2.5-flash-image',
-      name: 'Nano banana（绘图）',
-      desc: 'Gemini 2.5 Flash Image：图像理解与生图能力。',
-      provider: 'GEMINI',
-    },
-    {
       id: 'gpt-5.4',
       name: 'Gpt-5.4',
       desc: 'GPT-5.4：新一代通用高性能模型，代码、推理、写作均衡。',
@@ -539,6 +723,18 @@ export const ChatInterface: React.FC = () => {
       name: 'Gpt-5.3-Codex',
       desc: 'GPT-5.3 Codex：偏向工程实现与代码生成。',
       provider: 'OPENAI',
+    },
+    {
+      id: 'gpt-image-2',
+      name: 'GPT-Image-2（生图）',
+      desc: 'OpenAI GPT-Image-2：用于文本生成图片，默认 1:1 PNG 输出。',
+      provider: 'OPENAI',
+    },
+    {
+      id: 'claude-opus-4-6',
+      name: 'Claude Opus 4.6',
+      desc: 'Anthropic Claude Opus 4.6：高质量推理、写作与复杂分析。',
+      provider: 'ANTHROPIC',
     },
   ];
 
@@ -551,7 +747,69 @@ export const ChatInterface: React.FC = () => {
   const groupedModels = {
     GEMINI: filteredModels.filter((m) => m.provider === 'GEMINI'),
     OPENAI: filteredModels.filter((m) => m.provider === 'OPENAI'),
+    ANTHROPIC: filteredModels.filter((m) => m.provider === 'ANTHROPIC'),
   };
+  const modeOptions: Array<{
+    id: WorkMode;
+    label: string;
+    icon: React.ReactNode;
+    title: string;
+    when: string;
+    example: string;
+  }> = [
+    {
+      id: 'chat',
+      label: '普通',
+      icon: <MessageSquare size={13} />,
+      title: '普通对话模式',
+      when: '日常问答、翻译、写作、总结、代码解释。',
+      example: '例：把这段话改得更正式。',
+    },
+    {
+      id: 'research',
+      label: '科研',
+      icon: <BookOpen size={13} />,
+      title: '科研论文分析模式',
+      when: '读论文、看PDF、找创新点、方法、实验、局限。',
+      example: '例：总结这篇论文的方法和不足。',
+    },
+    {
+      id: 'planning',
+      label: '计划',
+      icon: <ClipboardList size={13} />,
+      title: '长任务计划模式',
+      when: '拆解课题、阅读计划、项目路线、阶段任务推进。',
+      example: '例：给我做一个两周论文阅读计划。',
+    },
+    {
+      id: 'uiux',
+      label: 'UI/UX',
+      icon: <Palette size={13} />,
+      title: 'UI/UX 设计评审模式',
+      when: '分析页面、交互流程、按钮文案、产品体验。',
+      example: '例：帮我优化上传文件后的用户体验。',
+    },
+  ];
+  const isImageMode = isImageGenerationModel(store.defaultModel);
+  const imageAttachCount = store.attachments.filter((att) => att.type === 'image').length;
+  const imageModeSendDisabled = !store.input.trim() || store.isLoading;
+  const imageSizeOptions: Array<{ value: GptImage2Params['size']; label: string }> = [
+    { value: 'auto', label: 'auto' },
+    { value: '1k', label: '1K' },
+    { value: '2k', label: '2K' },
+    { value: '4k', label: '4K' },
+  ];
+  const imageRatioOptions: Array<{ value: GptImage2Params['aspectRatio']; label: string }> = [
+    { value: 'auto', label: 'auto' },
+    { value: '1:1', label: '1:1' },
+    { value: '16:9', label: '16:9' },
+    { value: '9:16', label: '9:16' },
+    { value: '4:3', label: '4:3' },
+    { value: '3:4', label: '3:4' },
+    { value: '3:2', label: '3:2' },
+    { value: '2:3', label: '2:3' },
+    { value: '21:9', label: '21:9' },
+  ];
 
   // --- Render ---
   return (
@@ -602,7 +860,7 @@ export const ChatInterface: React.FC = () => {
                 </div>
 
                 <div className="max-h-[420px] overflow-y-auto p-2">
-                  {(['GEMINI', 'OPENAI'] as const).map((provider) => (
+                  {(['GEMINI', 'OPENAI', 'ANTHROPIC'] as const).map((provider) => (
                     <div key={provider} className="mb-2 last:mb-0">
                       <div className="px-2 py-1 text-[10px] tracking-[0.18em] text-muted-foreground/80 font-semibold">
                         {provider}
@@ -642,18 +900,8 @@ export const ChatInterface: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 ml-auto pointer-events-auto">
-          <a
-            href="https://math.aittco.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-10 px-3 rounded-xl border border-emerald-500/25 bg-card/90 backdrop-blur-md flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
-            title="新版全能网站"
-          >
-            <Sparkles size={14} />
-            <span>新版全能网站</span>
-          </a>
           <NoticePopover />
-          <button 
+          <button
             onClick={store.toggleTheme}
             className="p-2.5 rounded-xl bg-card md:bg-card/50 md:backdrop-blur-xl border border-border/40 text-foreground hover:bg-muted/80 transition-all shadow-sm active:scale-95 group"
             title="切换主题"
@@ -678,7 +926,7 @@ export const ChatInterface: React.FC = () => {
                 {store.defaultModel.includes('gpt') ? (
                   // OpenAI GPT Logo - 鑺辩摚褰㈢姸
                   <svg className="w-16 h-16 md:w-20 md:h-20" viewBox="0 0 24 24" fill="none">
-                    <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z" 
+                    <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"
                       className="fill-foreground"
                     />
                   </svg>
@@ -698,7 +946,7 @@ export const ChatInterface: React.FC = () => {
                   </svg>
                 )}
               </div>
-              
+
               {/* Google-style Greeting */}
               <div className="space-y-3">
                 <h1 className="text-3xl md:text-5xl font-normal tracking-tight">
@@ -739,9 +987,9 @@ export const ChatInterface: React.FC = () => {
                     </div>
                   }
                 >
-                  <MessageBubble 
-                    message={msg} 
-                    isStreaming={isStreaming && index === messages.length - 1} 
+                  <MessageBubble
+                    message={msg}
+                    isStreaming={isStreaming && index === messages.length - 1}
                     onRegenerate={handleRegenerate}
                     onEdit={handleEditMessage}
                     onContinue={handleContinue}
@@ -755,7 +1003,125 @@ export const ChatInterface: React.FC = () => {
 
       {/* Input Area - 绉诲姩绔娇鐢ㄤ笉閫忔槑鑳屾櫙閬垮厤 GPU 娓叉煋闂 */}
       <div className="absolute bottom-0 left-0 right-0 p-2 md:p-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-background md:bg-gradient-to-t md:from-background md:via-background/90 md:to-transparent z-10 pointer-events-none transition-all duration-300">
-        <div className="max-w-3xl mx-auto pointer-events-auto relative">
+        <div className={`${isImageMode ? 'max-w-[1120px]' : 'max-w-3xl'} mx-auto pointer-events-auto relative`}>
+          {!isImageMode && (
+          <div ref={modeGuideRef} className="relative mb-2 px-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pr-9">
+              {modeOptions.map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => {
+                    store.setWorkMode(mode.id);
+                    setShowModeGuide(false);
+                  }}
+                  className={`h-8 px-3 rounded-full border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors ${
+                    store.workMode === mode.id
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border/60 bg-card/80 text-muted-foreground hover:text-foreground hover:bg-muted/70'
+                  }`}
+                  title={mode.title}
+                >
+                  {mode.icon}
+                  <span>{mode.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowModeGuide((prev) => !prev);
+              }}
+              className={`absolute right-1 top-0 h-8 w-8 rounded-full border flex items-center justify-center transition-colors ${
+                showModeGuide
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-border/60 bg-card/90 text-muted-foreground hover:text-foreground hover:bg-muted/70'
+              }`}
+              title="查看模式说明"
+              aria-label="查看模式说明"
+              aria-expanded={showModeGuide}
+            >
+              <HelpCircle size={15} />
+            </button>
+
+            {showModeGuide && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute bottom-10 left-0 right-0 z-30 rounded-xl border border-border/70 bg-popover/95 backdrop-blur-md shadow-2xl overflow-hidden"
+              >
+                <div className="px-3 py-2 border-b border-border/70 flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-foreground">模式怎么选</div>
+                  <button
+                    type="button"
+                    onClick={() => setShowModeGuide(false)}
+                    className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    title="关闭"
+                    aria-label="关闭模式说明"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 max-h-[52vh] overflow-y-auto custom-scrollbar">
+                  {modeOptions.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        store.setWorkMode(mode.id);
+                        setShowModeGuide(false);
+                      }}
+                      className={`text-left rounded-lg border p-3 transition-colors ${
+                        store.workMode === mode.id
+                          ? 'border-primary/50 bg-primary/10'
+                          : 'border-border/50 bg-card/70 hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <span className="text-primary">{mode.icon}</span>
+                        <span>{mode.label}</span>
+                      </div>
+                      <div className="mt-1.5 text-xs leading-5 text-muted-foreground">{mode.when}</div>
+                      <div className="mt-1 text-xs leading-5 text-foreground/80">{mode.example}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          )}
+
+          {!isImageMode && store.workMode === 'planning' && researchPlan && (
+            <div className="mb-2 rounded-xl border border-border/60 bg-card/90 backdrop-blur-md p-3 shadow-lg">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <ClipboardList size={15} />
+                  <span className="truncate">{researchPlan.title}</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    await deleteResearchPlanBySession(researchPlan.sessionId);
+                    setResearchPlan(null);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  重置
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                {researchPlan.steps.map((step, index) => (
+                  <div key={step.id} className="flex items-center gap-2 text-xs min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      step.status === 'done' ? 'bg-emerald-500' : step.status === 'active' ? 'bg-blue-500' : 'bg-muted-foreground/30'
+                    }`} />
+                    <span className={step.status === 'done' ? 'text-muted-foreground line-through truncate' : 'text-foreground/85 truncate'}>
+                      {index + 1}. {step.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 闄勪欢灞曠ず鍒楄〃 */}
           {store.attachments.length > 0 && (
@@ -768,7 +1134,7 @@ export const ChatInterface: React.FC = () => {
                   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return <FileImage size={24} className="text-purple-500" />;
                   return <FileText size={24} className="text-blue-500" />;
                 };
-                
+
                 return (
                   <div key={att.id} className={`relative group w-16 h-16 rounded-lg overflow-hidden border shrink-0 transition-all ${att.included !== false ? 'border-primary/40 shadow-md' : 'border-border/50 opacity-50'}`}>
                     {isImage && att.content ? (
@@ -793,105 +1159,195 @@ export const ChatInterface: React.FC = () => {
                         {att.tokenCount > 1000 ? `${(att.tokenCount/1000).toFixed(1)}k` : att.tokenCount}
                       </div>
                     )}
+                    {(att.chunkCount || att.chunks?.length) && (
+                      <div className="absolute top-0.5 right-0.5 text-[6px] font-mono text-white bg-blue-600/80 px-0.5 py-0.5 rounded" title={`已解析为 ${att.chunkCount || att.chunks?.length} 个片段`}>
+                        {att.chunkCount || att.chunks?.length}段
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* 杈撳叆妗嗕富瀹瑰櫒 */}
-          <div className="relative flex items-end gap-1 md:gap-2 bg-muted md:bg-muted/40 md:backdrop-blur-xl border border-border/60 rounded-[20px] md:rounded-[24px] p-1.5 md:p-2 shadow-2xl shadow-black/10 focus-within:ring-2 focus-within:ring-primary/20 focus-within:bg-muted transition-all duration-300">
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} multiple />
-            
-            <button onClick={() => fileInputRef.current?.click()} disabled={store.isLoading} className={`p-2 md:p-3 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors shrink-0 ${store.isLoading ? 'animate-pulse opacity-50 cursor-wait' : ''}`} title="上传文件">
-              {store.isLoading ? <AlertCircle size={16} className="md:w-[18px] md:h-[18px] animate-spin" /> : <Paperclip size={16} className="md:w-[18px] md:h-[18px]" strokeWidth={2} />}
-            </button>
+          {isImageMode ? (
+            <div className="rounded-[28px] border border-border/70 bg-card/95 shadow-2xl shadow-black/10 backdrop-blur-xl p-3 md:p-4">
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} multiple accept="image/*" />
+              <div
+                ref={imagePromptRef}
+                contentEditable={!store.isLoading && !isStreaming}
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                data-placeholder="描述你想生成的图片，可上传参考图进行改图或风格控制..."
+                className="min-h-[68px] max-h-[220px] overflow-y-auto rounded-[24px] border border-border/60 bg-background/90 px-5 py-4 text-[16px] leading-7 text-foreground outline-none transition placeholder:text-muted-foreground/40 empty:before:text-muted-foreground/40 empty:before:content-[attr(data-placeholder)] focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                onInput={(e) => {
+                  const target = e.currentTarget;
+                  const normalizedText = target.innerText.replace(/\n{3,}/g, '\n\n').trimEnd();
+                  if (!normalizedText) {
+                    target.innerHTML = '';
+                  }
+                  store.setInput(normalizedText);
+                  target.style.height = '68px';
+                  target.style.height = `${Math.min(target.scrollHeight, 220)}px`;
+                }}
+                onPaste={handlePaste}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
 
-            {/* 鑱旂綉鎸夐挳浠呭湪 Gemini 鍘熺敓妯″瀷鏃舵樉绀猴紙鎺掗櫎 nano-banana 鐢诲浘妯″瀷锛?*/}
-            {(store.defaultModel === 'gemini-3.1-pro-preview' || 
-              store.defaultModel === 'gemini-3.1-flash-preview') && (
-              <button
-                onClick={(e) => { e.stopPropagation(); store.toggleWebSearch(); }}
-                className={`p-2 md:p-3 rounded-full transition-colors shrink-0 ${store.isWebSearchEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
-                title={store.isWebSearchEnabled ? '已开启联网搜索' : '点击开启联网搜索'}
-              >
-                <Globe size={16} className="md:w-[18px] md:h-[18px]" />
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-600 dark:text-amber-300">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>生图时间较长，通常需要 1-2 分钟，请耐心等待，生成中不要重复点击。</span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-[repeat(6,minmax(0,1fr))_120px]">
+                <label className="flex flex-col gap-1.5">
+                  <span className="px-2 text-xs font-medium text-muted-foreground">尺寸</span>
+                  <select value={gptImage2Params.size} onChange={(e) => updateGptImage2Param('size', e.target.value as GptImage2Params['size'])} className="h-11 rounded-2xl border border-border/70 bg-background px-4 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10">
+                    {imageSizeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="px-2 text-xs font-medium text-muted-foreground">画幅</span>
+                  <select value={gptImage2Params.aspectRatio} onChange={(e) => updateGptImage2Param('aspectRatio', e.target.value as GptImage2Params['aspectRatio'])} className="h-11 rounded-2xl border border-border/70 bg-background px-4 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10">
+                    {imageRatioOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="px-2 text-xs font-medium text-muted-foreground">质量</span>
+                  <select value={gptImage2Params.quality} onChange={(e) => updateGptImage2Param('quality', e.target.value as GptImage2Params['quality'])} className="h-11 rounded-2xl border border-border/70 bg-background px-4 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10">
+                    <option value="auto">auto</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="px-2 text-xs font-medium text-muted-foreground">格式</span>
+                  <select value={gptImage2Params.outputFormat} onChange={(e) => updateGptImage2Param('outputFormat', e.target.value as GptImage2Params['outputFormat'])} className="h-11 rounded-2xl border border-border/70 bg-background px-4 text-sm uppercase outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10">
+                    <option value="png">PNG</option>
+                    <option value="jpeg">JPEG</option>
+                    <option value="webp">WEBP</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="px-2 text-xs font-medium text-muted-foreground">压缩率</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    placeholder="0-100"
+                    value={gptImage2Params.outputCompression ?? ''}
+                    disabled={gptImage2Params.outputFormat === 'png'}
+                    onChange={(e) => updateGptImage2Param('outputCompression', e.target.value === '' ? null : Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                    className="h-11 rounded-2xl border border-border/70 bg-background px-4 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground/50"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="px-2 text-xs font-medium text-muted-foreground">审核</span>
+                  <select value={gptImage2Params.moderation} onChange={(e) => updateGptImage2Param('moderation', e.target.value as GptImage2Params['moderation'])} className="h-11 rounded-2xl border border-border/70 bg-background px-4 text-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10">
+                    <option value="auto">auto</option>
+                    <option value="low">low</option>
+                  </select>
+                </label>
+                <div className="mt-auto flex gap-2">
+                  <button onClick={() => fileInputRef.current?.click()} disabled={store.isLoading || imageAttachCount >= GPT_IMAGE2_IMAGE_LIMIT} className="h-11 w-14 rounded-2xl border border-border/70 bg-background text-muted-foreground transition hover:text-foreground hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50" title={`上传参考图（最多 ${GPT_IMAGE2_IMAGE_LIMIT} 张）`}>
+                    {store.isLoading ? <AlertCircle size={18} className="mx-auto animate-spin" /> : <Paperclip size={18} className="mx-auto" strokeWidth={2} />}
+                  </button>
+                  {isStreaming ? (
+                    <button onClick={handleStop} className="h-11 flex-1 rounded-2xl bg-red-500 text-white transition hover:bg-red-600" title="停止生成">
+                      <SquareIcon size={14} className="mx-auto" fill="currentColor" />
+                    </button>
+                  ) : (
+                    <button onClick={handleSend} disabled={imageModeSendDisabled} className={`h-11 flex-1 rounded-2xl transition ${imageModeSendDisabled ? 'bg-muted text-muted-foreground/50 cursor-not-allowed' : 'bg-foreground text-background hover:opacity-90'}`} title="生成图片">
+                      <Send size={18} className="mx-auto" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative flex items-end gap-1 md:gap-2 bg-muted md:bg-muted/40 md:backdrop-blur-xl border border-border/60 rounded-[20px] md:rounded-[24px] p-1.5 md:p-2 shadow-2xl shadow-black/10 focus-within:ring-2 focus-within:ring-primary/20 focus-within:bg-muted transition-all duration-300">
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} multiple />
+
+              <button onClick={() => fileInputRef.current?.click()} disabled={store.isLoading} className={`p-2 md:p-3 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors shrink-0 ${store.isLoading ? 'animate-pulse opacity-50 cursor-wait' : ''}`} title="上传文件">
+                {store.isLoading ? <AlertCircle size={16} className="md:w-[18px] md:h-[18px] animate-spin" /> : <Paperclip size={16} className="md:w-[18px] md:h-[18px]" strokeWidth={2} />}
               </button>
-            )}
 
-            <textarea 
-              ref={textareaRef}
-              value={store.input}
-              onChange={(e) => {
-                store.setInput(e.target.value);
-                // 褰撳唴瀹硅娓呯┖鏃讹紝绔嬪嵆閲嶇疆楂樺害
-                if (!e.target.value) {
+              {(store.defaultModel === 'gemini-3.1-pro-preview' ||
+                store.defaultModel === 'gemini-3.1-flash-preview') && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); store.toggleWebSearch(); }}
+                  className={`p-2 md:p-3 rounded-full transition-colors shrink-0 ${store.isWebSearchEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                  title={store.isWebSearchEnabled ? '已开启联网搜索' : '点击开启联网搜索'}
+                >
+                  <Globe size={16} className="md:w-[18px] md:h-[18px]" />
+                </button>
+              )}
+
+              <textarea
+                ref={textareaRef}
+                value={store.input}
+                onChange={(e) => {
+                  store.setInput(e.target.value);
+                  if (!e.target.value) {
+                    const minHeight = window.innerWidth < 768 ? 40 : 44;
+                    e.target.style.height = `${minHeight}px`;
+                    e.target.style.overflowY = 'hidden';
+                  }
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onPaste={handlePaste}
+                placeholder={store.isLoading ? "正在解析文件，请稍候..." : store.workMode === 'research' ? "询问论文创新点、方法、实验、局限..." : store.workMode === 'planning' ? "描述你的研究任务或继续推进计划..." : store.workMode === 'uiux' ? "描述页面、流程或需要评审的设计..." : "在此输入内容...（可粘贴图片）"}
+                className="flex-1 bg-transparent border-none resize-none max-h-[150px] md:max-h-[200px] min-h-[40px] md:min-h-[44px] py-2.5 md:py-3 text-[14px] focus:ring-0 focus:outline-none placeholder:text-muted-foreground/40 font-sans tracking-wide transition-[height] duration-150 ease-out"
+                rows={1}
+                style={{ height: '40px', overflowY: 'hidden' }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
                   const minHeight = window.innerWidth < 768 ? 40 : 44;
-                  e.target.style.height = `${minHeight}px`;
-                  e.target.style.overflowY = 'hidden';
-                }
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              onPaste={handlePaste}
-              placeholder={store.isLoading ? "正在解析文件，请稍候..." : "在此输入内容...（可粘贴图片）"}
-              className="flex-1 bg-transparent border-none resize-none max-h-[150px] md:max-h-[200px] min-h-[40px] md:min-h-[44px] py-2.5 md:py-3 text-[14px] focus:ring-0 focus:outline-none placeholder:text-muted-foreground/40 font-sans tracking-wide transition-[height] duration-150 ease-out"
-              rows={1}
-              style={{ height: '40px', overflowY: 'hidden' }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                const minHeight = window.innerWidth < 768 ? 40 : 44;
-                const maxHeight = window.innerWidth < 768 ? 150 : 200;
-                
-                // 如果内容为空，重置为最小高度
-                if (!target.value.trim()) {
-                  target.style.height = `${minHeight}px`;
-                  target.style.overflowY = 'hidden';
-                  return;
-                }
-                
-                target.style.height = 'auto';
-                const newHeight = Math.min(Math.max(target.scrollHeight, minHeight), maxHeight);
-                target.style.height = `${newHeight}px`;
-                target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
-              }}
-            />
+                  const maxHeight = window.innerWidth < 768 ? 150 : 200;
+                  if (!target.value.trim()) {
+                    target.style.height = `${minHeight}px`;
+                    target.style.overflowY = 'hidden';
+                    return;
+                  }
+                  target.style.height = 'auto';
+                  const newHeight = Math.min(Math.max(target.scrollHeight, minHeight), maxHeight);
+                  target.style.height = `${newHeight}px`;
+                  target.style.overflowY = target.scrollHeight > maxHeight ? 'auto' : 'hidden';
+                }}
+              />
 
-            {isStreaming ? (
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleStop();
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  handleStop();
-                }}
-                className="group p-1.5 md:p-2 rounded-full transition-all duration-300 ease-in-out shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 shadow-md bg-red-500 hover:bg-red-600 text-white hover:scale-110 active:scale-95 z-50 relative touch-manipulation cursor-pointer pointer-events-auto" 
-                title="停止生成"
-              >
-                <SquareIcon size={12} className="md:w-[14px] md:h-[14px]" fill="currentColor" />
-              </button>
-            ) : (
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-                disabled={(!store.input.trim() && store.attachments.filter(a => a.included !== false).length === 0) || store.isLoading} 
-                className={`p-1.5 md:p-2 rounded-full transition-all duration-300 ease-out shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 z-50 relative touch-manipulation cursor-pointer pointer-events-auto ${(store.input.trim() || store.attachments.filter(a => a.included !== false).length > 0) ? 'bg-foreground text-background shadow-lg scale-100 hover:scale-110 active:scale-95 opacity-100' : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed scale-90 opacity-50'}`}
-              >
-                <Send size={16} className={`md:w-[18px] md:h-[18px] ${store.input.trim() ? "ml-0.5" : ""}`} />
-              </button>
-            )}
-          </div>
-          
+              {isStreaming ? (
+                <button onClick={handleStop} className="group p-1.5 md:p-2 rounded-full transition-all duration-300 ease-in-out shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 shadow-md bg-red-500 hover:bg-red-600 text-white hover:scale-110 active:scale-95 z-50 relative touch-manipulation cursor-pointer pointer-events-auto" title="停止生成">
+                  <SquareIcon size={12} className="md:w-[14px] md:h-[14px]" fill="currentColor" />
+                </button>
+              ) : (
+                <button onClick={handleSend} disabled={(!store.input.trim() && store.attachments.filter(a => a.included !== false).length === 0) || store.isLoading} className={`p-1.5 md:p-2 rounded-full transition-all duration-300 ease-out shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 z-50 relative touch-manipulation cursor-pointer pointer-events-auto ${(store.input.trim() || store.attachments.filter(a => a.included !== false).length > 0) ? 'bg-foreground text-background shadow-lg scale-100 hover:scale-110 active:scale-95 opacity-100' : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed scale-90 opacity-50'}`}>
+                  <Send size={16} className={`md:w-[18px] md:h-[18px] ${store.input.trim() ? "ml-0.5" : ""}`} />
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-start items-center mt-3 px-2">
             <div className="text-[10px] text-muted-foreground/50 font-mono flex items-center gap-2 transition-all">
-              {store.input.trim() || store.attachments.filter(a => a.included !== false).length > 0 ? (
+              {isImageMode ? (
+                <div className="flex flex-wrap items-center gap-3 text-[10px]">
+                  <span>Model: <span className="text-foreground/80">GPT-Image-2</span></span>
+                  <span className="w-px h-2.5 bg-border/50"></span>
+                  <span>Refs: <span className="text-foreground/80">{imageAttachCount}/{GPT_IMAGE2_IMAGE_LIMIT}</span></span>
+                  <span className="w-px h-2.5 bg-border/50"></span>
+                  <span>Size: <span className="text-foreground/80">{gptImage2Params.size.toUpperCase()}</span></span>
+                  <span className="w-px h-2.5 bg-border/50"></span>
+                  <span>Ratio: <span className="text-foreground/80">{gptImage2Params.aspectRatio}</span></span>
+                </div>
+              ) : store.input.trim() || store.attachments.filter(a => a.included !== false).length > 0 ? (
                 <span className="text-[10px] font-mono text-muted-foreground/80 flex flex-wrap gap-y-1">
                   <span className={historyTokens > 1000 ? "text-red-500 font-bold" : ""}>
                     History: {historyTokens.toLocaleString()}
@@ -920,7 +1376,7 @@ export const ChatInterface: React.FC = () => {
                   <span title="回答消耗（Completion Tokens）">Output: <span className="text-foreground/70">{lastUsage ? lastUsage.completion.toLocaleString() : '--'}</span></span>
                 </div>
               )}
-              {store.userSystemPrompt && !store.input.trim() && store.attachments.filter(a => a.included !== false).length === 0 && (
+              {!isImageMode && store.userSystemPrompt && !store.input.trim() && store.attachments.filter(a => a.included !== false).length === 0 && (
                 <span className="text-red-500 font-bold">系统预设已生效（约 {sysTokens.toLocaleString()} tokens）</span>
               )}
             </div>

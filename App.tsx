@@ -1,17 +1,30 @@
-
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useEffect, useRef, useState, useTransition } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
 import { NoticeModal } from './components/NoticeModal';
 import { useStore } from './store';
 
+const VERSION_STORAGE_KEY = 'aittco_app_version_seen';
+
 const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
+  const currentVersionRef = useRef<string | null>(null);
   const [, startTransition] = useTransition();
-  const { 
-    setSessionId, setInput, clearAttachments, theme, toggleSidebar, isSidebarOpen, setUserSystemPrompt,
-    fetchNotices, fetchLatestNotice, latestNotice, hasUnreadNotice, setNoticeModalOpen
+  const {
+    setSessionId,
+    setInput,
+    clearAttachments,
+    theme,
+    toggleSidebar,
+    isSidebarOpen,
+    setUserSystemPrompt,
+    fetchNotices,
+    fetchLatestNotice,
+    latestNotice,
+    hasUnreadNotice,
+    setNoticeModalOpen,
   } = useStore();
 
   const handleNewChat = () => {
@@ -31,27 +44,68 @@ const App: React.FC = () => {
     });
   };
 
-  // 关闭侧边栏（移动端用）
   const handleCloseSidebar = () => {
     if (isSidebarOpen) {
       toggleSidebar();
     }
   };
 
-  // Sync theme with DOM
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
   }, [theme]);
 
-  // Load announcements for notification center and unread badge.
   useEffect(() => {
     fetchNotices(1, '');
     fetchLatestNotice();
   }, [fetchNotices, fetchLatestNotice]);
 
-  // Poll announcements every 30s so new notices appear without page refresh.
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkVersion = async () => {
+      try {
+        const response = await fetch(`/app-version.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const remoteVersion = typeof data?.version === 'string' ? data.version : '';
+        if (!remoteVersion || cancelled) return;
+
+        const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
+        if (!currentVersionRef.current) {
+          currentVersionRef.current = remoteVersion;
+          if (storedVersion && storedVersion !== remoteVersion) {
+            setAvailableVersion(remoteVersion);
+            return;
+          }
+          localStorage.setItem(VERSION_STORAGE_KEY, remoteVersion);
+          return;
+        }
+
+        if (currentVersionRef.current !== remoteVersion) {
+          setAvailableVersion(remoteVersion);
+        }
+      } catch {
+        // Version checks are best effort and should never block the app.
+      }
+    };
+
+    checkVersion();
+    const timer = window.setInterval(checkVersion, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const handleReloadForUpdate = () => {
+    if (availableVersion) {
+      localStorage.setItem(VERSION_STORAGE_KEY, availableVersion);
+    }
+    window.location.reload();
+  };
+
   useEffect(() => {
     const poll = () => {
       fetchNotices(1, '');
@@ -62,7 +116,6 @@ const App: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [fetchNotices, fetchLatestNotice]);
 
-  // Show modal once when there is a new unread latest announcement.
   useEffect(() => {
     if (hasUnreadNotice && latestNotice) {
       setNoticeModalOpen(true, latestNotice);
@@ -71,24 +124,40 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-background text-foreground transition-colors duration-300 relative">
-      <Sidebar 
+      <Sidebar
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onCloseSidebar={handleCloseSidebar}
       />
-      
+
       <main className="flex-1 flex flex-col h-full relative z-0">
         <ChatInterface />
       </main>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
 
-      {/* 全局公告弹窗 */}
       <NoticeModal />
+
+      {availableVersion && (
+        <div className="fixed inset-x-0 bottom-5 z-[80] flex justify-center px-4 pointer-events-none">
+          <div className="pointer-events-auto flex max-w-xl items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-2xl shadow-black/20">
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-foreground">{'\u68c0\u6d4b\u5230\u65b0\u7248\u672c'}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{'\u9879\u76ee\u5df2\u66f4\u65b0\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u540e\u7ee7\u7eed\u4f7f\u7528\u3002'}</div>
+            </div>
+            <button
+              onClick={handleReloadForUpdate}
+              className="shrink-0 rounded-xl bg-foreground px-3 py-2 text-xs font-semibold text-background transition hover:opacity-90"
+            >
+              {'\u7acb\u5373\u66f4\u65b0'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

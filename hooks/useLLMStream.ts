@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useLLMStream Hook
  * Responsibilities:
  * - Stream chat responses
@@ -10,7 +10,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { streamChatCompletion, generateImage, UsageStats } from '../lib/api-client';
 import { saveMessage } from '../lib/db';
-import { Message, ModelId, Attachment } from '../types';
+import { Message, ModelId, Attachment, GptImage2Params } from '../types';
 import { countTokens } from '../lib/token';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -28,12 +28,12 @@ export interface StreamParams {
   onComplete?: (msg: Message) => void;
   onError?: (msgId: string, errorContent: string) => void;
 }
-
 export interface ImageGenerateParams {
   apiKey: string;
   model: ModelId;
   prompt: string;
   attachments: Attachment[];
+  params?: GptImage2Params;
   sessionId: string;
   existingMsgId?: string;
   onMessageCreated?: (msg: Message) => void;
@@ -88,7 +88,13 @@ export function useLLMStream(): UseLLMStreamReturn {
     (allMessages: Message[], model: ModelId, ratio: number): Message[] => {
       const GPT_CONTEXT_LIMIT = 1_050_000;
       const GEMINI_CONTEXT_LIMIT = 1_000_000;
-      const tokenBudget = Math.floor((model.includes('gpt') ? GPT_CONTEXT_LIMIT : GEMINI_CONTEXT_LIMIT) * ratio);
+      const CLAUDE_CONTEXT_LIMIT = 200_000;
+      const contextLimit = model.includes('claude')
+        ? CLAUDE_CONTEXT_LIMIT
+        : model.includes('gpt')
+        ? GPT_CONTEXT_LIMIT
+        : GEMINI_CONTEXT_LIMIT;
+      const tokenBudget = Math.floor(contextLimit * ratio);
 
       let used = 0;
       const selected: Message[] = [];
@@ -255,7 +261,7 @@ export function useLLMStream(): UseLLMStreamReturn {
 
           const fallbackError = second.error || first.error;
           if (fallbackError && fallbackError.name !== 'AbortError') {
-            const errorMsg = `\n\n> ⚠️ **生成失败**: ${toFriendlyError(fallbackError)}`;
+            const errorMsg = `\n\n> **生成失败**: ${toFriendlyError(fallbackError)}`;
             onError?.(botMsgId, fullResponse + errorMsg);
           }
           return;
@@ -263,7 +269,7 @@ export function useLLMStream(): UseLLMStreamReturn {
 
         // Non-retryable error.
         if (first.error && first.error.name !== 'AbortError') {
-          const errorMsg = `\n\n> ⚠️ **生成失败**: ${toFriendlyError(first.error)}`;
+          const errorMsg = `\n\n> **生成失败**: ${toFriendlyError(first.error)}`;
           onError?.(botMsgId, fullResponse + errorMsg);
         }
       } finally {
@@ -280,6 +286,7 @@ export function useLLMStream(): UseLLMStreamReturn {
       model,
       prompt,
       attachments,
+      params: imageParams,
       sessionId,
       existingMsgId,
       onMessageCreated,
@@ -294,7 +301,7 @@ export function useLLMStream(): UseLLMStreamReturn {
       id: botMsgId,
       sessionId,
       role: 'assistant',
-      content: '正在调用 Gemini 2.5 绘图...',
+      content: model === 'gpt-image-2' ? '正在调用 GPT-Image-2 生图...' : '正在调用图像模型...',
       timestamp: Date.now(),
       model,
     };
@@ -304,27 +311,33 @@ export function useLLMStream(): UseLLMStreamReturn {
     }
 
     try {
-      const b64Image = await generateImage(apiKey, prompt, model, attachments);
-      const finalContent = `已为您生成图片：\n> ${prompt}`;
-      const imageAttachment: Attachment = {
-        id: uuidv4(),
-        name: `generated-${Date.now()}.png`,
-        type: 'image',
-        content: `data:image/png;base64,${b64Image}`,
-        included: true,
-      };
+      const imageResult = await generateImage(apiKey, prompt, model, attachments, imageParams);
+      const outputImages = (imageResult.images || []).map((image, index) => {
+        const imageContent = image.startsWith('data:image') || image.startsWith('http')
+          ? image
+          : `data:image/png;base64,${image}`;
+        const extension = imageParams?.outputFormat === 'jpeg' ? 'jpg' : imageParams?.outputFormat || 'png';
+        return {
+          id: uuidv4(),
+          name: `generated-${Date.now()}-${index + 1}.${extension}`,
+          type: 'image',
+          content: imageContent,
+          included: true,
+        } satisfies Attachment;
+      });
+      const finalContent = `已为您生成 ${outputImages.length} 张图片：\n> ${prompt}`;
 
       const finalMsg: Message = {
         ...botMsg,
         content: finalContent,
-        attachments: [imageAttachment],
+        attachments: outputImages,
       };
 
       await saveMessage(finalMsg);
       onComplete?.(finalMsg);
     } catch (err: unknown) {
       const error = err as Error;
-      const errorMsg = `\n\n> ⚠️ **生图失败**: ${error.message}`;
+      const errorMsg = `\n\n> **生图失败**: ${error.message}`;
       onError?.(botMsgId, botMsg.content + errorMsg);
     } finally {
       setIsStreaming(false);

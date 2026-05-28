@@ -4,6 +4,7 @@
 
 import {
   ChatOptions,
+  ImageGenerationOptions,
   UsageStats,
   ChatCompletionRequestBody,
   StreamChunkResponse,
@@ -16,6 +17,46 @@ export class OpenAIProvider extends BaseProvider {
 
   supportsModel(modelId: string): boolean {
     return modelId.includes('gpt');
+  }
+
+  async generateImage(options: ImageGenerationOptions) {
+    const { apiKey, prompt, model = 'gpt-image-2', attachments = [], params } = options;
+
+    validateApiKey(apiKey);
+
+    const response = await fetch('/api/image/generate-v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey,
+        model,
+        prompt,
+        attachments,
+        size: params?.size ?? 'auto',
+        aspectRatio: params?.aspectRatio ?? 'auto',
+        quality: params?.quality ?? 'auto',
+        outputFormat: params?.outputFormat ?? 'png',
+        outputCompression: params?.outputCompression ?? null,
+        moderation: params?.moderation ?? 'auto',
+        n: 1,
+      }),
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.detail || data?.message || `图片生成请求失败 (${response.status})`);
+    }
+
+    if (!Array.isArray(data?.images) || data.images.length === 0) {
+      throw new Error('生图接口返回异常，未找到图片数据。');
+    }
+
+    return {
+      images: data.images,
+      revisedPrompt: data.revisedPrompt,
+      size: data.size,
+      aspectRatio: data.aspectRatio,
+    };
   }
 
   async streamChat(options: ChatOptions): Promise<void> {

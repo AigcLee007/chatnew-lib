@@ -7,7 +7,7 @@
  * DO NOT DELETE - preserves imports in App.tsx and other components.
  */
 
-import { ModelId, Message, Attachment } from '../types';
+import { ModelId, Message, Attachment, GptImage2Params, ImageGenerationResult } from '../types';
 import { LLMFactory, UsageStats, fetchWithRetry } from './llm';
 
 // Re-export types for backward compatibility
@@ -101,16 +101,17 @@ export async function checkBalance(apiKey: string): Promise<BalanceResult> {
  * 
  * @param apiKey - API key for authentication
  * @param prompt - Text prompt for image generation
- * @param model - Model ID (default: 'gemini-2.5-flash-image')
+ * @param model - Model ID (default: 'gpt-image-2')
  * @param attachments - Optional attachments for image-to-image
  * @returns Base64 encoded image data
  */
 export async function generateImage(
   apiKey: string,
   prompt: string,
-  model: string = 'gemini-2.5-flash-image',
-  attachments: Attachment[] = []
-): Promise<string> {
+  model: string = 'gpt-image-2',
+  attachments: Attachment[] = [],
+  params?: GptImage2Params
+): Promise<ImageGenerationResult> {
   const provider = LLMFactory.getProvider(model);
   
   if (!provider.generateImage) {
@@ -122,6 +123,7 @@ export async function generateImage(
     prompt,
     model,
     attachments,
+    params,
   });
 }
 

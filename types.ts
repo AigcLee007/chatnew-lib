@@ -1,23 +1,52 @@
 export type Role = 'user' | 'assistant' | 'system';
 
-export type ModelId = 
-  | 'gemini-3.1-pro-preview' 
-  | 'gemini-3.1-flash-preview' 
+export type ModelId =
+  | 'gemini-3.1-pro-preview'
+  | 'gemini-3.1-flash-preview'
   | 'gpt-5.4'
   | 'gpt-5.3-codex'
-  | 'gemini-2.5-flash-image';
+  | 'gpt-image-2'
+  | 'claude-opus-4-6';
+
+export type WorkMode = 'chat' | 'research' | 'planning' | 'uiux';
+
+export interface AttachmentChunk {
+  id: string;
+  index: number;
+  title: string;
+  content: string;
+  tokenCount: number;
+}
 
 export interface Attachment {
   id: string;
   name: string;
   type: string;
-  content: string; // Base64 or extracted text
-  preview?: string; // Base64 for images
+  content: string; // Base64, extracted text, or a compact document overview.
+  preview?: string; // Base64 for images.
   tokenCount?: number;
-  included?: boolean; // 控制文件是否包含在当前上下文中
+  fullTokenCount?: number;
+  documentId?: string;
+  chunkCount?: number;
+  chunks?: AttachmentChunk[];
+  included?: boolean;
 }
 
-// [新增] 提示词接口定义
+export interface DocumentStore {
+  id: string;
+  name: string;
+  type: string;
+  overview: string;
+  tokenCount: number;
+  fullTokenCount: number;
+  chunkCount: number;
+  createdAt: number;
+}
+
+export interface DocumentChunk extends AttachmentChunk {
+  documentId: string;
+}
+
 export interface Prompt {
   id: string;
   title: string;
@@ -33,7 +62,7 @@ export interface Message {
   timestamp: number;
   attachments?: Attachment[];
   model?: ModelId;
-  thinkingContent?: string; // 大模型思考过程
+  thinkingContent?: string;
 }
 
 export interface Session {
@@ -47,7 +76,7 @@ export interface Session {
 export interface AppSettings {
   apiKey: string;
   defaultModel: ModelId;
-  userSystemPrompt: string; 
+  userSystemPrompt: string;
 }
 
 export interface ChatState {
@@ -58,7 +87,6 @@ export interface ChatState {
   input: string;
 }
 
-// [新增] 公告通知接口定义
 export interface Notice {
   id: string;
   title: string;
@@ -73,4 +101,41 @@ export interface NoticeListResponse {
   page: number;
   pageSize: number;
   items: Notice[];
+}
+
+export interface ResearchPlanStep {
+  id: string;
+  title: string;
+  status: 'pending' | 'active' | 'done';
+}
+
+export interface ResearchPlan {
+  id: string;
+  sessionId: string;
+  title: string;
+  goal: string;
+  steps: ResearchPlanStep[];
+  findings: string[];
+  updatedAt: number;
+}
+
+export type GptImage2Quality = 'auto' | 'low' | 'medium' | 'high';
+export type GptImage2OutputFormat = 'png' | 'jpeg' | 'webp';
+export type GptImage2Moderation = 'auto' | 'low';
+
+export interface GptImage2Params {
+  size: 'auto' | '1k' | '2k' | '4k';
+  aspectRatio: 'auto' | '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '3:2' | '2:3' | '21:9';
+  quality: GptImage2Quality;
+  outputFormat: GptImage2OutputFormat;
+  outputCompression: number | null;
+  moderation: GptImage2Moderation;
+  n: number;
+}
+
+export interface ImageGenerationResult {
+  images: string[];
+  revisedPrompt?: string;
+  size?: string;
+  aspectRatio?: string;
 }

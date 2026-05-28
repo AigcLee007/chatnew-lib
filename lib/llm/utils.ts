@@ -106,12 +106,15 @@ export function buildCoreSystemIdentity(modelId: string): string {
 
   const isGemini = modelId.includes('gemini');
   const isGPT = modelId.includes('gpt');
+  const isClaude = modelId.includes('claude');
 
   let identityLine: string;
   if (isGemini) {
     identityLine = `You are ${displayName}, a large language model (LLM) developed by Google DeepMind.`;
   } else if (isGPT) {
     identityLine = `You are ${displayName}, a large language model (LLM) developed by OpenAI.`;
+  } else if (isClaude) {
+    identityLine = `You are ${displayName}, a large language model (LLM) developed by Anthropic.`;
   } else {
     identityLine = `You are ${displayName}, a large language model (LLM).`;
   }
