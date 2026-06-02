@@ -1,10 +1,26 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { createSession, db, deleteResearchPlanBySession, getResearchPlanBySession, saveMessage, saveResearchPlanRecord } from '../lib/db';
+import {
+  createSession,
+  db,
+  deleteResearchPlanBySession,
+  getConversationMemoryBySession,
+  getResearchPlanBySession,
+  saveConversationMemory,
+  saveMessage,
+  saveResearchPlanRecord
+} from '../lib/db';
 import { parseAttachmentWithMinerU, prepareAttachmentForPromptAsync, processFile } from '../lib/file-processor';
 import { advanceResearchPlan, buildModeSystemPrompt, createDefaultResearchPlan, shouldRegenerateDefaultResearchPlan } from '../lib/skill-prompts';
+import {
+  applyConversationMemoryWindow,
+  buildMemorySystemPrompt,
+  generateConversationMemory,
+  shouldAllowManualMemory,
+  shouldAutoUpdateMemory
+} from '../lib/conversation-memory';
 import { countTokens } from '../lib/token';
-import { Attachment, GptImage2Params, Message, ModelId, ResearchPlan, WorkMode } from '../types';
+import { Attachment, ConversationMemory, GptImage2Params, Message, ModelId, ResearchPlan, WorkMode } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useChatSession, useLLMStream } from '../hooks';
@@ -29,10 +45,12 @@ import {
   ClipboardList,
   Palette,
   MessageSquare,
-  HelpCircle
+  HelpCircle,
+  Brain
 } from 'lucide-react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { NoticePopover } from './NoticePopover';
+import { ContactPopover } from './ContactPopover';
 
 // 馃洝锔?鍏煎鎬т慨澶嶏細鍦?HTTP 鐜涓嬪洖閫€鍒?Math.random
 const safeUuid = (): string => {
@@ -83,6 +101,8 @@ export const ChatInterface: React.FC = () => {
   const [showModeGuide, setShowModeGuide] = useState(false);
   const [modelQuery, setModelQuery] = useState('');
   const [researchPlan, setResearchPlan] = useState<ResearchPlan | null>(null);
+  const [conversationMemory, setConversationMemory] = useState<ConversationMemory | null>(null);
+  const [isOrganizingMemory, setIsOrganizingMemory] = useState(false);
   const [gptImage2Params, setGptImage2Params] = useState<GptImage2Params>(DEFAULT_GPT_IMAGE2_PARAMS);
 
   // --- Refs ---
@@ -102,20 +122,25 @@ export const ChatInterface: React.FC = () => {
   useEffect(() => {
     if (!store.currentSessionId) {
       setResearchPlan(null);
+      setConversationMemory(null);
       return;
     }
 
     let cancelled = false;
-    getResearchPlanBySession(store.currentSessionId).then((plan) => {
-      if (cancelled) return;
-      if (plan && shouldRegenerateDefaultResearchPlan(plan, plan.goal)) {
-        const migratedPlan = createDefaultResearchPlan(store.currentSessionId!, plan.goal || '计划任务');
-        setResearchPlan(migratedPlan);
-        saveResearchPlanRecord(migratedPlan);
-        return;
-      }
-      setResearchPlan(plan || null);
-    });
+    Promise.all([
+      getResearchPlanBySession(store.currentSessionId),
+      getConversationMemoryBySession(store.currentSessionId),
+    ]).then(([plan, memory]) => {
+        if (cancelled) return;
+        if (plan && shouldRegenerateDefaultResearchPlan(plan, plan.goal)) {
+          const migratedPlan = createDefaultResearchPlan(store.currentSessionId!, plan.goal || '计划任务');
+          setResearchPlan(migratedPlan);
+          saveResearchPlanRecord(migratedPlan);
+        } else {
+          setResearchPlan(plan || null);
+        }
+        setConversationMemory(memory || null);
+      });
     return () => {
       cancelled = true;
     };
@@ -281,14 +306,20 @@ export const ChatInterface: React.FC = () => {
 
     await addMessage(newUserMsg);
 
-    const contextMessages = buildContextWindow([...history, newUserMsg], store.defaultModel);
+    const memoryPrompt = buildMemorySystemPrompt(conversationMemory);
+    const modePrompt = buildModeSystemPrompt(store.workMode, researchPlan);
+    const combinedSystemPrompt = [store.userSystemPrompt, modePrompt, memoryPrompt].filter(Boolean).join('\n\n');
+    const contextMessages = buildContextWindow(
+      applyConversationMemoryWindow([...history, newUserMsg], conversationMemory),
+      store.defaultModel
+    );
 
     await startStream({
       apiKey: store.apiKey,
       model: store.defaultModel,
       messages: contextMessages,
       attachments: newUserMsg.attachments || [],
-      userSystemPrompt: store.userSystemPrompt,
+      userSystemPrompt: combinedSystemPrompt,
       sessionId: newUserMsg.sessionId,
       isWebSearchEnabled: store.isWebSearchEnabled,
       onMessageCreated: (msg) => setMessages(prev => [...prev, msg]),
@@ -314,14 +345,17 @@ export const ChatInterface: React.FC = () => {
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: '' } : m));
 
     const regenModel = (targetMsg.model as ModelId) || store.defaultModel;
-    const contextMessages = buildContextWindow(history, regenModel);
+    const memoryPrompt = buildMemorySystemPrompt(conversationMemory);
+    const modePrompt = buildModeSystemPrompt(store.workMode, researchPlan);
+    const combinedSystemPrompt = [store.userSystemPrompt, modePrompt, memoryPrompt].filter(Boolean).join('\n\n');
+    const contextMessages = buildContextWindow(applyConversationMemoryWindow(history, conversationMemory), regenModel);
 
     await startStream({
       apiKey: store.apiKey,
       model: regenModel,
       messages: contextMessages,
       attachments: lastUserMsg.attachments || [],
-      userSystemPrompt: store.userSystemPrompt,
+      userSystemPrompt: combinedSystemPrompt,
       sessionId: targetMsg.sessionId,
       existingMsgId: msgId,
       isWebSearchEnabled: store.isWebSearchEnabled,
@@ -345,14 +379,17 @@ export const ChatInterface: React.FC = () => {
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: '' } : m));
 
     const continueModel = (targetMsg.model as ModelId) || store.defaultModel;
-    const contextMessages = buildContextWindow(history, continueModel);
+    const memoryPrompt = buildMemorySystemPrompt(conversationMemory);
+    const modePrompt = buildModeSystemPrompt(store.workMode, researchPlan);
+    const combinedSystemPrompt = [store.userSystemPrompt, modePrompt, memoryPrompt].filter(Boolean).join('\n\n');
+    const contextMessages = buildContextWindow(applyConversationMemoryWindow(history, conversationMemory), continueModel);
 
     await startStream({
       apiKey: store.apiKey,
       model: continueModel,
       messages: contextMessages,
       attachments: [],
-      userSystemPrompt: store.userSystemPrompt,
+      userSystemPrompt: combinedSystemPrompt,
       sessionId: targetMsg.sessionId,
       existingMsgId: msgId,
       isWebSearchEnabled: store.isWebSearchEnabled,
@@ -402,6 +439,54 @@ export const ChatInterface: React.FC = () => {
     return prepared;
   };
 
+  const organizeConversationMemory = async (reason: 'manual' | 'auto' = 'manual'): Promise<ConversationMemory | null> => {
+    if (!store.currentSessionId || isImageGenerationModel(store.defaultModel)) return conversationMemory;
+    if (isOrganizingMemory) return conversationMemory;
+
+    if (!store.apiKey || !store.apiKey.startsWith('sk-')) {
+      if (reason === 'manual') alert('需要先配置有效的 API Key，才能整理记忆。');
+      return conversationMemory;
+    }
+
+    if (!shouldAllowManualMemory(messages)) {
+      if (reason === 'manual') alert('当前对话较短，暂时无需整理记忆。');
+      return conversationMemory;
+    }
+
+    setIsOrganizingMemory(true);
+    try {
+      const memory = await generateConversationMemory({
+        apiKey: store.apiKey,
+        model: store.defaultModel,
+        sessionId: store.currentSessionId,
+        messages,
+        previousMemory: conversationMemory,
+      });
+      await saveConversationMemory(memory);
+      setConversationMemory(memory);
+      if (reason === 'manual') {
+        alert('已整理当前话题记忆，后续对话会优先保留这些关键信息。');
+      }
+      return memory;
+    } catch (error: unknown) {
+      const err = error as Error;
+      if (reason === 'manual') {
+        alert(`整理记忆失败\n${err.message || err}`);
+      } else {
+        console.warn('[Conversation Memory] auto organize failed:', err.message || err);
+      }
+      return conversationMemory;
+    } finally {
+      setIsOrganizingMemory(false);
+    }
+  };
+
+  const maybeAutoOrganizeMemory = async (): Promise<ConversationMemory | null> => {
+    if (isImageGenerationModel(store.defaultModel)) return conversationMemory;
+    if (!shouldAutoUpdateMemory(messages, conversationMemory, historyTokens)) return conversationMemory;
+    return organizeConversationMemory('auto');
+  };
+
   const handleSend = async () => {
     if (sendLockRef.current) return;
     sendLockRef.current = true;
@@ -447,8 +532,10 @@ export const ChatInterface: React.FC = () => {
         await saveResearchPlan(planForPrompt);
       }
 
+      const memoryForPrompt = await maybeAutoOrganizeMemory();
       const modePrompt = buildModeSystemPrompt(store.workMode, planForPrompt);
-      const combinedSystemPrompt = [store.userSystemPrompt, modePrompt].filter(Boolean).join('\n\n');
+      const memoryPrompt = buildMemorySystemPrompt(memoryForPrompt);
+      const combinedSystemPrompt = [store.userSystemPrompt, modePrompt, memoryPrompt].filter(Boolean).join('\n\n');
 
       const userMsg: Message = {
         id: safeUuid(),
@@ -515,7 +602,8 @@ export const ChatInterface: React.FC = () => {
 
         const safeHistory = isNewSession ? [] : messages;
 
-        const rawContextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+        const memoryAwareHistory = applyConversationMemoryWindow([...safeHistory, userMsg], memoryForPrompt);
+        const rawContextMessages = buildContextWindow(memoryAwareHistory, store.defaultModel);
         store.setLoading(true);
         const contextMessages = await prepareMessagesForModel(rawContextMessages, store.defaultModel, store.input);
         store.setLoading(false);
@@ -563,7 +651,8 @@ export const ChatInterface: React.FC = () => {
 
         const safeHistory = isNewSession ? [] : messages;
 
-        const rawContextMessages = buildContextWindow([...safeHistory, userMsg], store.defaultModel);
+        const memoryAwareHistory = applyConversationMemoryWindow([...safeHistory, userMsg], memoryForPrompt);
+        const rawContextMessages = buildContextWindow(memoryAwareHistory, store.defaultModel);
         store.setLoading(true);
         const contextMessages = await prepareMessagesForModel(rawContextMessages, store.defaultModel, store.input);
         store.setLoading(false);
@@ -713,15 +802,15 @@ export const ChatInterface: React.FC = () => {
       provider: 'GEMINI',
     },
     {
-      id: 'gpt-5.4',
-      name: 'Gpt-5.4',
-      desc: 'GPT-5.4：新一代通用高性能模型，代码、推理、写作均衡。',
+      id: 'gpt-5.5',
+      name: 'GPT-5.5',
+      desc: 'GPT-5.5：OpenAI 最新旗舰模型，适合高难度推理、复杂分析、长文写作与代码任务。',
       provider: 'OPENAI',
     },
     {
-      id: 'gpt-5.3-codex',
-      name: 'Gpt-5.3-Codex',
-      desc: 'GPT-5.3 Codex：偏向工程实现与代码生成。',
+      id: 'gpt-5.4',
+      name: 'Gpt-5.4',
+      desc: 'GPT-5.4：新一代通用高性能模型，代码、推理、写作均衡。',
       provider: 'OPENAI',
     },
     {
@@ -729,6 +818,18 @@ export const ChatInterface: React.FC = () => {
       name: 'GPT-Image-2（生图）',
       desc: 'OpenAI GPT-Image-2：用于文本生成图片，默认 1:1 PNG 输出。',
       provider: 'OPENAI',
+    },
+    {
+      id: 'claude-opus-4-8',
+      name: 'Claude Opus 4.8',
+      desc: 'Claude Opus 4.8：Anthropic 最新旗舰模型，擅长深度推理、科研阅读、复杂写作与长任务分析。',
+      provider: 'ANTHROPIC',
+    },
+    {
+      id: 'claude-opus-4-7',
+      name: 'Claude Opus 4.7',
+      desc: 'Anthropic Claude Opus 4.7：高质量推理、写作与复杂分析。',
+      provider: 'ANTHROPIC',
     },
     {
       id: 'claude-opus-4-6',
@@ -791,6 +892,18 @@ export const ChatInterface: React.FC = () => {
     },
   ];
   const isImageMode = isImageGenerationModel(store.defaultModel);
+  const memoryButtonDisabled =
+    isStreaming ||
+    isOrganizingMemory ||
+    store.isLoading ||
+    isImageMode ||
+    !store.currentSessionId ||
+    !shouldAllowManualMemory(messages);
+  const memoryStatusText = conversationMemory
+    ? `Memory: ${conversationMemory.tokenCount.toLocaleString()}`
+    : messages.length >= 20
+    ? 'Memory: 建议整理'
+    : 'Memory: --';
   const imageAttachCount = store.attachments.filter((att) => att.type === 'image').length;
   const imageModeSendDisabled = !store.input.trim() || store.isLoading;
   const imageSizeOptions: Array<{ value: GptImage2Params['size']; label: string }> = [
@@ -901,6 +1014,7 @@ export const ChatInterface: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 ml-auto pointer-events-auto">
           <NoticePopover />
+          <ContactPopover />
           <button
             onClick={store.toggleTheme}
             className="p-2.5 rounded-xl bg-card md:bg-card/50 md:backdrop-blur-xl border border-border/40 text-foreground hover:bg-muted/80 transition-all shadow-sm active:scale-95 group"
@@ -930,6 +1044,13 @@ export const ChatInterface: React.FC = () => {
                       className="fill-foreground"
                     />
                   </svg>
+                ) : store.defaultModel.includes('claude') ? (
+                  <img
+                    src="/logo/claude-ai-icon.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="w-16 h-16 md:w-20 md:h-20 object-contain"
+                  />
                 ) : (
                   // Google Gemini Logo
                   <svg className="w-16 h-16 md:w-20 md:h-20" viewBox="0 0 28 28" fill="none">
@@ -1335,7 +1456,7 @@ export const ChatInterface: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-start items-center mt-3 px-2">
+          <div className="flex justify-between items-center gap-3 mt-3 px-2">
             <div className="text-[10px] text-muted-foreground/50 font-mono flex items-center gap-2 transition-all">
               {isImageMode ? (
                 <div className="flex flex-wrap items-center gap-3 text-[10px]">
@@ -1351,6 +1472,10 @@ export const ChatInterface: React.FC = () => {
                 <span className="text-[10px] font-mono text-muted-foreground/80 flex flex-wrap gap-y-1">
                   <span className={historyTokens > 1000 ? "text-red-500 font-bold" : ""}>
                     History: {historyTokens.toLocaleString()}
+                  </span>
+                  <span className="mx-1">|</span>
+                  <span className={conversationMemory ? "text-emerald-500 font-bold" : messages.length >= 20 ? "text-amber-500 font-bold" : ""}>
+                    {memoryStatusText}
                   </span>
                   <span className="mx-1">+</span>
                   <span className="font-bold text-foreground">
@@ -1374,12 +1499,43 @@ export const ChatInterface: React.FC = () => {
                   <span title="提问消耗（Prompt Tokens）">Input: <span className="text-foreground/70">{lastUsage ? lastUsage.prompt.toLocaleString() : '--'}</span></span>
                   <span className="w-px h-2.5 bg-border/50"></span>
                   <span title="回答消耗（Completion Tokens）">Output: <span className="text-foreground/70">{lastUsage ? lastUsage.completion.toLocaleString() : '--'}</span></span>
+                  {!isImageMode && conversationMemory && (
+                    <>
+                      <span className="w-px h-2.5 bg-border/50"></span>
+                      <span title="当前话题记忆" className="text-emerald-500">Memory: {conversationMemory.tokenCount.toLocaleString()}</span>
+                    </>
+                  )}
                 </div>
               )}
               {!isImageMode && store.userSystemPrompt && !store.input.trim() && store.attachments.filter(a => a.included !== false).length === 0 && (
                 <span className="text-red-500 font-bold">系统预设已生效（约 {sysTokens.toLocaleString()} tokens）</span>
               )}
             </div>
+
+            {!isImageMode && (
+              <button
+                type="button"
+                onClick={() => organizeConversationMemory('manual')}
+                disabled={memoryButtonDisabled}
+                className={`h-8 px-3 rounded-full border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors ${
+                  conversationMemory
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                    : 'border-border/60 bg-card/80 text-muted-foreground hover:text-foreground hover:bg-muted/70'
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+                title={
+                  !store.currentSessionId
+                    ? '新建话题后可整理记忆'
+                    : !shouldAllowManualMemory(messages)
+                    ? '当前对话较短，暂时无需整理'
+                    : conversationMemory
+                    ? '重新整理当前话题记忆'
+                    : '整理当前话题记忆'
+                }
+              >
+                <Brain size={13} />
+                <span>{isOrganizingMemory ? '整理中...' : conversationMemory ? '已整理' : '整理记忆'}</span>
+              </button>
+            )}
 
           </div>
         </div>

@@ -69,7 +69,7 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
       ? (() => {
           const storedModel = localStorage.getItem('aittco_model');
           if (storedModel === 'gpt-5.2-all') return 'gpt-5.4';
-          if (storedModel === 'gpt-5.2-thinking') return 'gpt-5.3-codex';
+          if (storedModel === 'gpt-5.2-thinking' || storedModel === 'gpt-5.3-codex') return 'gpt-5.5';
           if (storedModel === 'gemini-2.5-flash-image') return 'gpt-image-2';
           return (storedModel as ModelId) || 'gemini-3.1-flash-preview';
         })()
@@ -105,8 +105,8 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
   setModel: (model) => {
     const migratedModel = model === ('gpt-5.2-all' as ModelId)
       ? 'gpt-5.4'
-      : model === ('gpt-5.2-thinking' as ModelId)
-      ? 'gpt-5.3-codex'
+      : model === ('gpt-5.2-thinking' as ModelId) || model === ('gpt-5.3-codex' as ModelId)
+      ? 'gpt-5.5'
       : model === ('gemini-2.5-flash-image' as ModelId)
       ? 'gpt-image-2'
       : model;

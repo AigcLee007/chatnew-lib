@@ -4,9 +4,11 @@ export type ModelId =
   | 'gemini-3.1-pro-preview'
   | 'gemini-3.1-flash-preview'
   | 'gpt-5.4'
-  | 'gpt-5.3-codex'
+  | 'gpt-5.5'
   | 'gpt-image-2'
-  | 'claude-opus-4-6';
+  | 'claude-opus-4-6'
+  | 'claude-opus-4-7'
+  | 'claude-opus-4-8';
 
 export type WorkMode = 'chat' | 'research' | 'planning' | 'uiux';
 
@@ -116,6 +118,16 @@ export interface ResearchPlan {
   goal: string;
   steps: ResearchPlanStep[];
   findings: string[];
+  updatedAt: number;
+}
+
+export interface ConversationMemory {
+  id: string;
+  sessionId: string;
+  summary: string;
+  compressedUntil: number;
+  sourceMessageCount: number;
+  tokenCount: number;
   updatedAt: number;
 }
 

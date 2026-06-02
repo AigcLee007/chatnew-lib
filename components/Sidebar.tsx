@@ -90,6 +90,7 @@ export const Sidebar: React.FC<Props> = ({ onNewChat, onSelectSession, onOpenSet
     try {
       await db.sessions.delete(id);
       await db.messages.where('sessionId').equals(id).delete();
+      await db.conversationMemories.where('sessionId').equals(id).delete();
       if (currentSessionId === id) onNewChat();
       setConfirmDeleteId(null);
     } catch (error) {

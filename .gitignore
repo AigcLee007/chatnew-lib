@@ -34,3 +34,6 @@ dist.zip
 *.njsproj
 *.sln
 *.sw?
+*.zip
+output/
+tmp/

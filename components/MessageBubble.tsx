@@ -387,6 +387,13 @@ const MessageBubbleInner: React.FC<Props> = ({ message, isStreaming, onRegenerat
                 className="fill-foreground"
               />
             </svg>
+          ) : message.model?.includes('claude') ? (
+            <img
+              src="/logo/claude-ai-icon.svg"
+              alt=""
+              aria-hidden="true"
+              className="w-5 h-5 object-contain"
+            />
           ) : (
             // Google Gemini Logo
             <svg className="w-5 h-5" viewBox="0 0 28 28" fill="none">

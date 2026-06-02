@@ -39,10 +39,12 @@ const ADMIN_SK = 'sk-K9OJf52OughwT8vizrDKJpvMebzutpbKVXxxhYe8EZFF0nm7';
 const MODEL_OPTIONS: { id: ModelId; label: string; desc: string }[] = [
   { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', desc: '高质量推理与复杂任务' },
   { id: 'gemini-3.1-flash-preview', label: 'gemini-3.1-flash-preview', desc: '速度快，适合高频对话' },
+  { id: 'gpt-5.5', label: 'GPT-5.5', desc: 'OpenAI 最新旗舰，适合高难度推理与复杂任务' },
   { id: 'gpt-5.4', label: 'Gpt-5.4', desc: '通用能力均衡' },
-  { id: 'gpt-5.3-codex', label: 'Gpt-5.3-Codex', desc: '深度分析与复杂推理' },
   { id: 'gpt-image-2', label: 'gpt-image-2', desc: 'OpenAI 生图模型' },
-  { id: 'claude-opus-4-6', label: 'claude-opus-4-6', desc: 'Anthropic Claude 高质量推理模型' },
+  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', desc: 'Anthropic 最新旗舰，擅长深度推理与长任务分析' },
+  { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', desc: 'Anthropic Claude 高质量推理模型' },
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', desc: 'Anthropic Claude 高质量推理模型' },
 ];
 
 const PROMPT_PRESETS = [
@@ -225,6 +227,7 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
     const sessions = await db.sessions.toArray();
     const messages = await db.messages.toArray();
     const promptsData = await db.prompts.toArray();
+    const conversationMemories = await db.conversationMemories.toArray();
     const settings = {
       apiKey,
       defaultModel,
@@ -233,7 +236,7 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
       isWebSearchEnabled,
     };
 
-    const data = { sessions, messages, prompts: promptsData, settings, exportDate: new Date().toISOString() };
+    const data = { sessions, messages, prompts: promptsData, conversationMemories, settings, exportDate: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -254,14 +257,15 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (data.sessions) await db.sessions.bulkPut(data.sessions);
         if (data.messages) await db.messages.bulkPut(data.messages);
         if (data.prompts) await db.prompts.bulkPut(data.prompts);
+        if (data.conversationMemories) await db.conversationMemories.bulkPut(data.conversationMemories);
 
         if (data.settings) {
           setApiKey(data.settings.apiKey || '');
           const importedModel = data.settings.defaultModel;
           const migratedModel = importedModel === 'gpt-5.2-all'
             ? 'gpt-5.4'
-            : importedModel === 'gpt-5.2-thinking'
-            ? 'gpt-5.3-codex'
+            : importedModel === 'gpt-5.2-thinking' || importedModel === 'gpt-5.3-codex'
+            ? 'gpt-5.5'
             : importedModel || 'gemini-3.1-flash-preview';
           setModel(migratedModel as ModelId);
           setUserSystemPrompt(data.settings.userSystemPrompt || '');

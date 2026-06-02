@@ -1,5 +1,5 @@
 ﻿import Dexie, { Table } from 'dexie';
-import { DocumentChunk, DocumentStore, Message, Session, Prompt, ModelId, ResearchPlan } from '../types';
+import { ConversationMemory, DocumentChunk, DocumentStore, Message, Session, Prompt, ModelId, ResearchPlan } from '../types';
 
 const safeUuid = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -15,6 +15,7 @@ class AittcoChatDB extends Dexie {
   messages!: Table<Message>;
   prompts!: Table<Prompt>;
   researchPlans!: Table<ResearchPlan>;
+  conversationMemories!: Table<ConversationMemory>;
   documentStores!: Table<DocumentStore>;
   documentChunks!: Table<DocumentChunk>;
 
@@ -45,6 +46,17 @@ class AittcoChatDB extends Dexie {
       messages: 'id, sessionId, timestamp',
       prompts: 'id, title, createdAt',
       researchPlans: 'id, sessionId, updatedAt',
+      documentStores: 'id, createdAt',
+      documentChunks: 'id, documentId, index',
+    });
+
+    // v5: rolling conversation memory for long-running topics
+    this.version(5).stores({
+      sessions: 'id, updatedAt, model',
+      messages: 'id, sessionId, timestamp',
+      prompts: 'id, title, createdAt',
+      researchPlans: 'id, sessionId, updatedAt',
+      conversationMemories: 'id, sessionId, updatedAt',
       documentStores: 'id, createdAt',
       documentChunks: 'id, documentId, index',
     });
@@ -87,6 +99,19 @@ export const getResearchPlanBySession = async (sessionId: string) => {
 export const deleteResearchPlanBySession = async (sessionId: string) => {
   const plans = await db.researchPlans.where('sessionId').equals(sessionId).toArray();
   await db.researchPlans.bulkDelete(plans.map((plan) => plan.id));
+};
+
+export const saveConversationMemory = async (memory: ConversationMemory) => {
+  await db.conversationMemories.put(memory);
+};
+
+export const getConversationMemoryBySession = async (sessionId: string) => {
+  return db.conversationMemories.where('sessionId').equals(sessionId).first();
+};
+
+export const deleteConversationMemoryBySession = async (sessionId: string) => {
+  const memories = await db.conversationMemories.where('sessionId').equals(sessionId).toArray();
+  await db.conversationMemories.bulkDelete(memories.map((memory) => memory.id));
 };
 
 export const saveDocumentRecord = async (doc: DocumentStore, chunks: DocumentChunk[]) => {
