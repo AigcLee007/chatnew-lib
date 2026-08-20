@@ -73,6 +73,8 @@ export async function initializeAnthropic({
     proxy: PROXY ?? undefined,
     reverseProxyUrl: ANTHROPIC_REVERSE_PROXY ?? undefined,
     modelOptions: {
+      // Native Anthropic web search is enabled by default; an explicit false still disables it.
+      web_search: true,
       ...(model_parameters ?? {}),
       user: req.user?.id,
     },

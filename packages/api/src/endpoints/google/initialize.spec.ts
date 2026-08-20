@@ -70,6 +70,23 @@ describe('initializeGoogle', () => {
     process.env = originalEnv;
   });
 
+  it('enables native Google Search when the conversation does not specify a value', async () => {
+    process.env.GOOGLE_KEY = 'test-api-key';
+
+    await initializeGoogle({
+      req: createReq(),
+      endpoint: EModelEndpoint.google,
+      model_parameters: { model: 'gemini-3.5-flash-preview' },
+      db: createDb(),
+    });
+
+    const [, options] = getGoogleConfigCall();
+    expect(options.modelOptions).toEqual({
+      model: 'gemini-3.5-flash-preview',
+      web_search: true,
+    });
+  });
+
   it('forces Vertex AI ADC config and ignores GOOGLE_KEY for vertexai endpoint', async () => {
     process.env.GOOGLE_KEY = 'test-api-key';
     process.env.VERTEX_PROJECT_ID = 'fiery-catwalk-385918';
@@ -97,7 +114,7 @@ describe('initializeGoogle', () => {
       expect.objectContaining({
         forceVertex: true,
         projectId: 'fiery-catwalk-385918',
-        modelOptions: { model: 'gemini-2.5-flash' },
+        modelOptions: { model: 'gemini-2.5-flash', web_search: true },
       }),
     );
   });
@@ -124,7 +141,7 @@ describe('initializeGoogle', () => {
       expect.objectContaining({
         forceVertex: false,
         projectId: undefined,
-        modelOptions: { model: 'gemini-2.5-flash' },
+        modelOptions: { model: 'gemini-2.5-flash', web_search: true },
       }),
     );
   });
