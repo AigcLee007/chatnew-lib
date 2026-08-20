@@ -41,6 +41,8 @@ endpoints:
     - name: OpenAI
       apiKey: user_provided
       baseURL: https://api.aittco.com/v1
+      addParams:
+        web_search: true
       models:
         default:
           - gpt-5.6-sol
@@ -55,6 +57,8 @@ endpoints:
     - name: xAI
       apiKey: user_provided
       baseURL: https://api.aittco.com/v1
+      addParams:
+        web_search: true
       models:
         default:
           - grok-4.6

@@ -113,7 +113,11 @@ export async function initializeGoogle({
     authHeader: isEnabled(GOOGLE_AUTH_HEADER) ?? undefined,
     proxy: PROXY ?? undefined,
     ...(headers && { headers }),
-    modelOptions: model_parameters ?? {},
+    // Native Google Search is enabled by default; an explicit false still disables it.
+    modelOptions: {
+      web_search: true,
+      ...(model_parameters ?? {}),
+    },
     forceVertex: isVertexEndpoint,
     projectId: isVertexEndpoint
       ? (process.env.VERTEX_PROJECT_ID ??

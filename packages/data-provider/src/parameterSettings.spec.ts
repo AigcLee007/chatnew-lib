@@ -4,6 +4,21 @@ import type { SettingDefinition } from './generate';
 
 const googleParams = paramSettings[EModelEndpoint.google] as SettingDefinition[];
 const maxOut = (params: SettingDefinition[]) => params.find((p) => p.key === 'maxOutputTokens');
+const webSearch = (params: SettingDefinition[]) => params.find((p) => p.key === 'web_search');
+
+describe('native web search defaults', () => {
+  it('enables native search by default for supported first-party endpoints', () => {
+    expect(webSearch(paramSettings[EModelEndpoint.openAI] as SettingDefinition[])?.default).toBe(
+      true,
+    );
+    expect(webSearch(paramSettings[EModelEndpoint.google] as SettingDefinition[])?.default).toBe(
+      true,
+    );
+    expect(
+      webSearch(paramSettings[EModelEndpoint.anthropic] as SettingDefinition[])?.default,
+    ).toBe(true);
+  });
+});
 
 describe('applyModelAwareDefaults', () => {
   it('resolves the Google maxOutputTokens default for current Gemini models', () => {
