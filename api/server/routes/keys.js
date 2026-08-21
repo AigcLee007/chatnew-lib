@@ -22,10 +22,17 @@ const quotaPaths = [
   '/v1/billing/subscription',
   '/v1/dashboard/billing/usage',
   '/dashboard/billing/usage',
+  '/v1/models',
 ];
 
 function normalizeQuota(data) {
-  const source = data?.data && typeof data.data === 'object' ? data.data : data || {};
+  const candidate = Array.isArray(data) ? data[0] : data;
+  const nested = candidate?.data;
+  const source = Array.isArray(nested)
+    ? nested[0] || {}
+    : nested && typeof nested === 'object'
+      ? nested
+      : candidate || {};
   const total = Number(source.total ?? source.total_quota ?? source.quota ?? source.credit_grants ?? 0);
   const used = Number(source.used ?? source.usage ?? source.used_quota ?? 0);
   const remaining = Number(source.remaining ?? source.remain ?? source.balance ?? source.available ?? total - used);

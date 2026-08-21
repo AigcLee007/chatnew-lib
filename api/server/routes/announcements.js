@@ -22,6 +22,10 @@ const announcementSchema = new mongoose.Schema(
 announcementSchema.index({ active: 1, pinned: -1, publishAt: -1 });
 const Announcement = mongoose.models.Announcement || mongoose.model('Announcement', announcementSchema);
 
+function canManageAnnouncements(user) {
+  return user?.role === 'ADMIN' || user?.role === 'DELEGATED_ADMIN' || user?.isAdmin === true;
+}
+
 function publicAnnouncement(item) {
   const value = item.toObject ? item.toObject() : item;
   delete value.createdBy;
@@ -30,7 +34,7 @@ function publicAnnouncement(item) {
 
 router.get('/', requireJwtAuth, async (req, res, next) => {
   try {
-    const all = req.user?.role === 'ADMIN' && req.query.all === 'true';
+    const all = canManageAnnouncements(req.user) && req.query.all === 'true';
     const items = await Announcement.find(all ? {} : { active: true, publishAt: { $lte: new Date() } })
       .sort({ pinned: -1, publishAt: -1 })
       .lean();
@@ -44,7 +48,7 @@ router.get('/', requireJwtAuth, async (req, res, next) => {
 router.get('/:id', requireJwtAuth, async (req, res, next) => {
   try {
     const item = await Announcement.findById(req.params.id).lean();
-    if (!item || (!isVisibleAnnouncement(item) && req.user?.role !== 'ADMIN')) {
+    if (!item || (!isVisibleAnnouncement(item) && !canManageAnnouncements(req.user))) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
     res.json(publicAnnouncement(item));

@@ -82,6 +82,17 @@ describe('Keys Routes', () => {
       await request(app).get('/api/keys/aittco/quota');
       expect(axios.get).toHaveBeenCalledTimes(2);
     });
+
+    it('supports array-wrapped proxy responses and the models fallback', async () => {
+      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-models-key' });
+      axios.get.mockRejectedValueOnce(new Error('missing endpoint'));
+      axios.get.mockResolvedValueOnce({ data: [{ balance: 42 }] });
+
+      const response = await request(app).get('/api/keys/aittco/quota');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ total: 42, used: 0, remaining: 42, percentage: 0 });
+    });
   });
 
   describe('PUT /', () => {
