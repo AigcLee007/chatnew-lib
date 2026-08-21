@@ -27,27 +27,35 @@ const quotaPaths = [
 
 function normalizeQuota(data) {
   if (!data || typeof data !== 'object') return null;
-  const candidate = Array.isArray(data) ? data[0] : data;
-  if (!candidate || typeof candidate !== 'object') return null;
-  const nested = candidate?.data;
-  const source = Array.isArray(nested)
-    ? nested[0] || {}
-    : nested && typeof nested === 'object'
-      ? nested
-      : candidate || {};
-  const toNumber = (value) => (value == null || value === '' ? null : Number(value));
-  const total = toNumber(source.total ?? source.total_quota ?? source.quota ?? source.credit_grants ?? source.hard_limit_usd);
-  const rawUsed = toNumber(source.used ?? source.usage ?? source.used_quota ?? source.total_usage);
-  const used = source.total_usage != null && source.used == null && source.usage == null
+  const values = [];
+  const visit = (value) => {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) return value.forEach(visit);
+    values.push(value);
+    Object.values(value).forEach((child) => {
+      if (child && typeof child === 'object') visit(child);
+    });
+  };
+  visit(data);
+  const numberFor = (keys) => {
+    for (const value of values) {
+      for (const key of keys) {
+        if (value[key] !== undefined && value[key] !== null && value[key] !== '') {
+          const number = Number(value[key]);
+          if (Number.isFinite(number)) return number;
+        }
+      }
+    }
+    return null;
+  };
+  const total = numberFor(['total', 'quota', 'total_quota', 'total_available', 'total_granted', 'grant_amount', 'hard_limit_usd', 'hard_limit', 'quota_total', 'balance_total']);
+  const rawUsed = numberFor(['used', 'usage', 'used_quota', 'total_usage', 'total_used', 'used_amount', 'quota_used', 'balance_used', 'consumed_amount']);
+  const used = values.some((value) => value.total_usage !== undefined) && !values.some((value) => value.used !== undefined || value.usage !== undefined)
     ? (rawUsed == null ? null : rawUsed / 100)
     : rawUsed;
-  const remaining = toNumber(source.remaining ?? source.remain ?? source.balance ?? source.available ?? source.available_quota);
+  const remaining = numberFor(['remaining', 'remain', 'balance', 'available', 'available_quota', 'remain_quota', 'residual_quota', 'remaining_amount', 'quota_remaining', 'balance_remaining', 'available_amount']);
   if (![total, used, remaining].some((value) => Number.isFinite(value))) return null;
-  return {
-    ...(Number.isFinite(total) ? { total } : {}),
-    ...(Number.isFinite(used) ? { used } : {}),
-    ...(Number.isFinite(remaining) ? { remaining } : {}),
-  };
+  return { total, used, remaining };
 }
 
 async function fetchAittcoQuota(apiKey) {

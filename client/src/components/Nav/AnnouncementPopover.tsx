@@ -3,6 +3,7 @@ import * as Menu from '@ariakit/react/menu';
 import { Bell, Pin } from 'lucide-react';
 import { DropdownMenuSeparator } from '@librechat/client';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { getTokenHeader } from 'librechat-data-provider';
 
 type Announcement = { _id: string; title: string; content: string; pinned?: boolean; active?: boolean };
 
@@ -13,9 +14,14 @@ export default function AnnouncementPopover() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [error, setError] = useState('');
+  const authHeaders = () => {
+    const token = getTokenHeader();
+    return token ? { Authorization: token } : {};
+  };
 
   const load = () =>
-    fetch(`/api/announcements${canManage ? '?all=true' : ''}`)
+    fetch(`/api/announcements${canManage ? '?all=true' : ''}`, { headers: authHeaders() })
       .then((response) => (response.ok ? response.json() : []))
       .then(setItems)
       .catch(() => setItems([]));
@@ -26,22 +32,26 @@ export default function AnnouncementPopover() {
 
   const publish = async () => {
     if (!title.trim() || !content.trim()) return;
+    setError('');
     const response = await fetch('/api/announcements', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ title, content, pinned: true }),
     });
     if (response.ok) {
       setTitle('');
       setContent('');
       load();
+    } else {
+      const body = await response.json().catch(() => ({}));
+      setError(body?.error || body?.message || `发布失败（HTTP ${response.status}）`);
     }
   };
 
   const update = async (item: Announcement, changes: Partial<Announcement>) => {
     const response = await fetch(`/api/announcements/${item._id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(changes),
     });
     if (response.ok) load();
@@ -49,7 +59,7 @@ export default function AnnouncementPopover() {
 
   const remove = async (item: Announcement) => {
     if (!window.confirm(`确定删除公告“${item.title}”吗？`)) return;
-    const response = await fetch(`/api/announcements/${item._id}`, { method: 'DELETE' });
+    const response = await fetch(`/api/announcements/${item._id}`, { method: 'DELETE', headers: authHeaders() });
     if (response.ok) load();
   };
 
@@ -91,6 +101,7 @@ export default function AnnouncementPopover() {
               <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="公告标题" className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-sm" />
               <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="公告内容" className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-sm" rows={3} />
               <button type="button" onClick={publish} className="w-full rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover">发布公告</button>
+              {error && <p className="text-xs text-red-500">{error}</p>}
             </div>
           </>
         )}

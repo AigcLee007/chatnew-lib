@@ -1,12 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { SystemCapabilities } = require('@librechat/data-schemas');
 const { requireJwtAuth } = require('~/server/middleware');
-const { requireCapability } = require('~/server/middleware/roles/capabilities');
 const { normalizeAnnouncement, isVisibleAnnouncement, sortAnnouncements } = require('./announcement-utils');
 
 const router = express.Router();
-const requireAdminAccess = requireCapability(SystemCapabilities.ACCESS_ADMIN);
 
 const announcementSchema = new mongoose.Schema(
   {
@@ -25,6 +22,11 @@ const Announcement = mongoose.models.Announcement || mongoose.model('Announcemen
 function canManageAnnouncements(user) {
   return user?.role === 'ADMIN' || user?.role === 'DELEGATED_ADMIN' || user?.isAdmin === true;
 }
+
+const requireAdminAccess = (req, res, next) => {
+  if (canManageAnnouncements(req.user)) return next();
+  return res.status(403).json({ error: 'Administrator access required' });
+};
 
 function publicAnnouncement(item) {
   const value = item.toObject ? item.toObject() : item;
