@@ -111,6 +111,9 @@ junit.xml
 **/.venv/
 **/venv/
 
+# Local Git worktrees
+/.worktrees/
+
 # docker override file
 docker-compose.override.yaml
 docker-compose.override.yml
