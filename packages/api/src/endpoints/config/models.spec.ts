@@ -114,6 +114,72 @@ describe('createLoadConfigModels – user-provided baseURL header guard', () => 
     );
   });
 
+  it('resolves configured OpenAI and xAI endpoints from the Aittco shared key', async () => {
+    const getUserKeyValues = jest.fn().mockResolvedValue({
+      apiKey: 'sk-user-key',
+      baseURL: 'https://user-controlled.example.com/v1',
+    });
+    const loadConfigModels = createLoadConfigModels({
+      getAppConfig: jest.fn().mockResolvedValue({
+        endpoints: {
+          [EModelEndpoint.custom]: [
+            {
+              name: 'OpenAI',
+              baseURL: AuthType.USER_PROVIDED,
+              apiKey: AuthType.USER_PROVIDED,
+              models: { fetch: true },
+            },
+            {
+              name: 'xAI',
+              baseURL: AuthType.USER_PROVIDED,
+              apiKey: AuthType.USER_PROVIDED,
+              models: { fetch: true },
+            },
+          ],
+        },
+      }),
+      getUserKeyValues,
+      fetchModels,
+    });
+
+    await loadConfigModels({
+      user: { id: 'user-1' },
+      config: undefined,
+    } as unknown as ServerRequest);
+
+    expect(getUserKeyValues).toHaveBeenNthCalledWith(1, {
+      userId: 'user-1',
+      name: 'aittco_shared',
+    });
+    expect(getUserKeyValues).toHaveBeenNthCalledWith(2, {
+      userId: 'user-1',
+      name: 'aittco_shared',
+    });
+  });
+
+  it.each([null, { apiKey: 'user_provided', baseURL: 'https://user-controlled.example.com/v1' }])(
+    'does not fetch models with a %p Aittco shared key',
+    async (userKeyValues) => {
+      const loadConfigModels = createLoadConfigModels({
+        getAppConfig: jest
+          .fn()
+          .mockResolvedValue(
+            buildAppConfig({ name: 'OpenAI', models: { fetch: true, default: ['gpt-default'] } }),
+          ),
+        getUserKeyValues: jest.fn().mockResolvedValue(userKeyValues),
+        fetchModels,
+      });
+
+      const modelsConfig = await loadConfigModels({
+        user: { id: 'user-1' },
+        config: undefined,
+      } as unknown as ServerRequest);
+
+      expect(fetchModels).not.toHaveBeenCalled();
+      expect(modelsConfig.OpenAI).toEqual(['gpt-default']);
+    },
+  );
+
   it('does NOT call fetchModels when user-provided baseURL validation fails', async () => {
     mockValidateEndpointURL.mockRejectedValueOnce(new Error('blocked SSRF target'));
 

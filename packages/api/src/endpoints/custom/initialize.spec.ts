@@ -109,6 +109,47 @@ describe('initializeCustom – Agents API user key resolution', () => {
     );
   });
 
+  it.each(['OpenAI', 'xAI'])(
+    'reads the %s custom endpoint from the Aittco shared key',
+    async (endpoint) => {
+      const params = createParams({
+        apiKey: AuthType.USER_PROVIDED,
+        baseURL: 'https://api.example.com/v1',
+        userApiKey: 'sk-user-key',
+      });
+      params.endpoint = endpoint;
+
+      await initializeCustom(params);
+
+      expect(params.db.getUserKeyValues).toHaveBeenCalledWith({
+        userId: 'user-1',
+        name: 'aittco_shared',
+      });
+    },
+  );
+
+  it('preserves NO_USER_KEY when the Aittco shared key is missing', async () => {
+    const params = createParams({
+      apiKey: AuthType.USER_PROVIDED,
+      baseURL: 'https://api.example.com/v1',
+      userApiKey: '',
+    });
+    params.endpoint = 'OpenAI';
+
+    await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+  });
+
+  it('does not treat user_provided as an Aittco shared credential', async () => {
+    const params = createParams({
+      apiKey: AuthType.USER_PROVIDED,
+      baseURL: 'https://api.example.com/v1',
+      userApiKey: AuthType.USER_PROVIDED,
+    });
+    params.endpoint = 'OpenAI';
+
+    await expect(initializeCustom(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+  });
+
   it('should fetch user key for user-provided URL without expiresAt (Agents API flow)', async () => {
     const { checkUserKeyExpiry } = jest.requireMock('~/utils');
     const params = createParams({

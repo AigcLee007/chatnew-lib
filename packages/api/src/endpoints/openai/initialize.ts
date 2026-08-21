@@ -13,6 +13,7 @@ import {
   getAzureCredentials,
 } from '~/utils';
 import { validateEndpointURL } from '~/auth';
+import { getAittcoKeyName } from '~/auth/sharedKey';
 import { getOpenAIConfig } from './config';
 
 /**
@@ -52,9 +53,14 @@ export async function initializeOpenAI({
   const userProvidesURL = isUserProvided(baseURLOptions[endpoint as keyof typeof baseURLOptions]);
 
   let userValues: UserKeyValues | null = null;
-  if (expiresAt && (userProvidesKey || userProvidesURL)) {
-    checkUserKeyExpiry(expiresAt, endpoint);
-    userValues = await db.getUserKeyValues({ userId: req.user?.id ?? '', name: endpoint });
+  if (userProvidesKey || userProvidesURL) {
+    if (expiresAt) {
+      checkUserKeyExpiry(expiresAt, endpoint);
+    }
+    userValues = await db.getUserKeyValues({
+      userId: req.user?.id ?? '',
+      name: getAittcoKeyName(endpoint),
+    });
   }
 
   let apiKey = userProvidesKey
@@ -164,7 +170,7 @@ export async function initializeOpenAI({
     );
   }
 
-  if (userProvidesKey && !apiKey) {
+  if (userProvidesKey && (!apiKey || isUserProvided(apiKey))) {
     throw new Error(
       JSON.stringify({
         type: ErrorTypes.NO_USER_KEY,
