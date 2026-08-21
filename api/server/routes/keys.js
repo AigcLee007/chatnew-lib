@@ -57,6 +57,22 @@ function normalizeQuota(data) {
   return { total, used, remaining };
 }
 
+function mergeQuotaValues(base, next) {
+  const merged = { ...(base || {}) };
+  for (const key of ['total', 'used', 'remaining']) {
+    const value = Number(next?.[key]);
+    if (!Number.isFinite(value)) continue;
+
+    const existing = Number(merged[key]);
+    // Keep the first valid positive value. Compatibility endpoints often
+    // return zero for fields they do not expose, which must not erase data.
+    if (!Number.isFinite(existing) || existing <= 0 || value > 0) {
+      if (!Number.isFinite(existing) || existing <= 0) merged[key] = value;
+    }
+  }
+  return merged;
+}
+
 async function fetchAittcoQuota(apiKey) {
   const baseUrl = (process.env.AITTCO_API_URL || 'https://api.aittco.com').replace(/\/$/, '');
   const config = { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10000 };
@@ -71,7 +87,7 @@ async function fetchAittcoQuota(apiKey) {
     try {
       const response = await axios.get(`${baseUrl}${path}`, config);
       const normalized = normalizeQuota(response.data);
-      if (normalized) quota = { ...(quota || {}), ...normalized };
+      if (normalized) quota = mergeQuotaValues(quota, normalized);
     } catch (error) {
       lastError = error;
     }
@@ -80,19 +96,19 @@ async function fetchAittcoQuota(apiKey) {
     const total = Number(quota.total);
     const used = Number(quota.used);
     const remaining = Number(quota.remaining);
-    const safeTotal = Number.isFinite(total)
+    const safeTotal = Number.isFinite(total) && total > 0
       ? total
       : Number.isFinite(used) && Number.isFinite(remaining)
         ? used + remaining
         : Number.isFinite(remaining)
           ? remaining
-          : used;
-    const safeUsed = Number.isFinite(used)
+          : Math.max(0, used || 0);
+    const safeUsed = Number.isFinite(used) && used >= 0
       ? used
       : Number.isFinite(remaining)
         ? Math.max(0, safeTotal - remaining)
         : 0;
-    const safeRemaining = Number.isFinite(remaining)
+    const safeRemaining = Number.isFinite(remaining) && remaining >= 0
       ? remaining
       : Math.max(0, safeTotal - safeUsed);
     return {

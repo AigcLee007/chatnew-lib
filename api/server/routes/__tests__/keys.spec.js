@@ -21,6 +21,7 @@ jest.mock('~/server/middleware', () => ({
 
 describe('Keys Routes', () => {
   let app;
+  let requestUserId = 'test-user-123';
   const { updateUserKey, deleteUserKey, getUserKeyExpiry, getUserKeyValues, getUserKey } = require('~/models');
   const axios = require('axios');
 
@@ -31,7 +32,7 @@ describe('Keys Routes', () => {
     app.use(express.json());
 
     app.use((req, res, next) => {
-      req.user = { id: 'test-user-123' };
+      req.user = { id: requestUserId };
       next();
     });
 
@@ -41,6 +42,7 @@ describe('Keys Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    requestUserId = 'test-user-123';
   });
 
   describe('GET /aittco/quota', () => {
@@ -106,6 +108,24 @@ describe('Keys Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ total: 100, used: 12.5, remaining: 87.5, percentage: 12.5 });
+    });
+
+    it('preserves valid quota values when a later endpoint returns zero fields', async () => {
+      requestUserId = 'quota-zero-overwrite-user';
+      getUserKey.mockResolvedValue('sk-zero-overwrite-key');
+      axios.get
+        .mockResolvedValueOnce({ data: { total: 110.52, used: 23.07, remaining: 87.45 } })
+        .mockResolvedValueOnce({ data: { total: 0, used: 23.07, remaining: 0 } });
+
+      const response = await request(app).get('/api/keys/aittco/quota');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        total: 110.52,
+        used: 23.07,
+        remaining: 87.45,
+        percentage: 20.87,
+      });
     });
   });
 
