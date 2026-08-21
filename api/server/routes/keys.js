@@ -1,6 +1,5 @@
 const express = require('express');
-const { updateUserKey, deleteUserKey, getUserKeyExpiry } = require('~/models');
-const { getUserKeyValues } = require('~/models');
+const { updateUserKey, deleteUserKey, getUserKeyExpiry, getUserKey } = require('~/models');
 const axios = require('axios');
 const { requireJwtAuth } = require('~/server/middleware');
 
@@ -111,8 +110,7 @@ router.get('/aittco/quota', requireJwtAuth, async (req, res) => {
   const cached = quotaCache.get(userId);
   if (cached && cached.expiresAt > Date.now()) return res.status(200).send(cached.value);
   try {
-    const values = await getUserKeyValues({ userId, name: AITTCO_SHARED_KEY_NAME });
-    const apiKey = typeof values === 'string' ? values : values?.apiKey || values?.key || values?.value;
+    const apiKey = await getUserKey({ userId, name: AITTCO_SHARED_KEY_NAME });
     if (!apiKey || apiKey === 'user_provided') {
       return res.status(404).send({ error: 'Aittco API key is not configured.' });
     }

@@ -6,6 +6,7 @@ jest.mock('~/models', () => ({
   deleteUserKey: jest.fn(),
   getUserKeyExpiry: jest.fn(),
   getUserKeyValues: jest.fn(),
+  getUserKey: jest.fn(),
 }));
 
 jest.mock('axios', () => ({
@@ -20,7 +21,7 @@ jest.mock('~/server/middleware', () => ({
 
 describe('Keys Routes', () => {
   let app;
-  const { updateUserKey, deleteUserKey, getUserKeyExpiry, getUserKeyValues } = require('~/models');
+  const { updateUserKey, deleteUserKey, getUserKeyExpiry, getUserKeyValues, getUserKey } = require('~/models');
   const axios = require('axios');
 
   beforeAll(() => {
@@ -44,7 +45,7 @@ describe('Keys Routes', () => {
 
   describe('GET /aittco/quota', () => {
     it('returns normalized quota data without exposing the shared key', async () => {
-      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-super-secret' });
+      getUserKey.mockResolvedValue('sk-super-secret');
       axios.get.mockResolvedValue({ data: { total: 1000, used: 250 } });
 
       const response = await request(app).get('/api/keys/aittco/quota');
@@ -52,7 +53,7 @@ describe('Keys Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ total: 1000, used: 250, remaining: 750, percentage: 25 });
       expect(JSON.stringify(response.body)).not.toContain('sk-super-secret');
-      expect(getUserKeyValues).toHaveBeenCalledWith({ userId: 'test-user-123', name: 'aittco_shared' });
+      expect(getUserKey).toHaveBeenCalledWith({ userId: 'test-user-123', name: 'aittco_shared' });
       expect(axios.get).toHaveBeenCalledWith(
         expect.stringContaining('/api/key/balance'),
         expect.objectContaining({ headers: { Authorization: 'Bearer sk-super-secret' } }),
@@ -60,7 +61,7 @@ describe('Keys Routes', () => {
     });
 
     it('returns 404 when the user has no shared key', async () => {
-      getUserKeyValues.mockRejectedValue(new Error('no user key'));
+      getUserKey.mockRejectedValue(new Error('no user key'));
 
       const response = await request(app).get('/api/keys/aittco/quota');
 
@@ -71,7 +72,7 @@ describe('Keys Routes', () => {
 
     it('caches quota responses for 60 seconds per user', async () => {
       jest.useFakeTimers();
-      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-cache-key' });
+      getUserKey.mockResolvedValue('sk-cache-key');
       axios.get.mockResolvedValue({ data: { balance: 42 } });
 
       await request(app).get('/api/keys/aittco/quota');
@@ -84,7 +85,7 @@ describe('Keys Routes', () => {
     });
 
     it('supports array-wrapped proxy responses and the models fallback', async () => {
-      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-models-key' });
+      getUserKey.mockResolvedValue('sk-models-key');
       axios.get.mockRejectedValueOnce(new Error('missing endpoint'));
       axios.get.mockResolvedValueOnce({ data: [{ balance: 42 }] });
 
@@ -95,7 +96,7 @@ describe('Keys Routes', () => {
     });
 
     it('ignores unauthorized message payloads and combines billing subscription and usage', async () => {
-      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-billing-key' });
+      getUserKey.mockResolvedValue('sk-billing-key');
       axios.get
         .mockResolvedValueOnce({ data: { message: 'Unauthorized, invalid access token', success: false } })
         .mockResolvedValueOnce({ data: { hard_limit_usd: 100 } })
