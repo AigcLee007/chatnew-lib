@@ -1,5 +1,5 @@
 import { Providers } from '@librechat/agents';
-import { AuthKeys, EModelEndpoint } from 'librechat-data-provider';
+import { AuthKeys, EModelEndpoint, ErrorTypes } from 'librechat-data-provider';
 import type { EndpointDbMethods, ServerRequest } from '~/types';
 
 const mockGetGoogleConfig = jest.fn(
@@ -144,6 +144,57 @@ describe('initializeGoogle', () => {
         modelOptions: { model: 'gemini-2.5-flash', web_search: true },
       }),
     );
+  });
+
+  it('reads a user-provided Google key from the Aittco shared key', async () => {
+    process.env.GOOGLE_KEY = 'user_provided';
+    const db = createDb();
+    const req = createReq();
+    req.body = { key: '2099-01-01' };
+
+    await initializeGoogle({
+      req,
+      endpoint: EModelEndpoint.google,
+      model_parameters: { model: 'gemini-2.5-flash' },
+      db,
+    });
+
+    expect(db.getUserKey).toHaveBeenCalledWith({ userId: 'user-1', name: 'aittco_shared' });
+  });
+
+  it('reads a permanent user-provided Google key without an expiry timestamp', async () => {
+    process.env.GOOGLE_KEY = 'user_provided';
+    const db = createDb();
+
+    await expect(
+      initializeGoogle({
+        req: createReq(),
+        endpoint: EModelEndpoint.google,
+        model_parameters: { model: 'gemini-2.5-flash' },
+        db,
+      }),
+    ).resolves.toBeDefined();
+
+    expect(db.getUserKey).toHaveBeenCalledWith({ userId: 'user-1', name: 'aittco_shared' });
+    expect(mockCheckUserKeyExpiry).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'user_provided'])('rejects a %p Aittco shared Google key', async (userKey) => {
+    process.env.GOOGLE_KEY = 'user_provided';
+    const db = createDb();
+    (db.getUserKey as jest.Mock).mockResolvedValue(userKey);
+    const req = createReq();
+    req.body = { key: '2099-01-01' };
+
+    await expect(
+      initializeGoogle({
+        req,
+        endpoint: EModelEndpoint.google,
+        model_parameters: { model: 'gemini-2.5-flash' },
+        db,
+      }),
+    ).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+    expect(mockGetGoogleConfig).not.toHaveBeenCalled();
   });
 
   it('resolves configured headers at init (merged over endpoints.all) before getGoogleConfig', async () => {

@@ -16,6 +16,7 @@ import { getTokenConfigKey } from '~/endpoints/custom/initialize';
 import { getAppConfigOptionsFromUser } from '~/app/service';
 import { resolveConfigSecret } from '~/admin/secrets';
 import { validateEndpointURL } from '~/auth';
+import { getAittcoKeyName } from '~/auth/sharedKey';
 import { tokenConfigCache } from '~/cache';
 import { isUserProvided } from '~/utils';
 
@@ -133,7 +134,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
     if (userKeyEndpoints.length > 0 && req.user?.id) {
       const userId = req.user.id;
       const results = await Promise.allSettled(
-        userKeyEndpoints.map((e) => getUserKeyValues({ userId, name: e.name })),
+        userKeyEndpoints.map((e) => getUserKeyValues({ userId, name: getAittcoKeyName(e.name) })),
       );
       for (let i = 0; i < userKeyEndpoints.length; i++) {
         const settled = results[i];
@@ -204,7 +205,7 @@ export function createLoadConfigModels(deps: LoadConfigModelsDeps) {
           apiKeyIsUserProvided || baseURLIsUserProvided ? userKeyValues?.apiKey : API_KEY;
         const resolvedBaseURL = baseURLIsUserProvided ? userKeyValues?.baseURL : BASE_URL;
 
-        if (resolvedApiKey && resolvedBaseURL) {
+        if (resolvedApiKey && !isUserProvided(resolvedApiKey) && resolvedBaseURL) {
           const userFetchKey = `user:${req.user?.id}:${name}`;
           fetchPromisesMap[userFetchKey] =
             fetchPromisesMap[userFetchKey] ||

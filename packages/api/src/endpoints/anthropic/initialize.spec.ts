@@ -1,4 +1,4 @@
-import { EModelEndpoint } from 'librechat-data-provider';
+import { EModelEndpoint, ErrorTypes } from 'librechat-data-provider';
 import type { AnthropicClientOptions } from '@librechat/agents';
 import type { BaseInitializeParams, ServerRequest } from '~/types';
 import { FINE_GRAINED_TOOL_STREAMING_BETA } from './helpers';
@@ -48,6 +48,33 @@ function createParams(
 }
 
 describe('initializeAnthropic – custom headers', () => {
+  it('reads a user-provided Anthropic key from the Aittco shared key', async () => {
+    const { params, restore } = createParams({}, { ANTHROPIC_API_KEY: 'user_provided' });
+    (params.req.body as { key?: string }).key = '2099-01-01';
+    (params.db.getUserKey as jest.Mock).mockResolvedValue('sk-ant-user-key');
+
+    try {
+      await initializeAnthropic(params);
+      expect(params.db.getUserKey).toHaveBeenCalledWith({
+        userId: 'user-42',
+        name: 'aittco_shared',
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  it.each([null, 'user_provided'])('rejects a %p Aittco shared Anthropic key', async (userKey) => {
+    const { params, restore } = createParams({}, { ANTHROPIC_API_KEY: 'user_provided' });
+    (params.db.getUserKey as jest.Mock).mockResolvedValue(userKey);
+
+    try {
+      await expect(initializeAnthropic(params)).rejects.toThrow(ErrorTypes.NO_USER_KEY);
+    } finally {
+      restore();
+    }
+  });
+
   it('threads configured headers into clientOptions.defaultHeaders without resolving placeholders', async () => {
     const { params, restore } = createParams(
       {

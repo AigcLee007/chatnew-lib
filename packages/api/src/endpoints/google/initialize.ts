@@ -1,6 +1,6 @@
 import path from 'path';
 import { Providers } from '@librechat/agents';
-import { EModelEndpoint, AuthKeys } from 'librechat-data-provider';
+import { EModelEndpoint, AuthKeys, ErrorTypes } from 'librechat-data-provider';
 import type {
   BaseInitializeParams,
   InitializeResultBase,
@@ -14,6 +14,7 @@ import {
   mergeHeaders,
   resolveHeaders,
 } from '~/utils';
+import { getAittcoKeyName } from '~/auth/sharedKey';
 import { getGoogleConfig } from './llm';
 
 /**
@@ -38,9 +39,22 @@ export async function initializeGoogle({
   const { key: expiresAt } = req.body;
 
   let userKey = null;
-  if (expiresAt && useUserProvidedGoogleKey) {
-    checkUserKeyExpiry(expiresAt, EModelEndpoint.google);
-    userKey = await db.getUserKey({ userId: req.user?.id ?? '', name: EModelEndpoint.google });
+  if (useUserProvidedGoogleKey) {
+    if (expiresAt) {
+      checkUserKeyExpiry(expiresAt, EModelEndpoint.google);
+    }
+    userKey = await db.getUserKey({
+      userId: req.user?.id ?? '',
+      name: getAittcoKeyName(EModelEndpoint.google),
+    });
+  }
+
+  if (useUserProvidedGoogleKey && (!userKey || userKey === 'user_provided')) {
+    throw new Error(
+      JSON.stringify({
+        type: ErrorTypes.NO_USER_KEY,
+      }),
+    );
   }
 
   let serviceKey: Record<string, unknown> = {};

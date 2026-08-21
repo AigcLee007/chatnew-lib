@@ -97,6 +97,35 @@ describe('initializeOpenAI – SSRF guard wiring', () => {
     );
   });
 
+  it('reads user-provided OpenAI values from the Aittco shared key', async () => {
+    const params = createParams({ OPENAI_API_KEY: AuthType.USER_PROVIDED });
+
+    try {
+      await initializeOpenAI(params);
+      expect(params.db.getUserKeyValues).toHaveBeenCalledWith({
+        userId: 'user-1',
+        name: 'aittco_shared',
+      });
+    } finally {
+      (params as unknown as { _restore: () => void })._restore();
+    }
+  });
+
+  it('reads permanent user-provided OpenAI values without an expiry timestamp', async () => {
+    const params = createParams({ OPENAI_API_KEY: AuthType.USER_PROVIDED });
+    delete params.req.body.key;
+
+    try {
+      await expect(initializeOpenAI(params)).resolves.toBeDefined();
+      expect(params.db.getUserKeyValues).toHaveBeenCalledWith({
+        userId: 'user-1',
+        name: 'aittco_shared',
+      });
+    } finally {
+      (params as unknown as { _restore: () => void })._restore();
+    }
+  });
+
   it('should NOT call validateEndpointURL when OPENAI_REVERSE_PROXY is a system URL', async () => {
     const params = createParams({
       OPENAI_API_KEY: 'sk-test',

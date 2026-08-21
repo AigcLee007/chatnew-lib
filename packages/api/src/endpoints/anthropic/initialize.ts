@@ -1,7 +1,8 @@
-import { EModelEndpoint, AuthKeys } from 'librechat-data-provider';
+import { EModelEndpoint, AuthKeys, ErrorTypes } from 'librechat-data-provider';
 import type { BaseInitializeParams, InitializeResultBase, AnthropicConfigOptions } from '~/types';
 import { loadAnthropicVertexCredentials, getVertexCredentialOptions } from './vertex';
 import { checkUserKeyExpiry, isEnabled, mergeHeaders } from '~/utils';
+import { getAittcoKeyName } from '~/auth/sharedKey';
 import { getLLMConfig } from './llm';
 
 /**
@@ -50,11 +51,18 @@ export async function initializeAnthropic({
     const isUserProvided = ANTHROPIC_API_KEY === 'user_provided';
 
     const anthropicApiKey = isUserProvided
-      ? await db.getUserKey({ userId: req.user?.id ?? '', name: EModelEndpoint.anthropic })
+      ? await db.getUserKey({
+          userId: req.user?.id ?? '',
+          name: getAittcoKeyName(EModelEndpoint.anthropic),
+        })
       : ANTHROPIC_API_KEY;
 
-    if (!anthropicApiKey) {
-      throw new Error('Anthropic API key not provided. Please provide it again.');
+    if (!anthropicApiKey || anthropicApiKey === 'user_provided') {
+      throw new Error(
+        JSON.stringify({
+          type: ErrorTypes.NO_USER_KEY,
+        }),
+      );
     }
 
     if (expiresAt && isUserProvided) {
