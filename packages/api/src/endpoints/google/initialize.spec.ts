@@ -179,6 +179,24 @@ describe('initializeGoogle', () => {
     expect(mockCheckUserKeyExpiry).not.toHaveBeenCalled();
   });
 
+  it('passes the shared gateway key as a raw API key', async () => {
+    process.env.GOOGLE_KEY = 'user_provided';
+    const db = createDb();
+
+    await initializeGoogle({
+      req: createReq(),
+      endpoint: EModelEndpoint.google,
+      model_parameters: { model: 'gemini-2.5-flash' },
+      db,
+    });
+
+    expect(mockGetGoogleConfig).toHaveBeenCalledWith(
+      'user-google-key',
+      expect.any(Object),
+      true,
+    );
+  });
+
   it.each([null, 'user_provided'])('rejects a %p Aittco shared Google key', async (userKey) => {
     process.env.GOOGLE_KEY = 'user_provided';
     const db = createDb();

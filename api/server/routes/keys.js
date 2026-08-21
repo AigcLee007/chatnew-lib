@@ -26,28 +26,27 @@ const quotaPaths = [
 ];
 
 function normalizeQuota(data) {
+  if (!data || typeof data !== 'object') return null;
   const candidate = Array.isArray(data) ? data[0] : data;
+  if (!candidate || typeof candidate !== 'object') return null;
   const nested = candidate?.data;
   const source = Array.isArray(nested)
     ? nested[0] || {}
     : nested && typeof nested === 'object'
       ? nested
       : candidate || {};
-  const total = Number(source.total ?? source.total_quota ?? source.quota ?? source.credit_grants ?? 0);
-  const used = Number(source.used ?? source.usage ?? source.used_quota ?? 0);
-  const remaining = Number(source.remaining ?? source.remain ?? source.balance ?? source.available ?? total - used);
-  const hasTotal = Number.isFinite(total) && total > 0;
-  const hasUsed = Number.isFinite(used) && used >= 0;
-  const hasRemaining = Number.isFinite(remaining) && remaining >= 0;
-  if (!hasTotal && !hasUsed && !hasRemaining) return null;
-  const safeTotal = hasTotal ? total : (hasUsed && hasRemaining ? used + remaining : remaining);
-  const safeUsed = hasUsed ? used : Math.max(0, safeTotal - remaining);
-  const safeRemaining = hasRemaining ? remaining : Math.max(0, safeTotal - safeUsed);
+  const toNumber = (value) => (value == null || value === '' ? null : Number(value));
+  const total = toNumber(source.total ?? source.total_quota ?? source.quota ?? source.credit_grants ?? source.hard_limit_usd);
+  const rawUsed = toNumber(source.used ?? source.usage ?? source.used_quota ?? source.total_usage);
+  const used = source.total_usage != null && source.used == null && source.usage == null
+    ? (rawUsed == null ? null : rawUsed / 100)
+    : rawUsed;
+  const remaining = toNumber(source.remaining ?? source.remain ?? source.balance ?? source.available ?? source.available_quota);
+  if (![total, used, remaining].some((value) => Number.isFinite(value))) return null;
   return {
-    total: safeTotal,
-    used: safeUsed,
-    remaining: safeRemaining,
-    percentage: safeTotal > 0 ? Math.round((safeUsed / safeTotal) * 10000) / 100 : 0,
+    ...(Number.isFinite(total) ? { total } : {}),
+    ...(Number.isFinite(used) ? { used } : {}),
+    ...(Number.isFinite(remaining) ? { remaining } : {}),
   };
 }
 
@@ -55,14 +54,41 @@ async function fetchAittcoQuota(apiKey) {
   const baseUrl = (process.env.AITTCO_API_URL || 'https://api.aittco.com').replace(/\/$/, '');
   const config = { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10000 };
   let lastError;
+  let quota = null;
   for (const path of quotaPaths) {
     try {
       const response = await axios.get(`${baseUrl}${path}`, config);
       const normalized = normalizeQuota(response.data);
-      if (normalized) return normalized;
+      if (normalized) quota = { ...(quota || {}), ...normalized };
     } catch (error) {
       lastError = error;
     }
+  }
+  if (quota) {
+    const total = Number(quota.total);
+    const used = Number(quota.used);
+    const remaining = Number(quota.remaining);
+    const safeTotal = Number.isFinite(total)
+      ? total
+      : Number.isFinite(used) && Number.isFinite(remaining)
+        ? used + remaining
+        : Number.isFinite(remaining)
+          ? remaining
+          : used;
+    const safeUsed = Number.isFinite(used)
+      ? used
+      : Number.isFinite(remaining)
+        ? Math.max(0, safeTotal - remaining)
+        : 0;
+    const safeRemaining = Number.isFinite(remaining)
+      ? remaining
+      : Math.max(0, safeTotal - safeUsed);
+    return {
+      total: safeTotal,
+      used: safeUsed,
+      remaining: safeRemaining,
+      percentage: safeTotal > 0 ? Math.round((safeUsed / safeTotal) * 10000) / 100 : 0,
+    };
   }
   throw lastError || new Error('Quota response was unavailable');
 }

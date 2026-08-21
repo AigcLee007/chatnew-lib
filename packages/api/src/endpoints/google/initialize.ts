@@ -142,7 +142,8 @@ export async function initializeGoogle({
     ...clientOptions,
   };
 
-  const result = getGoogleConfig(credentials, clientOptions);
+  // User-provided shared gateway keys are raw API key strings, not service-account JSON.
+  const result = getGoogleConfig(credentials, clientOptions, useUserProvidedGoogleKey);
 
   if (clientOptions.streamRate != null) {
     result.llmConfig._lc_stream_delay = clientOptions.streamRate;

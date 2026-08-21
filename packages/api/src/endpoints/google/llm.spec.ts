@@ -1769,6 +1769,14 @@ describe('getGoogleConfig', () => {
         });
       }).toThrow('Error parsing string credentials');
     });
+
+    it('accepts a raw shared gateway API key string', () => {
+      const result = getGoogleConfig('sk-gateway-key', {
+        modelOptions: { model: 'gemini-3.5-flash-preview' },
+      }, true);
+
+      expect(result.llmConfig).toMatchObject({ apiKey: 'sk-gateway-key' });
+    });
   });
 
   describe('Edge Cases', () => {

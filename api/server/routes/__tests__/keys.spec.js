@@ -93,6 +93,19 @@ describe('Keys Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ total: 42, used: 0, remaining: 42, percentage: 0 });
     });
+
+    it('ignores unauthorized message payloads and combines billing subscription and usage', async () => {
+      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-billing-key' });
+      axios.get
+        .mockResolvedValueOnce({ data: { message: 'Unauthorized, invalid access token', success: false } })
+        .mockResolvedValueOnce({ data: { hard_limit_usd: 100 } })
+        .mockResolvedValueOnce({ data: { total_usage: 1250 } });
+
+      const response = await request(app).get('/api/keys/aittco/quota');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ total: 100, used: 12.5, remaining: 87.5, percentage: 12.5 });
+    });
   });
 
   describe('PUT /', () => {
