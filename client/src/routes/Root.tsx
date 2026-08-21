@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import {
   PromptGroupsProvider,
   AssistantsMapContext,
@@ -18,6 +18,7 @@ import { UnifiedSidebar, SIDEBAR_TRANSITION } from '~/components/UnifiedSidebar'
 import KeyboardShortcutsDialog from '~/components/Nav/KeyboardShortcutsDialog';
 import KeyboardDeleteDialog from '~/components/Nav/KeyboardDeleteDialog';
 import { useUserTermsQuery, useGetStartupConfig } from '~/data-provider';
+import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import useKeyboardShortcuts from '~/hooks/useKeyboardShortcuts';
 import useSidebarState from '~/hooks/Nav/useSidebarState';
 import { TermsAndConditionsModal } from '~/components/ui';
@@ -58,6 +59,17 @@ export default function Root() {
     [setSidebarExpanded],
   );
   const { isAuthenticated, logout } = useAuthContext();
+  const navigate = useNavigate();
+  const sharedKeyQuery = useUserKeyQuery('aittco_shared', {
+    enabled: isAuthenticated,
+    refetchOnMount: true,
+  });
+
+  useEffect(() => {
+    if (isAuthenticated && !sharedKeyQuery.isLoading && !sharedKeyQuery.isError && !sharedKeyQuery.data?.expiresAt) {
+      navigate('/setup-key', { replace: true });
+    }
+  }, [isAuthenticated, sharedKeyQuery.isLoading, sharedKeyQuery.isError, sharedKeyQuery.data?.expiresAt, navigate]);
 
   useDrawerSwipe({
     paneRef,
@@ -97,7 +109,7 @@ export default function Root() {
     logout('/login?redirect=false');
   };
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || sharedKeyQuery.isLoading || sharedKeyQuery.isError || !sharedKeyQuery.data?.expiresAt) {
     return null;
   }
 

@@ -21,6 +21,7 @@ import ShareRoute from './ShareRoute';
 import ChatRoute from './ChatRoute';
 import Search from './Search';
 import Root from './Root';
+import SetupKey from './SetupKey';
 
 const AuthLayout = () => (
   <AuthContextProvider>
@@ -123,6 +124,10 @@ export const router = createBrowserRouter(
           ],
         },
         dashboardRoutes,
+        {
+          path: 'setup-key',
+          element: <SetupKey />,
+        },
         {
           path: '/',
           element: <Root />,

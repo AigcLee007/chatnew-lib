@@ -39,9 +39,9 @@ function Footer({ className, startupConfig }: FooterProps) {
   const mainContentParts = (
     typeof config?.customFooter === 'string'
       ? config.customFooter
-      : '[LibreChat ' +
+      : '[AittcoChat ' +
         Constants.VERSION +
-        '](https://librechat.ai) - ' +
+        '](https://chatvip.aittco.com) - ' +
         localize('com_ui_latest_footer')
   ).split('|');
 
