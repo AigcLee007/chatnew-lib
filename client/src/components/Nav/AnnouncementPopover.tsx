@@ -37,6 +37,21 @@ export default function AnnouncementPopover() {
     }
   };
 
+  const update = async (item: Announcement, changes: Partial<Announcement>) => {
+    const response = await fetch(`/api/announcements/${item._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(changes),
+    });
+    if (response.ok) load();
+  };
+
+  const remove = async (item: Announcement) => {
+    if (!window.confirm(`确定删除公告“${item.title}”吗？`)) return;
+    const response = await fetch(`/api/announcements/${item._id}`, { method: 'DELETE' });
+    if (response.ok) load();
+  };
+
   return (
     <Menu.MenuProvider open={open} setOpen={setOpen} placement="right-start">
       <Menu.MenuItem
@@ -57,6 +72,14 @@ export default function AnnouncementPopover() {
             <article key={item._id} className="border-b border-border-medium pb-3 last:border-0">
               <h3 className="flex items-center gap-1 text-sm font-medium">{item.pinned && <Pin className="size-3" />}{item.title}</h3>
               <p className="mt-1 whitespace-pre-wrap text-xs text-text-secondary">{item.content}</p>
+              {user?.role === 'ADMIN' && (
+                <div className="mt-2 flex gap-2 text-xs">
+                  <button type="button" className="text-accent-primary" onClick={() => update(item, { active: !item.active })}>
+                    {item.active === false ? '启用' : '停用'}
+                  </button>
+                  <button type="button" className="text-red-500" onClick={() => remove(item)}>删除</button>
+                </div>
+              )}
             </article>
           ))}
         </div>

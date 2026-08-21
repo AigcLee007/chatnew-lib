@@ -53,9 +53,14 @@ function normalizeQuota(data) {
 async function fetchAittcoQuota(apiKey) {
   const baseUrl = (process.env.AITTCO_API_URL || 'https://api.aittco.com').replace(/\/$/, '');
   const config = { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10000 };
+  const today = new Date().toISOString().slice(0, 10);
+  const usageStart = '2023-01-01';
+  const paths = quotaPaths.map((path) =>
+    path.includes('/usage') ? `${path}?start_date=${usageStart}&end_date=${today}` : path,
+  );
   let lastError;
   let quota = null;
-  for (const path of quotaPaths) {
+  for (const path of paths) {
     try {
       const response = await axios.get(`${baseUrl}${path}`, config);
       const normalized = normalizeQuota(response.data);
