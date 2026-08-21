@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as Menu from '@ariakit/react/menu';
 import { BarChart3, RefreshCw } from 'lucide-react';
+import { getTokenHeader } from 'librechat-data-provider';
 
 type Quota = { total: number | null; used: number | null; remaining: number | null; percentage: number | null };
 
@@ -13,7 +14,10 @@ export default function QuotaSummary() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/keys/aittco/quota');
+      const tokenHeader = getTokenHeader();
+      const response = await fetch('/api/keys/aittco/quota', {
+        headers: tokenHeader ? { Authorization: tokenHeader } : undefined,
+      });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         setQuota(null);
