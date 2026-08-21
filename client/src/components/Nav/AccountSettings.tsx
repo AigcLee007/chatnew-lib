@@ -17,6 +17,9 @@ import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import Settings from './Settings';
+import ContactSupport from './ContactSupport';
+import AnnouncementPopover from './AnnouncementPopover';
+import QuotaSummary from './QuotaSummary';
 import store from '~/store';
 
 function HelpSubmenu({
@@ -157,6 +160,9 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
           privacyPolicyURL={startupConfig?.interface?.privacyPolicy?.externalUrl}
           onShowShortcuts={() => setShowShortcutsDialog(true)}
         />
+        <ContactSupport />
+        <AnnouncementPopover />
+        <QuotaSummary />
         <Menu.MenuItem onClick={() => setShowArchived(true)} className="select-item text-sm">
           <Archive className="icon-md" aria-hidden="true" />
           {localize('com_nav_archived_chats')}
