@@ -5,6 +5,11 @@ jest.mock('~/models', () => ({
   updateUserKey: jest.fn(),
   deleteUserKey: jest.fn(),
   getUserKeyExpiry: jest.fn(),
+  getUserKeyValues: jest.fn(),
+}));
+
+jest.mock('axios', () => ({
+  get: jest.fn(),
 }));
 
 jest.mock('~/server/middleware/requireJwtAuth', () => (req, res, next) => next());
@@ -15,7 +20,8 @@ jest.mock('~/server/middleware', () => ({
 
 describe('Keys Routes', () => {
   let app;
-  const { updateUserKey, deleteUserKey, getUserKeyExpiry } = require('~/models');
+  const { updateUserKey, deleteUserKey, getUserKeyExpiry, getUserKeyValues } = require('~/models');
+  const axios = require('axios');
 
   beforeAll(() => {
     const keysRouter = require('../keys');
@@ -33,6 +39,49 @@ describe('Keys Routes', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  describe('GET /aittco/quota', () => {
+    it('returns normalized quota data without exposing the shared key', async () => {
+      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-super-secret' });
+      axios.get.mockResolvedValue({ data: { total: 1000, used: 250 } });
+
+      const response = await request(app).get('/api/keys/aittco/quota');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ total: 1000, used: 250, remaining: 750, percentage: 25 });
+      expect(JSON.stringify(response.body)).not.toContain('sk-super-secret');
+      expect(getUserKeyValues).toHaveBeenCalledWith({ userId: 'test-user-123', name: 'aittco_shared' });
+      expect(axios.get).toHaveBeenCalledWith(
+        expect.stringContaining('/api/key/balance'),
+        expect.objectContaining({ headers: { Authorization: 'Bearer sk-super-secret' } }),
+      );
+    });
+
+    it('returns 404 when the user has no shared key', async () => {
+      getUserKeyValues.mockRejectedValue(new Error('no user key'));
+
+      const response = await request(app).get('/api/keys/aittco/quota');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Aittco API key is not configured.' });
+      expect(axios.get).not.toHaveBeenCalled();
+    });
+
+    it('caches quota responses for 60 seconds per user', async () => {
+      jest.useFakeTimers();
+      getUserKeyValues.mockResolvedValue({ apiKey: 'sk-cache-key' });
+      axios.get.mockResolvedValue({ data: { balance: 42 } });
+
+      await request(app).get('/api/keys/aittco/quota');
+      await request(app).get('/api/keys/aittco/quota');
+      expect(axios.get).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(60001);
+      await request(app).get('/api/keys/aittco/quota');
+      expect(axios.get).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('PUT /', () => {
