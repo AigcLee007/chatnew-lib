@@ -5,7 +5,7 @@ import { getTokenHeader } from 'librechat-data-provider';
 
 type Quota = { total: number | null; used: number | null; remaining: number | null; percentage: number | null };
 
-export default function QuotaSummary() {
+export default function QuotaSummary({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [quota, setQuota] = useState<Quota | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +33,9 @@ export default function QuotaSummary() {
     }
   };
   return (
-    <Menu.MenuProvider open={open} setOpen={(value) => { setOpen(value); if (value && !quota) void refresh(); }} placement="right-start">
-      <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />} onClick={() => setOpen((value) => !value)}>
-        <BarChart3 className="icon-md" aria-hidden="true" />额度查询
+    <Menu.MenuProvider open={open} setOpen={(value) => { setOpen(value); if (value && !quota) void refresh(); }} placement={compact ? 'bottom-end' : 'right-start'}>
+      <Menu.MenuItem className={compact ? 'flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover' : 'select-item text-sm'} render={<Menu.MenuButton />} onClick={() => setOpen((value) => !value)} aria-label="额度查询" title="额度查询">
+        <BarChart3 className="icon-md" aria-hidden="true" />{!compact && '额度查询'}
       </Menu.MenuItem>
       <Menu.Menu portal className="account-settings-popover popover-ui z-[126] w-[260px] rounded-lg p-4">
         <div className="flex items-center justify-between text-sm font-medium"><span>API Key 额度</span><button type="button" aria-label="刷新额度" onClick={refresh} disabled={loading}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></button></div>

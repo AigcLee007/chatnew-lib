@@ -18,6 +18,9 @@ import AddMultiConvo from './AddMultiConvo';
 import { useHasAccess } from '~/hooks';
 import { cn } from '~/utils';
 import store from '~/store';
+import ContactSupport from '~/components/Nav/ContactSupport';
+import AnnouncementPopover from '~/components/Nav/AnnouncementPopover';
+import QuotaSummary from '~/components/Nav/QuotaSummary';
 
 const defaultInterface = getConfigDefaults().interface;
 
@@ -105,6 +108,11 @@ function Header({
       <div className={cn('flex flex-shrink-0 items-center gap-2', hiddenBehindNav)}>
         {!isNewChat && <NewChat className="md:hidden" />}
         <HeaderMenu startupConfig={startupConfig} className="md:hidden" />
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <QuotaSummary compact />
+          <AnnouncementPopover compact />
+          <ContactSupport compact />
+        </div>
         <div className="hidden items-center gap-2 md:flex">
           <ExportAndShareMenu isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false} />
           {hasAccessToTemporaryChat === true && <TemporaryChat />}

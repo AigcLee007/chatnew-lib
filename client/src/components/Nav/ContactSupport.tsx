@@ -3,18 +3,20 @@ import * as Menu from '@ariakit/react/menu';
 import { Headphones, MessageCircle } from 'lucide-react';
 import { DropdownMenuSeparator } from '@librechat/client';
 
-export default function ContactSupport() {
+export default function ContactSupport({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <Menu.MenuProvider open={open} setOpen={setOpen} placement="right-start">
+    <Menu.MenuProvider open={open} setOpen={setOpen} placement={compact ? 'bottom-end' : 'right-start'}>
       <Menu.MenuItem
-        className="select-item text-sm"
+        className={compact ? 'flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover' : 'select-item text-sm'}
         render={<Menu.MenuButton />}
         onClick={() => setOpen((value) => !value)}
+        aria-label="联系客服"
+        title="联系客服"
       >
         <Headphones className="icon-md" aria-hidden="true" />
-        联系客服
+        {!compact && '联系客服'}
       </Menu.MenuItem>
       <Menu.Menu
         portal
