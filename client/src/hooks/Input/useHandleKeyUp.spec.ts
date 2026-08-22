@@ -6,6 +6,9 @@ const mockHasPromptsAccess = { current: true };
 const mockHasMultiConvoAccess = { current: true };
 const mockHasSkillsAccess = { current: true };
 const mockSkillsEnabled = { current: true };
+const mockUseAgentCapabilities = jest.fn((capabilities?: string[]) => ({
+  skillsEnabled: mockSkillsEnabled.current && capabilities?.includes('skills') === true,
+}));
 const mockEndpoint = { current: 'openAI' as string | null };
 const mockCommandToggles = { at: true, plus: true, slash: true, dollar: true };
 
@@ -74,13 +77,11 @@ jest.mock('~/hooks/Roles/useHasAccess', () =>
 );
 
 jest.mock('~/hooks/Agents/useGetAgentsConfig', () =>
-  jest.fn(() => ({ agentsConfig: { capabilities: [] } })),
+  jest.fn(() => ({ agentsConfig: undefined })),
 );
 
 jest.mock('~/hooks/Agents/useAgentCapabilities', () =>
-  jest.fn(() => ({
-    skillsEnabled: mockSkillsEnabled.current,
-  })),
+  mockUseAgentCapabilities,
 );
 
 jest.mock('~/hooks/Messages/useLatestMessage', () => ({
@@ -138,6 +139,7 @@ beforeEach(() => {
   mockCommandToggles.plus = true;
   mockCommandToggles.slash = true;
   mockCommandToggles.dollar = true;
+  mockUseAgentCapabilities.mockClear();
 });
 
 describe('useHandleKeyUp', () => {
@@ -176,6 +178,17 @@ describe('useHandleKeyUp', () => {
       act(() => handleKeyUp(makeKeyEvent('$')));
 
       expect(setShowSkillsPopover).toHaveBeenCalledWith(true);
+    });
+
+    it('uses default agent capabilities while endpoint config is unavailable', () => {
+      const ref = makeTextAreaRef('$', 1);
+      const { handleKeyUp } = renderUseHandleKeyUp(ref);
+
+      act(() => handleKeyUp(makeKeyEvent('$')));
+
+      expect(mockUseAgentCapabilities).toHaveBeenCalledWith(
+        expect.arrayContaining(['skills']),
+      );
     });
 
     it('triggers $ skill command when $ is inserted before an existing draft', () => {
