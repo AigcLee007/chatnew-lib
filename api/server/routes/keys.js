@@ -108,9 +108,12 @@ async function fetchAittcoQuota(apiKey) {
       : Number.isFinite(remaining)
         ? Math.max(0, safeTotal - remaining)
         : 0;
-    const safeRemaining = Number.isFinite(remaining) && remaining >= 0
+    const derivedRemaining = Math.max(0, safeTotal - safeUsed);
+    // Some proxy balance endpoints expose `remaining: 0` even when the
+    // account still has credit. Prefer the internally consistent balance.
+    const safeRemaining = Number.isFinite(remaining) && remaining > 0
       ? remaining
-      : Math.max(0, safeTotal - safeUsed);
+      : derivedRemaining;
     return {
       total: safeTotal,
       used: safeUsed,

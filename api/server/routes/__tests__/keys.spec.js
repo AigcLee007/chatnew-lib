@@ -127,6 +127,22 @@ describe('Keys Routes', () => {
         percentage: 20.87,
       });
     });
+
+    it('derives remaining balance when the proxy reports zero despite unused quota', async () => {
+      requestUserId = 'quota-zero-remaining-user';
+      getUserKey.mockResolvedValue('sk-zero-remaining-key');
+      axios.get.mockResolvedValue({ data: { total: 110.52, used: 23.97, remaining: 0 } });
+
+      const response = await request(app).get('/api/keys/aittco/quota');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        total: 110.52,
+        used: 23.97,
+        remaining: 86.55,
+        percentage: 21.69,
+      });
+    });
   });
 
   describe('PUT /', () => {
