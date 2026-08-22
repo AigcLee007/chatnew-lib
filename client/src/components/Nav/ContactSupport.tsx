@@ -8,16 +8,20 @@ export default function ContactSupport({ compact = false }: { compact?: boolean 
 
   return (
     <Menu.MenuProvider open={open} setOpen={setOpen} placement={compact ? 'bottom-end' : 'right-start'}>
-      <Menu.MenuItem
-        className={compact ? 'flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover' : 'select-item text-sm'}
-        render={<Menu.MenuButton />}
-        onClick={() => setOpen((value) => !value)}
-        aria-label="联系客服"
-        title="联系客服"
-      >
-        <Headphones className="icon-md" aria-hidden="true" />
-        {!compact && '联系客服'}
-      </Menu.MenuItem>
+      {compact ? (
+        <Menu.MenuButton
+          className="flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
+          aria-label="联系客服"
+          title="联系客服"
+        >
+          <Headphones className="icon-md" aria-hidden="true" />
+        </Menu.MenuButton>
+      ) : (
+        <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
+          <Headphones className="icon-md" aria-hidden="true" />
+          联系客服
+        </Menu.MenuItem>
+      )}
       <Menu.Menu
         portal
         className="account-settings-popover popover-ui z-[126] w-[260px] rounded-lg p-4"

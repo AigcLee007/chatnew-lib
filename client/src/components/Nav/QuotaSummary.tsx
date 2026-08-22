@@ -34,9 +34,19 @@ export default function QuotaSummary({ compact = false }: { compact?: boolean })
   };
   return (
     <Menu.MenuProvider open={open} setOpen={(value) => { setOpen(value); if (value && !quota) void refresh(); }} placement={compact ? 'bottom-end' : 'right-start'}>
-      <Menu.MenuItem className={compact ? 'flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover' : 'select-item text-sm'} render={<Menu.MenuButton />} onClick={() => setOpen((value) => !value)} aria-label="额度查询" title="额度查询">
-        <BarChart3 className="icon-md" aria-hidden="true" />{!compact && '额度查询'}
-      </Menu.MenuItem>
+      {compact ? (
+        <Menu.MenuButton
+          className="flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
+          aria-label="额度查询"
+          title="额度查询"
+        >
+          <BarChart3 className="icon-md" aria-hidden="true" />
+        </Menu.MenuButton>
+      ) : (
+        <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
+          <BarChart3 className="icon-md" aria-hidden="true" />额度查询
+        </Menu.MenuItem>
+      )}
       <Menu.Menu portal className="account-settings-popover popover-ui z-[126] w-[260px] rounded-lg p-4">
         <div className="flex items-center justify-between text-sm font-medium"><span>API Key 额度</span><button type="button" aria-label="刷新额度" onClick={refresh} disabled={loading}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
         {quota ? <dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><dt className="text-text-secondary">总额度</dt><dd>{quota.total ?? '-'}</dd><dt className="text-text-secondary">已使用</dt><dd>{quota.used ?? '-'}</dd><dt className="text-text-secondary">剩余</dt><dd>{quota.remaining ?? '-'}</dd><dt className="text-text-secondary">使用率</dt><dd>{quota.percentage == null ? '-' : `${quota.percentage}%`}</dd></dl> : <p className="mt-3 text-xs text-text-secondary">{error || '暂无额度数据'}</p>}

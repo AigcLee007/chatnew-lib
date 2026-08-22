@@ -65,17 +65,22 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   return (
     <Menu.MenuProvider open={open} setOpen={setOpen} placement={compact ? 'bottom-end' : 'right-start'}>
-      <Menu.MenuItem
-        className={compact ? 'relative flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover' : 'select-item text-sm'}
-        render={<Menu.MenuButton />}
-        onClick={() => setOpen((value) => !value)}
-        aria-label="公告"
-        title="公告"
-      >
-        <Bell className="icon-md" aria-hidden="true" />
-        {!compact && '公告'}
-        {items.length > 0 && <span className={compact ? 'absolute right-1 top-1 size-2 rounded-full bg-red-500' : 'ml-auto size-2 rounded-full bg-red-500'} aria-label="有新公告" />}
-      </Menu.MenuItem>
+      {compact ? (
+        <Menu.MenuButton
+          className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
+          aria-label="公告"
+          title="公告"
+        >
+          <Bell className="icon-md" aria-hidden="true" />
+          {items.length > 0 && <span className="absolute right-1 top-1 size-2 rounded-full bg-red-500" aria-label="有新公告" />}
+        </Menu.MenuButton>
+      ) : (
+        <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
+          <Bell className="icon-md" aria-hidden="true" />
+          公告
+          {items.length > 0 && <span className="ml-auto size-2 rounded-full bg-red-500" aria-label="有新公告" />}
+        </Menu.MenuItem>
+      )}
       <Menu.Menu portal className="account-settings-popover popover-ui z-[126] w-[320px] rounded-lg p-4">
         <div className="flex items-center gap-2 text-sm font-medium"><Bell className="size-4" />公告</div>
         <DropdownMenuSeparator />
