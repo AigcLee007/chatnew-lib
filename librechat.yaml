@@ -10,6 +10,7 @@ interface:
     share: false
     public: false
   fileCitations: true
+  skills: true
   defaultPinnedTools:
     - artifacts
     - execute_code
