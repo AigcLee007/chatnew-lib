@@ -1,6 +1,6 @@
 ---
 name: getting-started
-description: Explain how to use the enabled tools in this LibreChat deployment.
+description: 介绍本项目中已启用工具的用途、适用场景和基本使用方法。
 user-invocable: true
 disable-model-invocation: true
 ---

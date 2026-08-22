@@ -1,6 +1,6 @@
 ---
 name: methodology-advisor
-description: Use when a student needs to choose or explain a qualitative, quantitative, mixed-methods, experimental, survey, interview, case-study, or text-analysis research design.
+description: 适用于需要选择或解释定性、定量、混合研究、实验、问卷、访谈、案例研究或文本分析设计的学生。
 user-invocable: true
 disable-model-invocation: true
 ---

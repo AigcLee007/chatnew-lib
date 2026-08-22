@@ -1,6 +1,6 @@
 ---
 name: citation-verifier
-description: Use when a student needs to check whether thesis claims are supported by supplied sources or whether a reference list contains unverifiable entries.
+description: 适用于需要核查论文观点是否有给定文献支持，或检查参考文献列表中是否存在无法核验条目的学生。
 user-invocable: true
 disable-model-invocation: true
 ---

@@ -357,6 +357,9 @@ function SkillsCommandContent({
           onFocus={() => setOpen(true)}
           onBlur={() => {
             timeoutRef.current = setTimeout(() => {
+              if (uploadOpen || detailSkillId) {
+                return;
+              }
               setOpen(false);
               setShowSkillsPopover(false);
             }, 150);

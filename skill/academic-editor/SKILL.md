@@ -1,6 +1,6 @@
 ---
 name: academic-editor
-description: Use when a student needs thesis prose edited for academic clarity, structure, grammar, cohesion, or discipline-appropriate tone while preserving meaning and evidence.
+description: 适用于需要润色学术论文正文的学生，在保留原意和证据的前提下改进学术表达、结构、语法、衔接和符合学科规范的语气。
 user-invocable: true
 disable-model-invocation: true
 ---

@@ -1,6 +1,6 @@
 ---
 name: thesis-outline
-description: Use when a student needs to turn a topic, proposal, or school template into a coherent thesis outline with chapter goals and research logic.
+description: 适用于需要将论文主题、开题方案或学校模板整理为结构连贯的论文提纲，并明确章节目标和研究逻辑的学生。
 user-invocable: true
 disable-model-invocation: true
 ---

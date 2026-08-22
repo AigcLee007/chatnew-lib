@@ -1,6 +1,6 @@
 ---
 name: literature-review-builder
-description: Use when a student needs to organize uploaded papers into a literature review, research landscape, themes, methods, or research gaps.
+description: 适用于需要将上传的论文整理为文献综述、研究现状、主题脉络、研究方法或研究空白的学生。
 user-invocable: true
 disable-model-invocation: true
 ---
