@@ -157,6 +157,22 @@ export function createImportHandler(deps: ImportSkillDeps) {
       return res.status(400).json({ error: 'No file provided' });
     }
 
+    if (req.body?.mode === 'personal-single') {
+      const basename = path.basename(file.originalname).toLowerCase();
+      if (basename !== SKILL_MD.toLowerCase()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          issues: [
+            {
+              field: 'file',
+              code: 'PERSONAL_SKILL_FILE_REQUIRED',
+              message: 'Personal skill imports require a single file named SKILL.md',
+            },
+          ],
+        });
+      }
+    }
+
     const ext = path.extname(file.originalname).toLowerCase();
 
     try {

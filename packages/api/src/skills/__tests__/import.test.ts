@@ -53,7 +53,7 @@ function mockImportDeps(limits?: ImportSkillDeps['limits']): ImportSkillDeps {
   };
 }
 
-function mockZipRequest(buffer: Buffer): ImportRequest {
+function mockZipRequest(buffer: Buffer, mode?: string): ImportRequest {
   return {
     user: {
       id: 'user-1',
@@ -64,10 +64,15 @@ function mockZipRequest(buffer: Buffer): ImportRequest {
       originalname: 'tiny-limit-skill.skill',
       buffer,
     },
+    body: mode ? { mode } : {},
   } as unknown as ImportRequest;
 }
 
-function mockMarkdownRequest(content: string, originalname = 'bad-frontmatter.md'): ImportRequest {
+function mockMarkdownRequest(
+  content: string,
+  originalname = 'bad-frontmatter.md',
+  mode?: string,
+): ImportRequest {
   return {
     user: {
       id: 'user-1',
@@ -78,6 +83,7 @@ function mockMarkdownRequest(content: string, originalname = 'bad-frontmatter.md
       originalname,
       buffer: Buffer.from(content),
     },
+    body: mode ? { mode } : {},
   } as unknown as ImportRequest;
 }
 
@@ -346,6 +352,65 @@ describe('parseFrontmatter', () => {
 });
 
 describe('createImportHandler', () => {
+  const validSkillMarkdown = [
+    '---',
+    'name: personal-skill',
+    'description: A private skill.',
+    '---',
+    '# Personal skill',
+  ].join('\n');
+
+  it.each(['SKILL.md', 'skill.md'])(
+    'accepts %s for a personal single-file import',
+    async (originalname) => {
+      const deps = mockImportDeps();
+      const handler = createImportHandler(deps);
+      const res = mockResponse();
+
+      await handler(mockMarkdownRequest(validSkillMarkdown, originalname, 'personal-single'), res);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(deps.createSkill).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['custom.md', 'bundle.zip', 'bundle.skill'])(
+    'rejects %s for a personal single-file import before creating a skill',
+    async (originalname) => {
+      const deps = mockImportDeps();
+      const handler = createImportHandler(deps);
+      const res = mockResponse();
+      const req = originalname.endsWith('.md')
+        ? mockMarkdownRequest(validSkillMarkdown, originalname, 'personal-single')
+        : mockZipRequest(await zipWithAdditionalFiles(0, 0), 'personal-single');
+      req.file!.originalname = originalname;
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          error: 'Validation failed',
+          issues: expect.arrayContaining([
+            expect.objectContaining({ field: 'file', code: 'PERSONAL_SKILL_FILE_REQUIRED' }),
+          ]),
+        }),
+      );
+      expect(deps.createSkill).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves the archive import path when no import mode is supplied', async () => {
+    const deps = mockImportDeps();
+    const handler = createImportHandler(deps);
+    const res = mockResponse();
+
+    await handler(mockZipRequest(await zipWithAdditionalFiles(0, 0)), res);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(deps.createSkill).toHaveBeenCalledTimes(1);
+  });
+
   it('uses request-scoped import limits', async () => {
     const buffer = await zipWithAdditionalFiles(0, 0);
     const deps = mockImportDeps(() => ({
