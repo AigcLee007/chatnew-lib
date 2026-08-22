@@ -1449,5 +1449,13 @@
   "com_ui_zoom_in": "放大",
   "com_ui_zoom_level": "缩放级别",
   "com_ui_zoom_out": "缩小",
-  "com_user_message": "您"
+  "com_user_message": "您",
+  "com_ui_skill_when_to_use": "适用场景",
+  "com_ui_skill_inputs": "输入",
+  "com_ui_skill_outputs": "输出",
+  "com_ui_skill_example": "示例",
+  "com_ui_skill_source_deployment": "部署技能",
+  "com_ui_skill_source_personal": "我的技能",
+  "com_ui_skill_use_this": "使用此技能",
+  "com_ui_skill_open_details": "打开完整详情"
 }

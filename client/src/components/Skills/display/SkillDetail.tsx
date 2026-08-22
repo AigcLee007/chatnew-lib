@@ -17,6 +17,32 @@ interface SkillDetailProps {
 }
 
 const SKIP_KEYS = new Set(['name', 'description']);
+const KNOWN_METADATA_KEYS = ['when-to-use', 'inputs', 'outputs', 'example'] as const;
+export const skillMetadataLabels = {
+  'when-to-use': 'com_ui_skill_when_to_use',
+  inputs: 'com_ui_skill_inputs',
+  outputs: 'com_ui_skill_outputs',
+  example: 'com_ui_skill_example',
+} as const;
+
+export function getSkillMetadata(fields: Array<{ key: string; value: string }>) {
+  return KNOWN_METADATA_KEYS.map((key) => {
+    const field = fields.find((item) => item.key.toLowerCase() === key);
+    return field && field.value.trim() ? { key, value: field.value.trim() } : null;
+  }).filter(
+    (field): field is { key: (typeof KNOWN_METADATA_KEYS)[number]; value: string } =>
+      field !== null,
+  );
+}
+
+export function getSkillSourceLabel(
+  skill: Pick<TSkill, 'source' | 'author'>,
+  userId?: string,
+): 'deployment' | 'personal' | undefined {
+  if (skill.source === 'deployment') return 'deployment';
+  if (skill.source === 'inline' && skill.author === userId) return 'personal';
+  return undefined;
+}
 
 export default function SkillDetail({ skill, onEdit, onDelete }: SkillDetailProps) {
   const localize = useLocalize();
@@ -37,6 +63,11 @@ export default function SkillDetail({ skill, onEdit, onDelete }: SkillDetailProp
     () => parseFrontmatter(skill.body ?? '', SKIP_KEYS),
     [skill.body],
   );
+  const metadata = useMemo(() => getSkillMetadata(frontmatterFields), [frontmatterFields]);
+  const source = getSkillSourceLabel(skill, user?.id);
+  const sourceLabel = source
+    ? localize(source === 'deployment' ? 'com_ui_skill_source_deployment' : 'com_ui_skill_source_personal')
+    : undefined;
 
   return (
     <article
@@ -74,6 +105,7 @@ export default function SkillDetail({ skill, onEdit, onDelete }: SkillDetailProp
                 {updatedDate}
               </span>
             )}
+            {sourceLabel && <span data-testid="skill-source">{sourceLabel}</span>}
           </div>
         </div>
 
@@ -117,12 +149,12 @@ export default function SkillDetail({ skill, onEdit, onDelete }: SkillDetailProp
       </div>
 
       {/* Frontmatter metadata */}
-      {viewMode === 'rendered' && frontmatterFields.length > 0 && (
+      {viewMode === 'rendered' && metadata.length > 0 && (
         <div className="grid grid-cols-[max-content_1fr] items-baseline gap-x-8 gap-y-2 pb-2">
-          {frontmatterFields.map(({ key, value }) => (
+          {metadata.map(({ key, value }) => (
             <React.Fragment key={key}>
-              <span className="text-xs text-text-secondary">{key}</span>
-              <span className="text-sm text-text-primary">{value}</span>
+              <span className="text-xs text-text-secondary">{localize(skillMetadataLabels[key])}</span>
+              <span className="whitespace-pre-wrap text-sm text-text-primary">{value}</span>
             </React.Fragment>
           ))}
         </div>
