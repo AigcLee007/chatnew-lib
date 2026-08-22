@@ -437,6 +437,21 @@ describe('Skill routes', () => {
       expect(res.body.skills.length).toBe(1);
       expect(res.body.skills[0].name).toBe('mine-skill');
     });
+
+    it('keeps an inline skill private to its owner when another user lists skills', async () => {
+      const ownerSkill = await createSkillAsOwner({ name: 'owner-private-skill' });
+      expect(ownerSkill.status).toBe(201);
+
+      setTestUser(testUsers.noAccess);
+      const otherSkill = await createSkillAsOwner({ name: 'other-private-skill' });
+      expect(otherSkill.status).toBe(201);
+
+      setTestUser(testUsers.owner);
+      const res = await request(app).get('/api/skills');
+      expect(res.status).toBe(200);
+      expect(res.body.skills.map((skill) => skill._id)).toEqual([ownerSkill.body._id]);
+      expect(res.body.skills.map((skill) => skill.name)).not.toContain('other-private-skill');
+    });
   });
 
   describe('GET /api/skills/:id', () => {
@@ -454,6 +469,26 @@ describe('Skill routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.name).toBe('demo-skill');
       expect(res.body.isPublic).toBe(false);
+    });
+
+    it('does not let another user fetch, edit, or delete an inline skill', async () => {
+      const created = await createSkillAsOwner({ name: 'private-crud-skill' });
+      expect(created.status).toBe(201);
+
+      setTestUser(testUsers.noAccess);
+      await request(app).get(`/api/skills/${created.body._id}`).expect(403);
+      await request(app)
+        .patch(`/api/skills/${created.body._id}`)
+        .send({ expectedVersion: 1, description: 'Unauthorized edit attempt' })
+        .expect(403);
+      await request(app).delete(`/api/skills/${created.body._id}`).expect(403);
+
+      setTestUser(testUsers.owner);
+      await request(app).get(`/api/skills/${created.body._id}`).expect(200);
+      await request(app)
+        .patch(`/api/skills/${created.body._id}`)
+        .send({ expectedVersion: 1, description: 'Owner update' })
+        .expect(200);
     });
   });
 
