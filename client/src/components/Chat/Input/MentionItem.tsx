@@ -11,6 +11,7 @@ export interface MentionItemProps {
   isActive?: boolean;
   description?: string;
   style?: React.CSSProperties;
+  action?: React.ReactNode;
 }
 
 export default function MentionItem({
@@ -22,6 +23,7 @@ export default function MentionItem({
   description,
   style,
   type = 'mention',
+  action,
 }: MentionItemProps) {
   return (
     <button
@@ -39,7 +41,7 @@ export default function MentionItem({
         )}
       >
         <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center">{icon}</div>
-        <div className="flex min-w-0 flex-grow items-center justify-between">
+          <div className="flex min-w-0 flex-grow items-center justify-between gap-2">
           <div className="truncate">
             <span className="font-medium">{name}</span>
             {description != null && description ? (
@@ -48,7 +50,7 @@ export default function MentionItem({
               </span>
             ) : null}
           </div>
-          <Clock4 size={16} className="ml-2 flex-shrink-0" />
+          {action ?? <Clock4 size={16} className="ml-2 flex-shrink-0" />}
         </div>
       </div>
     </button>

@@ -14,6 +14,7 @@ import { cn } from '~/utils';
 interface UploadSkillDialogProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  onSuccess?: (skill: { _id: string; name: string }) => void;
 }
 
 function formatMegabytes(bytes: number): string {
@@ -21,7 +22,7 @@ function formatMegabytes(bytes: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
-export default function UploadSkillDialog({ isOpen, setIsOpen }: UploadSkillDialogProps) {
+export default function UploadSkillDialog({ isOpen, setIsOpen, onSuccess }: UploadSkillDialogProps) {
   const localize = useLocalize();
   const navigate = useNavigate();
   const { showToast } = useToastContext();
@@ -47,6 +48,7 @@ export default function UploadSkillDialog({ isOpen, setIsOpen }: UploadSkillDial
     onSuccess: (skill) => {
       showToast({ status: 'success', message: localize('com_ui_skill_created') });
       setIsOpen(false);
+      onSuccess?.(skill);
       navigate(`/skills/${skill._id}`);
     },
     onError: (error: unknown) => {
@@ -63,6 +65,10 @@ export default function UploadSkillDialog({ isOpen, setIsOpen }: UploadSkillDial
       if (importMutation.isLoading) {
         return;
       }
+      if (file.name.toLowerCase() !== 'skill.md') {
+        showToast({ status: 'error', message: localize('com_ui_skill_upload_req_personal_file') });
+        return;
+      }
       if (file.size > skillImportSizeLimit) {
         showToast({
           status: 'error',
@@ -72,6 +78,7 @@ export default function UploadSkillDialog({ isOpen, setIsOpen }: UploadSkillDial
       }
       const formData = new FormData();
       formData.append('file', file, file.name);
+      formData.append('mode', 'personal-single');
       importMutation.mutate(formData);
     },
     [displayedSizeLimit, importMutation, localize, showToast, skillImportSizeLimit],
@@ -139,8 +146,7 @@ export default function UploadSkillDialog({ isOpen, setIsOpen }: UploadSkillDial
               <div>
                 <p className="font-medium">{localize('com_ui_skill_upload_requirements')}</p>
                 <ul className="mt-1 list-inside list-disc">
-                  <li>{localize('com_ui_skill_upload_req_md')}</li>
-                  <li>{localize('com_ui_skill_upload_req_zip')}</li>
+                  <li>{localize('com_ui_skill_upload_req_personal_file')}</li>
                   <li>{localize('com_ui_skill_upload_req_size', { 0: displayedSizeLimit })}</li>
                 </ul>
               </div>
@@ -150,7 +156,7 @@ export default function UploadSkillDialog({ isOpen, setIsOpen }: UploadSkillDial
           <input
             ref={fileInputRef}
             type="file"
-            accept=".zip,.skill,.md"
+            accept=".md"
             className="hidden"
             onChange={handleFileInput}
           />

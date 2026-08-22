@@ -1457,5 +1457,7 @@
   "com_ui_skill_source_deployment": "部署技能",
   "com_ui_skill_source_personal": "我的技能",
   "com_ui_skill_use_this": "使用此技能",
-  "com_ui_skill_open_details": "打开完整详情"
+  "com_ui_skill_open_details": "打开完整详情",
+  "com_ui_skill_upload_req_personal_file": "只能上传名为 SKILL.md 的单个文件",
+  "com_ui_skill_upload_personal": "上传我的 SKILL.md"
 }

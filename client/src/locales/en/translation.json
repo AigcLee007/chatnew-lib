@@ -2041,6 +2041,8 @@
   "com_ui_skill_source_personal": "My skill",
   "com_ui_skill_use_this": "Use this skill",
   "com_ui_skill_open_details": "Open full details",
+  "com_ui_skill_upload_req_personal_file": "Upload a single file named SKILL.md",
+  "com_ui_skill_upload_personal": "Upload my SKILL.md",
   "com_ui_skill_warnings": "Heads up",
   "com_ui_skill_write_instructions": "Write skill instructions",
   "com_ui_skills": "Skills",

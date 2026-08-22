@@ -325,6 +325,16 @@ function SkillListItem({
 
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="truncate">{skill.name}</span>
+          {skill.source === 'deployment' && (
+            <span className="shrink-0 text-[10px] text-text-secondary">
+              {localize('com_ui_skill_source_deployment')}
+            </span>
+          )}
+          {skill.source === 'inline' && (
+            <span className="shrink-0 text-[10px] text-text-secondary">
+              {localize('com_ui_skill_source_personal')}
+            </span>
+          )}
           {skill.alwaysApply === true && (
             <Pin
               className="size-3 shrink-0 text-cyan-500"

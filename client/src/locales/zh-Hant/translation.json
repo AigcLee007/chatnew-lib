@@ -2062,5 +2062,7 @@
   "com_ui_zoom_in": "放大",
   "com_ui_zoom_level": "縮放比例",
   "com_ui_zoom_out": "縮小",
-  "com_user_message": "您"
+  "com_user_message": "您",
+  "com_ui_skill_upload_req_personal_file": "只能上傳名為 SKILL.md 的單一檔案",
+  "com_ui_skill_upload_personal": "上傳我的 SKILL.md"
 }

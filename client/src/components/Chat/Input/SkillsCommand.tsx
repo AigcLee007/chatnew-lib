@@ -1,18 +1,22 @@
 import { memo, useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ScrollText } from 'lucide-react';
+import { Info, ScrollText, Upload } from 'lucide-react';
 import { AutoSizer, List } from 'react-virtualized';
+import { useNavigate } from 'react-router-dom';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
-import { Input, Spinner, useCombobox } from '@librechat/client';
-import type { TSkillSummary } from 'librechat-data-provider';
+import { Button, Input, Spinner, TooltipAnchor, useCombobox } from '@librechat/client';
+import { PermissionTypes, Permissions } from 'librechat-data-provider';
+import type { TSkill, TSkillSummary } from 'librechat-data-provider';
 import type { MentionOption } from '~/common';
 import useInitPopoverInput from '~/hooks/Input/useInitPopoverInput';
-import { useLocalize, useSkillActiveState } from '~/hooks';
-import { useSkillsInfiniteQuery } from '~/data-provider';
+import { useHasAccess, useLocalize, useSkillActiveState } from '~/hooks';
+import { useGetSkillByIdQuery, useSkillsInfiniteQuery } from '~/data-provider';
 import { useAgentsMapContext } from '~/Providers';
 import { ephemeralAgentByConvoId } from '~/store';
 import { isEphemeralAgent } from '~/common';
 import MentionItem from './MentionItem';
 import store from '~/store';
+import SkillQuickDetail from './SkillQuickDetail';
+import { UploadSkillDialog } from '~/components/Skills/dialogs';
 
 const commandChar = '$';
 const ROW_HEIGHT = 44;
@@ -86,6 +90,11 @@ function SkillsCommandContent({
   agentId?: string | null;
 }) {
   const localize = useLocalize();
+  const navigate = useNavigate();
+  const canCreate = useHasAccess({
+    permissionType: PermissionTypes.SKILLS,
+    permission: Permissions.CREATE,
+  });
   const setShowSkillsPopover = useSetRecoilState(store.showSkillsPopoverFamily(index));
   const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(conversationId));
   const setPendingManualSkills = useSetRecoilState(
@@ -163,6 +172,9 @@ function SkillsCommandContent({
   }, [data?.pages, agentSkillIds, isActive]);
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const detailQuery = useGetSkillByIdQuery(detailSkillId ?? '', { enabled: !!detailSkillId });
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -253,6 +265,9 @@ function SkillsCommandContent({
     style: React.CSSProperties;
   }) => {
     const mention = matches[index] as MentionOption;
+    const summary = data?.pages
+      .flatMap((page) => page.skills)
+      .find((skill) => skill.name === mention.value);
     return (
       <MentionItem
         index={index}
@@ -270,6 +285,26 @@ function SkillsCommandContent({
         icon={mention.icon}
         description={mention.description}
         isActive={index === activeIndex}
+        action={
+          <TooltipAnchor
+            description={localize('com_ui_skill_open_details')}
+            side="top"
+            render={
+              <button
+                type="button"
+                aria-label={localize('com_ui_skill_open_details')}
+                className="rounded p-1 text-text-secondary hover:bg-surface-hover"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (summary) setDetailSkillId(summary._id);
+                }}
+              >
+                <Info className="size-4" aria-hidden="true" />
+              </button>
+            }
+          />
+        }
       />
     );
   };
@@ -359,7 +394,40 @@ function SkillsCommandContent({
             </AutoSizer>
           </div>
         )}
+        {open && canCreate && (
+          <Button
+            variant="ghost"
+            className="mt-2 flex w-full items-center justify-start gap-2 border-t border-border-light px-2 pt-2 text-sm"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setUploadOpen(true)}
+          >
+            <Upload className="size-4" aria-hidden="true" />
+            {localize('com_ui_skill_upload_personal')}
+          </Button>
+        )}
       </div>
+      {detailQuery.data && detailSkillId && (
+        <div className="popover border-token-border-light rounded-2xl border bg-surface-tertiary-alt shadow-lg">
+          <SkillQuickDetail
+            skill={detailQuery.data as TSkill}
+            onUse={() => {
+              handleSelect({
+                value: detailQuery.data?.name ?? '',
+                label: detailQuery.data?.displayTitle ?? detailQuery.data?.name,
+                type: 'skill',
+                icon: skillIcon,
+              });
+              setDetailSkillId(null);
+            }}
+            onOpenDetails={() => {
+              navigate(`/skills/${detailQuery.data?._id}`);
+              setDetailSkillId(null);
+            }}
+            onClose={() => setDetailSkillId(null)}
+          />
+        </div>
+      )}
+      <UploadSkillDialog isOpen={uploadOpen} setIsOpen={setUploadOpen} />
     </div>
   );
 }
