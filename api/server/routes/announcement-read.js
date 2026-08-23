@@ -26,8 +26,7 @@ function getAnnouncementReadModel(mongooseInstance) {
 function addUnreadFlags(items, readIds, now = new Date()) {
   return items.map((item) => ({
     ...item,
-    unread:
-      isVisibleAnnouncement(item, now) && !readIds.has(item._id.toString()),
+    unread: isVisibleAnnouncement(item, now) && !readIds.has(item._id.toString()),
   }));
 }
 
@@ -48,7 +47,19 @@ async function markAnnouncementsRead(ReadModel, userId, announcementIds, visible
     }));
 
   if (operations.length > 0) {
-    await ReadModel.bulkWrite(operations, { ordered: false });
+    try {
+      await ReadModel.bulkWrite(operations, { ordered: false });
+    } catch (error) {
+      const writeErrors = error?.writeErrors;
+      if (
+        Array.isArray(writeErrors) &&
+        writeErrors.length > 0 &&
+        writeErrors.every((writeError) => writeError.code === 11000)
+      ) {
+        return;
+      }
+      throw error;
+    }
   }
 }
 

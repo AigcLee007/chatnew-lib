@@ -8,10 +8,7 @@ describe('announcement-read', () => {
   it('returns only announcement ids read by the requested user', async () => {
     const ReadModel = {
       find: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue([
-          { announcementId: 'a-1' },
-          { announcementId: 'a-2' },
-        ]),
+        lean: jest.fn().mockResolvedValue([{ announcementId: 'a-1' }, { announcementId: 'a-2' }]),
       }),
     };
 
@@ -48,6 +45,17 @@ describe('announcement-read', () => {
     expect(ReadModel.bulkWrite).not.toHaveBeenCalled();
   });
 
+  it('treats concurrent duplicate-key upserts as an already-read announcement', async () => {
+    const error = Object.assign(new Error('duplicate key'), {
+      writeErrors: [{ code: 11000 }],
+    });
+    const ReadModel = { bulkWrite: jest.fn().mockRejectedValue(error) };
+
+    await expect(
+      markAnnouncementsRead(ReadModel, 'user-1', ['a-1'], new Set(['a-1'])),
+    ).resolves.toBeUndefined();
+  });
+
   it('marks only visible announcements without a read record as unread', () => {
     const items = [
       { _id: 'a-1', active: true, publishAt: new Date('2026-08-22') },
@@ -56,9 +64,7 @@ describe('announcement-read', () => {
       { _id: 'a-4', active: true, publishAt: new Date('2026-08-23') },
     ];
 
-    expect(
-      addUnreadFlags(items, new Set(['a-1']), new Date('2026-08-22T12:00:00.000Z')),
-    ).toEqual([
+    expect(addUnreadFlags(items, new Set(['a-1']), new Date('2026-08-22T12:00:00.000Z'))).toEqual([
       expect.objectContaining({ _id: 'a-1', unread: false }),
       expect.objectContaining({ _id: 'a-2', unread: true }),
       expect.objectContaining({ _id: 'a-3', unread: false }),

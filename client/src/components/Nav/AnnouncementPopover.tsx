@@ -25,38 +25,53 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const [error, setError] = useState('');
   const itemsRef = useRef<Announcement[]>([]);
   const markingRef = useRef(false);
-  const hadUnreadRef = useRef(false);
+  const pendingMarkRef = useRef(false);
+  const seenUnreadIdsRef = useRef(new Set<string>());
+  const openRef = useRef(open);
+  const loadVersionRef = useRef(0);
 
   const authHeaders = useCallback((): Record<string, string> => {
     const token = getTokenHeader();
     return token ? { Authorization: token } : {};
   }, []);
 
-  const load = useCallback(
-    () =>
-      fetch(`/api/announcements${canManage ? '?all=true' : ''}`, { headers: authHeaders() })
-        .then((response) => (response.ok ? response.json() : []))
-        .then((nextItems) => {
-          itemsRef.current = nextItems;
-          setItems(nextItems);
-        })
-        .catch(() => {
-          itemsRef.current = [];
-          setItems([]);
-        }),
-    [authHeaders, canManage],
-  );
+  const load = useCallback(() => {
+    const loadVersion = ++loadVersionRef.current;
+    return fetch(`/api/announcements${canManage ? '?all=true' : ''}`, { headers: authHeaders() })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((nextItems) => {
+        if (loadVersion !== loadVersionRef.current) return false;
+        itemsRef.current = nextItems;
+        setItems(nextItems);
+        return true;
+      })
+      .catch(() => {
+        if (loadVersion !== loadVersionRef.current) return false;
+        itemsRef.current = [];
+        setItems([]);
+        return true;
+      });
+  }, [authHeaders, canManage]);
 
   const hasUnread = items.some((item) => item.unread === true);
 
   useEffect(() => {
-    if (hasUnread && !hadUnreadRef.current) setOpen(true);
-    hadUnreadRef.current = hasUnread;
-  }, [hasUnread]);
+    const unreadIds = new Set(items.filter((item) => item.unread).map((item) => item._id));
+    if ([...unreadIds].some((id) => !seenUnreadIdsRef.current.has(id))) setOpen(true);
+    seenUnreadIdsRef.current = unreadIds;
+  }, [items]);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const markRead = useCallback(async () => {
     const announcementIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
-    if (announcementIds.length === 0 || markingRef.current) return;
+    if (announcementIds.length === 0) return;
+    if (markingRef.current) {
+      pendingMarkRef.current = true;
+      return;
+    }
     markingRef.current = true;
     try {
       const response = await fetch('/api/announcements/read', {
@@ -74,6 +89,10 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       // Keep unread state so the next menu open retries the request.
     } finally {
       markingRef.current = false;
+      if (pendingMarkRef.current) {
+        pendingMarkRef.current = false;
+        void markRead();
+      }
     }
   }, [authHeaders]);
 
@@ -81,7 +100,10 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
     if (!isAuthenticated) return undefined;
     void load();
     const refreshOnFocus = () => {
-      void load().then(markRead);
+      const wasOpen = openRef.current;
+      void load().then((applied) => {
+        if (wasOpen && applied) return markRead();
+      });
     };
     window.addEventListener('focus', refreshOnFocus);
     return () => window.removeEventListener('focus', refreshOnFocus);
