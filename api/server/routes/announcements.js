@@ -2,6 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { requireJwtAuth } = require('~/server/middleware');
 const { normalizeAnnouncement, isVisibleAnnouncement, sortAnnouncements } = require('./announcement-utils');
+const {
+  getAnnouncementReadModel,
+  getReadAnnouncementIds,
+  markAnnouncementsRead,
+  addUnreadFlags,
+} = require('./announcement-read');
 
 const router = express.Router();
 
@@ -18,6 +24,7 @@ const announcementSchema = new mongoose.Schema(
 );
 announcementSchema.index({ active: 1, pinned: -1, publishAt: -1 });
 const Announcement = mongoose.models.Announcement || mongoose.model('Announcement', announcementSchema);
+const AnnouncementRead = getAnnouncementReadModel(mongoose);
 
 function canManageAnnouncements(user) {
   return user?.role === 'ADMIN' || user?.role === 'DELEGATED_ADMIN' || user?.isAdmin === true;
@@ -41,9 +48,35 @@ router.get('/', requireJwtAuth, async (req, res, next) => {
       .sort({ pinned: -1, publishAt: -1 })
       .lean();
     const visible = all ? items : items.filter((item) => isVisibleAnnouncement(item));
-    res.json(sortAnnouncements(visible).map(publicAnnouncement));
+    const readIds = await getReadAnnouncementIds(AnnouncementRead, req.user.id);
+    res.json(sortAnnouncements(addUnreadFlags(visible.map(publicAnnouncement), readIds)));
   } catch (error) {
     next(error);
+  }
+});
+
+router.post('/read', requireJwtAuth, async (req, res, next) => {
+  try {
+    if (!Array.isArray(req.body?.announcementIds)) {
+      return res.status(400).json({ error: 'announcementIds must be an array' });
+    }
+
+    const visibleItems = await Announcement.find({ active: true, publishAt: { $lte: new Date() } })
+      .select({ _id: 1, active: 1, publishAt: 1 })
+      .lean();
+    const visibleIds = new Set(
+      visibleItems.filter((item) => isVisibleAnnouncement(item)).map((item) => item._id.toString()),
+    );
+    await markAnnouncementsRead(
+      AnnouncementRead,
+      req.user.id,
+      req.body.announcementIds.map(String),
+      visibleIds,
+    );
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return next(error);
   }
 });
 
