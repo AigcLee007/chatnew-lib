@@ -1,34 +1,95 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Menu from '@ariakit/react/menu';
 import { Bell, Pin } from 'lucide-react';
 import { DropdownMenuSeparator } from '@librechat/client';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { getTokenHeader } from 'librechat-data-provider';
 
-type Announcement = { _id: string; title: string; content: string; pinned?: boolean; active?: boolean };
+type Announcement = {
+  _id: string;
+  title: string;
+  content: string;
+  unread?: boolean;
+  pinned?: boolean;
+  active?: boolean;
+};
 
 export default function AnnouncementPopover({ compact = false }: { compact?: boolean }) {
   const { user } = useAuthContext();
+  const isAuthenticated = Boolean(user);
   const canManage = user?.role === 'ADMIN' || user?.role === 'DELEGATED_ADMIN';
   const [items, setItems] = useState<Announcement[]>([]);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [error, setError] = useState('');
-  const authHeaders = () => {
+  const itemsRef = useRef<Announcement[]>([]);
+  const markingRef = useRef(false);
+  const hadUnreadRef = useRef(false);
+
+  const authHeaders = useCallback((): Record<string, string> => {
     const token = getTokenHeader();
     return token ? { Authorization: token } : {};
-  };
+  }, []);
 
-  const load = () =>
-    fetch(`/api/announcements${canManage ? '?all=true' : ''}`, { headers: authHeaders() })
-      .then((response) => (response.ok ? response.json() : []))
-      .then(setItems)
-      .catch(() => setItems([]));
+  const load = useCallback(
+    () =>
+      fetch(`/api/announcements${canManage ? '?all=true' : ''}`, { headers: authHeaders() })
+        .then((response) => (response.ok ? response.json() : []))
+        .then((nextItems) => {
+          itemsRef.current = nextItems;
+          setItems(nextItems);
+        })
+        .catch(() => {
+          itemsRef.current = [];
+          setItems([]);
+        }),
+    [authHeaders, canManage],
+  );
+
+  const hasUnread = items.some((item) => item.unread === true);
 
   useEffect(() => {
-    load();
-  }, [canManage]);
+    if (hasUnread && !hadUnreadRef.current) setOpen(true);
+    hadUnreadRef.current = hasUnread;
+  }, [hasUnread]);
+
+  const markRead = useCallback(async () => {
+    const announcementIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
+    if (announcementIds.length === 0 || markingRef.current) return;
+    markingRef.current = true;
+    try {
+      const response = await fetch('/api/announcements/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ announcementIds }),
+      });
+      if (response.ok) {
+        itemsRef.current = itemsRef.current.map((item) =>
+          announcementIds.includes(item._id) ? { ...item, unread: false } : item,
+        );
+        setItems(itemsRef.current);
+      }
+    } catch {
+      // Keep unread state so the next menu open retries the request.
+    } finally {
+      markingRef.current = false;
+    }
+  }, [authHeaders]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    void load();
+    const refreshOnFocus = () => {
+      void load().then(markRead);
+    };
+    window.addEventListener('focus', refreshOnFocus);
+    return () => window.removeEventListener('focus', refreshOnFocus);
+  }, [isAuthenticated, load, markRead]);
+
+  useEffect(() => {
+    if (open) void markRead();
+  }, [markRead, open]);
 
   const publish = async () => {
     if (!title.trim() || !content.trim()) return;
@@ -59,12 +120,19 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   const remove = async (item: Announcement) => {
     if (!window.confirm(`确定删除公告“${item.title}”吗？`)) return;
-    const response = await fetch(`/api/announcements/${item._id}`, { method: 'DELETE', headers: authHeaders() });
+    const response = await fetch(`/api/announcements/${item._id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
     if (response.ok) load();
   };
 
   return (
-    <Menu.MenuProvider open={open} setOpen={setOpen} placement={compact ? 'bottom-end' : 'right-start'}>
+    <Menu.MenuProvider
+      open={open}
+      setOpen={setOpen}
+      placement={compact ? 'bottom-end' : 'right-start'}
+    >
       {compact ? (
         <Menu.MenuButton
           className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
@@ -72,30 +140,52 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           title="公告"
         >
           <Bell className="icon-md" aria-hidden="true" />
-          {items.length > 0 && <span className="absolute right-1 top-1 size-2 rounded-full bg-red-500" aria-label="有新公告" />}
+          {hasUnread && (
+            <span
+              className="absolute right-1 top-1 size-2 rounded-full bg-red-500"
+              aria-label="有新公告"
+            />
+          )}
         </Menu.MenuButton>
       ) : (
         <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
           <Bell className="icon-md" aria-hidden="true" />
           公告
-          {items.length > 0 && <span className="ml-auto size-2 rounded-full bg-red-500" aria-label="有新公告" />}
+          {hasUnread && (
+            <span className="ml-auto size-2 rounded-full bg-red-500" aria-label="有新公告" />
+          )}
         </Menu.MenuItem>
       )}
-      <Menu.Menu portal className="account-settings-popover popover-ui z-[126] w-[320px] rounded-lg p-4">
-        <div className="flex items-center gap-2 text-sm font-medium"><Bell className="size-4" />公告</div>
+      <Menu.Menu
+        portal
+        className="account-settings-popover popover-ui z-[126] w-[320px] rounded-lg p-4"
+      >
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Bell className="size-4" />
+          公告
+        </div>
         <DropdownMenuSeparator />
         <div className="max-h-64 space-y-3 overflow-y-auto">
           {items.length === 0 && <p className="text-sm text-text-secondary">暂无公告</p>}
           {items.map((item) => (
             <article key={item._id} className="border-b border-border-medium pb-3 last:border-0">
-              <h3 className="flex items-center gap-1 text-sm font-medium">{item.pinned && <Pin className="size-3" />}{item.title}</h3>
+              <h3 className="flex items-center gap-1 text-sm font-medium">
+                {item.pinned && <Pin className="size-3" />}
+                {item.title}
+              </h3>
               <p className="mt-1 whitespace-pre-wrap text-xs text-text-secondary">{item.content}</p>
               {canManage && (
                 <div className="mt-2 flex gap-2 text-xs">
-                  <button type="button" className="text-accent-primary" onClick={() => update(item, { active: !item.active })}>
+                  <button
+                    type="button"
+                    className="text-accent-primary"
+                    onClick={() => update(item, { active: !item.active })}
+                  >
                     {item.active === false ? '启用' : '停用'}
                   </button>
-                  <button type="button" className="text-red-500" onClick={() => remove(item)}>删除</button>
+                  <button type="button" className="text-red-500" onClick={() => remove(item)}>
+                    删除
+                  </button>
                 </div>
               )}
             </article>
@@ -105,9 +195,26 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           <>
             <DropdownMenuSeparator />
             <div className="space-y-2">
-              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="公告标题" className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-sm" />
-              <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="公告内容" className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-sm" rows={3} />
-              <button type="button" onClick={publish} className="w-full rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover">发布公告</button>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="公告标题"
+                className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-sm"
+              />
+              <textarea
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                placeholder="公告内容"
+                className="w-full rounded border border-border-medium bg-transparent px-2 py-1 text-sm"
+                rows={3}
+              />
+              <button
+                type="button"
+                onClick={publish}
+                className="w-full rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover"
+              >
+                发布公告
+              </button>
               {error && <p className="text-xs text-red-500">{error}</p>}
             </div>
           </>
