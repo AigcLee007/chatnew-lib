@@ -87,15 +87,11 @@ export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = 
           notices: visibleNotices,
           isAdminLoading: false,
         });
-      } else {
+      } else if (requestVersion === noticeRequestVersions.get(set)) {
         set({
           notices: visibleNotices,
-          ...(requestVersion === noticeRequestVersions.get(set)
-            ? {
-                latestNotice: newestVisible || null,
-                hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
-              }
-            : {}),
+          latestNotice: newestVisible || null,
+          hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
         });
       }
     } catch (err) {

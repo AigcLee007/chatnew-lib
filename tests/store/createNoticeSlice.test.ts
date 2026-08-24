@@ -147,6 +147,41 @@ describe('createNoticeSlice', () => {
     expect(store.getState().hasUnreadNotice).toBe(true);
   });
 
+  it('does not let an older list response overwrite newer notices', async () => {
+    let resolveOlder: (response: unknown) => void = () => undefined;
+    let resolveNewer: (response: unknown) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('page=1')) {
+          return new Promise((resolve) => {
+            resolveOlder = resolve;
+          });
+        }
+        return new Promise((resolve) => {
+          resolveNewer = resolve;
+        });
+      }),
+    );
+    const store = createTestSlice();
+
+    const olderRequest = store.getState().fetchNotices(1);
+    const newerRequest = store.getState().fetchNotices(2);
+
+    resolveNewer({
+      ok: true,
+      json: async () => ({ total: 1, page: 2, pageSize: 10, items: [newestNotice] }),
+    });
+    await newerRequest;
+    resolveOlder({
+      ok: true,
+      json: async () => ({ total: 1, page: 1, pageSize: 10, items: [olderNotice] }),
+    });
+    await olderRequest;
+
+    expect(store.getState().notices).toEqual([newestNotice]);
+  });
+
   it('keeps a notice unread when its detail is opened', () => {
     const store = createTestSlice({ latestNotice: newestNotice, hasUnreadNotice: true });
 
