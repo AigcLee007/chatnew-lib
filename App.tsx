@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [availableVersion, setAvailableVersion] = useState<string | null>(null);
   const currentVersionRef = useRef<string | null>(null);
+  const autoOpenedNoticeIdsRef = useRef(new Set<string>());
   const [, startTransition] = useTransition();
   const {
     setSessionId,
@@ -117,7 +118,8 @@ const App: React.FC = () => {
   }, [fetchNotices, fetchLatestNotice]);
 
   useEffect(() => {
-    if (hasUnreadNotice && latestNotice) {
+    if (hasUnreadNotice && latestNotice && !autoOpenedNoticeIdsRef.current.has(latestNotice.id)) {
+      autoOpenedNoticeIdsRef.current.add(latestNotice.id);
       setNoticeModalOpen(true, latestNotice);
     }
   }, [hasUnreadNotice, latestNotice, setNoticeModalOpen]);
@@ -135,10 +137,7 @@ const App: React.FC = () => {
         <ChatInterface />
       </main>
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
       <NoticeModal />
 
@@ -146,8 +145,14 @@ const App: React.FC = () => {
         <div className="fixed inset-x-0 bottom-5 z-[80] flex justify-center px-4 pointer-events-none">
           <div className="pointer-events-auto flex max-w-xl items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-2xl shadow-black/20">
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-foreground">{'\u68c0\u6d4b\u5230\u65b0\u7248\u672c'}</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">{'\u9879\u76ee\u5df2\u66f4\u65b0\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u540e\u7ee7\u7eed\u4f7f\u7528\u3002'}</div>
+              <div className="font-semibold text-foreground">
+                {'\u68c0\u6d4b\u5230\u65b0\u7248\u672c'}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {
+                  '\u9879\u76ee\u5df2\u66f4\u65b0\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u540e\u7ee7\u7eed\u4f7f\u7528\u3002'
+                }
+              </div>
             </div>
             <button
               onClick={handleReloadForUpdate}

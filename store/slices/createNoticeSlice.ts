@@ -21,7 +21,12 @@ export interface NoticeSlice {
   // --- Actions ---
   fetchNotices: (page?: number, search?: string) => Promise<void>;
   fetchLatestNotice: () => Promise<void>;
-  publishNotice: (title: string, content: string, active: boolean, pinned: boolean) => Promise<void>;
+  publishNotice: (
+    title: string,
+    content: string,
+    active: boolean,
+    pinned: boolean,
+  ) => Promise<void>;
   updateNotice: (id: string, updates: Partial<Notice>) => Promise<void>;
   deleteNotice: (id: string) => Promise<void>;
   setAdminPage: (page: number) => void;
@@ -32,12 +37,7 @@ export interface NoticeSlice {
 
 const ADMIN_KEY = 'sk-K9OJf52OughwT8vizrDKJpvMebzutpbKVXxxhYe8EZFF0nm7';
 
-export const createNoticeSlice: StateCreator<
-  StoreState,
-  [],
-  [],
-  NoticeSlice
-> = (set, get) => ({
+export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = (set, get) => ({
   adminNotices: [],
   adminTotal: 0,
   adminPage: 1,
@@ -54,10 +54,10 @@ export const createNoticeSlice: StateCreator<
   fetchNotices: async (page = 1, search = '') => {
     const { apiKey } = get();
     const isAdmin = apiKey === ADMIN_KEY;
-    const url = isAdmin 
+    const url = isAdmin
       ? `/api/announcements?all=1&page=${page}&search=${encodeURIComponent(search)}`
       : `/api/announcements?page=${page}&search=${encodeURIComponent(search)}`;
-    
+
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (isAdmin) headers['Authorization'] = `Bearer ${ADMIN_KEY}`;
 
@@ -65,25 +65,27 @@ export const createNoticeSlice: StateCreator<
       if (isAdmin) set({ isAdminLoading: true });
       const res = await fetch(url, { headers });
       if (!res.ok) throw new Error(res.status === 401 ? '管理员 API Key 无效' : '加载失败');
-      
+
       const data: NoticeListResponse = await res.json();
       const visibleNotices = isAdmin ? data.items.filter((n) => n.active) : data.items;
       const lastReadId = localStorage.getItem('lastReadNoticeId');
       const newestVisible = visibleNotices[0];
-      
+
       if (isAdmin) {
-        set({ 
-          adminNotices: data.items, 
-          adminTotal: data.total, 
+        set({
+          adminNotices: data.items,
+          adminTotal: data.total,
           adminPage: data.page,
           notices: visibleNotices,
+          latestNotice: newestVisible || null,
           hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
-          isAdminLoading: false 
+          isAdminLoading: false,
         });
       } else {
-        set({ 
-          notices: visibleNotices, 
-          hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false 
+        set({
+          notices: visibleNotices,
+          latestNotice: newestVisible || null,
+          hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
         });
       }
     } catch (err) {
@@ -97,9 +99,9 @@ export const createNoticeSlice: StateCreator<
       const res = await fetch('/api/announcement');
       const data: Notice | null = await res.json();
       const lastReadId = localStorage.getItem('lastReadNoticeId');
-      set({ 
+      set({
         latestNotice: data,
-        hasUnreadNotice: data ? data.id !== lastReadId : false
+        hasUnreadNotice: data ? data.id !== lastReadId : false,
       });
     } catch (err) {
       console.error(err);
@@ -112,9 +114,9 @@ export const createNoticeSlice: StateCreator<
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ADMIN_KEY}`
+        Authorization: `Bearer ${ADMIN_KEY}`,
       },
-      body: JSON.stringify({ title, content, active, pinned })
+      body: JSON.stringify({ title, content, active, pinned }),
     });
     if (!res.ok) {
       const err = await res.json();
@@ -129,13 +131,13 @@ export const createNoticeSlice: StateCreator<
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ADMIN_KEY}`
+        Authorization: `Bearer ${ADMIN_KEY}`,
       },
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updates),
     });
     if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || '更新失败');
+      const err = await res.json();
+      throw new Error(err.message || '更新失败');
     }
     await fetchNotices(adminPage, adminSearch);
   },
@@ -145,12 +147,12 @@ export const createNoticeSlice: StateCreator<
     const res = await fetch(`/api/announcement/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${ADMIN_KEY}`
-      }
+        Authorization: `Bearer ${ADMIN_KEY}`,
+      },
     });
     if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || '删除失败');
+      const err = await res.json();
+      throw new Error(err.message || '删除失败');
     }
     await fetchNotices(adminPage, adminSearch);
   },
@@ -174,10 +176,11 @@ export const createNoticeSlice: StateCreator<
   },
 
   markAllAsRead: () => {
-    const { notices } = get();
-    if (notices.length > 0) {
-      localStorage.setItem('lastReadNoticeId', notices[0].id);
+    const { latestNotice, notices } = get();
+    const latestAvailableNotice = latestNotice || notices[0];
+    if (latestAvailableNotice) {
+      localStorage.setItem('lastReadNoticeId', latestAvailableNotice.id);
       set({ hasUnreadNotice: false });
     }
-  }
+  },
 });
