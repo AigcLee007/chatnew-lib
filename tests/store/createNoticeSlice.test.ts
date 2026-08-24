@@ -114,6 +114,39 @@ describe('createNoticeSlice', () => {
     expect(store.getState().hasUnreadNotice).toBe(true);
   });
 
+  it('does not let a stale list response overwrite a newer latest notice response', async () => {
+    let resolveList: (response: unknown) => void = () => undefined;
+    let resolveLatest: (response: unknown) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url === '/api/announcements?page=1&search=') {
+          return new Promise((resolve) => {
+            resolveList = resolve;
+          });
+        }
+        return new Promise((resolve) => {
+          resolveLatest = resolve;
+        });
+      }),
+    );
+    const store = createTestSlice();
+
+    const listRequest = store.getState().fetchNotices();
+    const latestRequest = store.getState().fetchLatestNotice();
+
+    resolveLatest({ ok: true, json: async () => newestNotice });
+    await latestRequest;
+    resolveList({
+      ok: true,
+      json: async () => ({ total: 1, page: 1, pageSize: 10, items: [olderNotice] }),
+    });
+    await listRequest;
+
+    expect(store.getState().latestNotice).toEqual(newestNotice);
+    expect(store.getState().hasUnreadNotice).toBe(true);
+  });
+
   it('keeps a notice unread when its detail is opened', () => {
     const store = createTestSlice({ latestNotice: newestNotice, hasUnreadNotice: true });
 
@@ -130,6 +163,19 @@ describe('createNoticeSlice', () => {
 
     expect(localStorage.getItem('lastReadNoticeId')).toBe(newestNotice.id);
     expect(store.getState().hasUnreadNotice).toBe(false);
+  });
+
+  it('keeps the latest notice unread when an older notice is confirmed', () => {
+    const store = createTestSlice({
+      latestNotice: newestNotice,
+      currentNoticeDetail: olderNotice,
+      hasUnreadNotice: true,
+    });
+
+    store.getState().setNoticeModalOpen(false, olderNotice);
+
+    expect(localStorage.getItem('lastReadNoticeId')).toBe(olderNotice.id);
+    expect(store.getState().hasUnreadNotice).toBe(true);
   });
 
   it('marks the latest available notice as read even when the active list is empty', () => {
