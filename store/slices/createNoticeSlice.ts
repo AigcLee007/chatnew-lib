@@ -77,8 +77,6 @@ export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = 
           adminTotal: data.total,
           adminPage: data.page,
           notices: visibleNotices,
-          latestNotice: newestVisible || null,
-          hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
           isAdminLoading: false,
         });
       } else {
@@ -97,6 +95,7 @@ export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = 
   fetchLatestNotice: async () => {
     try {
       const res = await fetch('/api/announcement');
+      if (!res.ok) throw new Error('加载失败');
       const data: Notice | null = await res.json();
       const lastReadId = localStorage.getItem('lastReadNoticeId');
       set({

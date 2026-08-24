@@ -59,6 +59,29 @@ describe('createNoticeSlice', () => {
     expect(store.getState().hasUnreadNotice).toBe(true);
   });
 
+  it('keeps global latest and unread state while an admin browses older notice pages', async () => {
+    localStorage.setItem('lastReadNoticeId', olderNotice.id);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ total: 1, page: 2, pageSize: 1, items: [olderNotice] }),
+      }),
+    );
+    const store = createTestSlice({
+      apiKey: 'sk-K9OJf52OughwT8vizrDKJpvMebzutpbKVXxxhYe8EZFF0nm7',
+      latestNotice: newestNotice,
+      hasUnreadNotice: true,
+    });
+
+    await store.getState().fetchNotices(2, 'older');
+
+    expect(store.getState().adminNotices).toEqual([olderNotice]);
+    expect(store.getState().notices).toEqual([olderNotice]);
+    expect(store.getState().latestNotice).toEqual(newestNotice);
+    expect(store.getState().hasUnreadNotice).toBe(true);
+  });
+
   it('preserves the current notice state when a fetch fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     const store = createTestSlice({
@@ -71,6 +94,23 @@ describe('createNoticeSlice', () => {
 
     expect(store.getState().notices).toEqual([olderNotice]);
     expect(store.getState().latestNotice).toEqual(olderNotice);
+    expect(store.getState().hasUnreadNotice).toBe(true);
+  });
+
+  it('preserves latest and unread state when the latest notice request returns an HTTP error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => null,
+      }),
+    );
+    const store = createTestSlice({ latestNotice: newestNotice, hasUnreadNotice: true });
+
+    await store.getState().fetchLatestNotice();
+
+    expect(store.getState().latestNotice).toEqual(newestNotice);
     expect(store.getState().hasUnreadNotice).toBe(true);
   });
 
