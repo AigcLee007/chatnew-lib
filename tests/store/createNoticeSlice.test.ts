@@ -182,6 +182,51 @@ describe('createNoticeSlice', () => {
     expect(store.getState().notices).toEqual([newestNotice]);
   });
 
+  it.each(['list-first', 'latest-first'] as const)(
+    'keeps list and latest state when App requests both endpoints in parallel (%s)',
+    async (resolutionOrder) => {
+      let resolveList: (response: unknown) => void = () => undefined;
+      let resolveLatest: (response: unknown) => void = () => undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => {
+          if (url.startsWith('/api/announcements')) {
+            return new Promise((resolve) => {
+              resolveList = resolve;
+            });
+          }
+          return new Promise((resolve) => {
+            resolveLatest = resolve;
+          });
+        }),
+      );
+      const store = createTestSlice();
+
+      const listRequest = store.getState().fetchNotices();
+      const latestRequest = store.getState().fetchLatestNotice();
+      const listResponse = {
+        ok: true,
+        json: async () => ({ total: 1, page: 1, pageSize: 10, items: [newestNotice] }),
+      };
+      const latestResponse = { ok: true, json: async () => newestNotice };
+
+      if (resolutionOrder === 'list-first') {
+        resolveList(listResponse);
+        await listRequest;
+        resolveLatest(latestResponse);
+        await latestRequest;
+      } else {
+        resolveLatest(latestResponse);
+        await latestRequest;
+        resolveList(listResponse);
+        await listRequest;
+      }
+
+      expect(store.getState().notices).toEqual([newestNotice]);
+      expect(store.getState().latestNotice).toEqual(newestNotice);
+    },
+  );
+
   it('keeps a notice unread when its detail is opened', () => {
     const store = createTestSlice({ latestNotice: newestNotice, hasUnreadNotice: true });
 

@@ -36,11 +36,14 @@ export interface NoticeSlice {
 }
 
 const ADMIN_KEY = 'sk-K9OJf52OughwT8vizrDKJpvMebzutpbKVXxxhYe8EZFF0nm7';
-const noticeRequestVersions = new WeakMap<object, number>();
+type NoticeRequestKind = 'list' | 'latest';
+type NoticeRequestVersions = Record<NoticeRequestKind, number>;
+const noticeRequestVersions = new WeakMap<object, NoticeRequestVersions>();
 
-const nextNoticeRequestVersion = (set: object) => {
-  const nextVersion = (noticeRequestVersions.get(set) || 0) + 1;
-  noticeRequestVersions.set(set, nextVersion);
+const nextNoticeRequestVersion = (set: object, kind: NoticeRequestKind) => {
+  const versions = noticeRequestVersions.get(set) || { list: 0, latest: 0 };
+  const nextVersion = versions[kind] + 1;
+  noticeRequestVersions.set(set, { ...versions, [kind]: nextVersion });
   return nextVersion;
 };
 
@@ -61,7 +64,7 @@ export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = 
   fetchNotices: async (page = 1, search = '') => {
     const { apiKey } = get();
     const isAdmin = apiKey === ADMIN_KEY;
-    const requestVersion = isAdmin ? null : nextNoticeRequestVersion(set);
+    const requestVersion = isAdmin ? null : nextNoticeRequestVersion(set, 'list');
     const url = isAdmin
       ? `/api/announcements?all=1&page=${page}&search=${encodeURIComponent(search)}`
       : `/api/announcements?page=${page}&search=${encodeURIComponent(search)}`;
@@ -87,11 +90,15 @@ export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = 
           notices: visibleNotices,
           isAdminLoading: false,
         });
-      } else if (requestVersion === noticeRequestVersions.get(set)) {
+      } else if (requestVersion === noticeRequestVersions.get(set)?.list) {
         set({
           notices: visibleNotices,
-          latestNotice: newestVisible || null,
-          hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
+          ...(noticeRequestVersions.get(set)?.latest === 0
+            ? {
+                latestNotice: newestVisible || null,
+                hasUnreadNotice: newestVisible ? newestVisible.id !== lastReadId : false,
+              }
+            : {}),
         });
       }
     } catch (err) {
@@ -101,13 +108,13 @@ export const createNoticeSlice: StateCreator<StoreState, [], [], NoticeSlice> = 
   },
 
   fetchLatestNotice: async () => {
-    const requestVersion = nextNoticeRequestVersion(set);
+    const requestVersion = nextNoticeRequestVersion(set, 'latest');
     try {
       const res = await fetch('/api/announcement');
       if (!res.ok) throw new Error('加载失败');
       const data: Notice | null = await res.json();
       const lastReadId = localStorage.getItem('lastReadNoticeId');
-      if (requestVersion === noticeRequestVersions.get(set)) {
+      if (requestVersion === noticeRequestVersions.get(set)?.latest) {
         set({
           latestNotice: data,
           hasUnreadNotice: data ? data.id !== lastReadId : false,
