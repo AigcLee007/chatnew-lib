@@ -2,6 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bell, CheckCheck, Megaphone, Trash2, X } from 'lucide-react';
 import { useStore } from '../store';
 
+const noticeDateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  timeZone: 'Asia/Shanghai',
+});
+
 export const NoticePopover: React.FC = () => {
   const { notices, hasUnreadNotice, setNoticeModalOpen, markAllAsRead } = useStore();
   const [isOpen, setIsOpen] = useState(false);
@@ -23,7 +30,7 @@ export const NoticePopover: React.FC = () => {
     <div className="relative pointer-events-auto" ref={popoverRef}>
       <button
         type="button"
-        aria-label="通知中心"
+        aria-label={hasUnreadNotice ? '通知中心，有新公告' : '通知中心'}
         onClick={() => setIsOpen(!isOpen)}
         className={`p-2.5 rounded-xl border transition-all duration-300 relative group ${
           isOpen
@@ -90,7 +97,7 @@ export const NoticePopover: React.FC = () => {
                         {n.title}
                       </span>
                       <span className="text-[9px] text-muted-foreground font-mono shrink-0">
-                        {new Date(n.date).toLocaleDateString()}
+                        {noticeDateFormatter.format(new Date(n.date))}
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed opacity-80">

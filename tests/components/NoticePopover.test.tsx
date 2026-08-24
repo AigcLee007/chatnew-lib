@@ -42,15 +42,21 @@ describe('NoticePopover', () => {
     noticeState.markAllAsRead.mockReset();
   });
 
-  it('exposes the notification center label and a static unread dot', () => {
+  it('exposes the notification center label and unread state', () => {
     noticeState.hasUnreadNotice = true;
 
     render(<NoticePopover />);
 
-    const entry = screen.getByRole('button', { name: '通知中心' });
+    const entry = screen.getByRole('button', { name: '通知中心，有新公告' });
     expect(entry.getAttribute('title')).toBe('通知中心');
     expect(screen.getByLabelText('有新公告')).not.toBeNull();
     expect(screen.getByLabelText('有新公告').className).not.toMatch(/animate-(bounce|pulse)/);
+  });
+
+  it('uses the plain notification center name when there are no unread notices', () => {
+    render(<NoticePopover />);
+
+    expect(screen.getByRole('button', { name: '通知中心' })).not.toBeNull();
   });
 
   it('opens the announcement center and renders its list details', () => {
@@ -63,7 +69,7 @@ describe('NoticePopover', () => {
     expect(screen.getByRole('button', { name: /重要更新公告/ })).not.toBeNull();
     expect(screen.getByLabelText('置顶公告')).not.toBeNull();
     expect(screen.getByText(/第一行内容/)).not.toBeNull();
-    expect(screen.getAllByText(/2026|8月|08/).length).toBeGreaterThan(0);
+    expect(screen.getByText('2026/08/19')).not.toBeNull();
     expect(screen.getByText('© Aittco Notification System')).not.toBeNull();
   });
 
