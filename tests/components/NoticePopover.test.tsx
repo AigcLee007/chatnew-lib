@@ -116,6 +116,8 @@ describe('NoticePopover', () => {
     expect(panel?.classList.contains('left-4')).toBe(true);
     expect(panel?.classList.contains('right-4')).toBe(true);
     expect(panel?.classList.contains('w-auto')).toBe(true);
+    expect(panel?.classList.contains('bottom-4')).toBe(true);
+    expect(panel?.classList.contains('max-h-[calc(100vh-5rem)]')).toBe(true);
     expect(panel?.classList.contains('sm:right-0')).toBe(true);
     expect(panel?.classList.contains('sm:left-auto')).toBe(true);
     expect(panel?.classList.contains('sm:w-80')).toBe(true);

@@ -49,7 +49,7 @@ export const NoticePopover: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="fixed left-4 right-4 top-16 w-auto bg-card border border-border/50 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden z-50 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-3 sm:w-80">
+        <div className="fixed bottom-4 left-4 right-4 top-16 flex max-h-[calc(100vh-5rem)] w-auto flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200 z-50 sm:absolute sm:bottom-auto sm:left-auto sm:right-0 sm:top-full sm:mt-3 sm:max-h-none sm:w-80">
           {/* Header */}
           <div className="p-4 border-b border-border/50 flex justify-between items-center bg-muted/20">
             <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export const NoticePopover: React.FC = () => {
           </div>
 
           {/* List */}
-          <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+          <div className="min-h-0 flex-1 max-h-[350px] overflow-y-auto custom-scrollbar">
             {notices.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center opacity-40">
                 <Bell size={32} className="mb-2" />
