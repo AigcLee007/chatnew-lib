@@ -5,20 +5,57 @@ import { useStore } from '../store';
 export const NoticeModal: React.FC = () => {
   const { isNoticeModalOpen, currentNoticeDetail, setNoticeModalOpen } = useStore();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const currentNoticeRef = useRef(currentNoticeDetail);
+  currentNoticeRef.current = currentNoticeDetail;
 
   useEffect(() => {
     if (!isNoticeModalOpen || !currentNoticeDetail) return;
 
+    if (!previouslyFocusedRef.current && document.activeElement instanceof HTMLElement) {
+      previouslyFocusedRef.current = document.activeElement;
+    }
+
     dialogRef.current?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setNoticeModalOpen(false, currentNoticeDetail);
+        setNoticeModalOpen(false, currentNoticeRef.current);
+        return;
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusableElements = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled'));
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstFocusable) {
+        event.preventDefault();
+        lastFocusable.focus();
+      } else if (!event.shiftKey && document.activeElement === lastFocusable) {
+        event.preventDefault();
+        firstFocusable.focus();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
 
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isNoticeModalOpen, currentNoticeDetail, setNoticeModalOpen]);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocusedRef.current?.focus();
+      previouslyFocusedRef.current = null;
+    };
+  }, [isNoticeModalOpen, setNoticeModalOpen]);
 
   if (!isNoticeModalOpen || !currentNoticeDetail) return null;
 

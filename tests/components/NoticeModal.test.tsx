@@ -75,6 +75,38 @@ describe('NoticeModal', () => {
     expect(noticeState.setNoticeModalOpen).toHaveBeenCalledWith(false, currentNotice);
   });
 
+  it('wraps Tab from the last control to the first and Shift+Tab from the first to the last', () => {
+    render(<NoticeModal />);
+
+    const closeButton = screen.getByLabelText('关闭公告');
+    const confirmButton = screen.getByRole('button', { name: '我知道了' });
+
+    confirmButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(closeButton);
+
+    closeButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(confirmButton);
+  });
+
+  it('restores focus to the launcher after the modal closes', () => {
+    const launcher = document.createElement('button');
+    launcher.type = 'button';
+    launcher.textContent = '打开公告';
+    document.body.appendChild(launcher);
+    launcher.focus();
+
+    const { rerender } = render(<NoticeModal />);
+    expect(document.activeElement).not.toBe(launcher);
+
+    noticeState.isNoticeModalOpen = false;
+    rerender(<NoticeModal />);
+
+    expect(document.activeElement).toBe(launcher);
+    launcher.remove();
+  });
+
   it('renders nothing when closed or without a notice', () => {
     noticeState.isNoticeModalOpen = false;
     const { rerender } = render(<NoticeModal />);
