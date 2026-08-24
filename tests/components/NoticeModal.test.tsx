@@ -61,6 +61,20 @@ describe('NoticeModal', () => {
     expect(noticeState.setNoticeModalOpen).toHaveBeenCalledWith(false, currentNotice);
   });
 
+  it('moves focus into the dialog when it opens', () => {
+    render(<NoticeModal />);
+
+    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: currentNotice.title }));
+  });
+
+  it('confirms the current notice when Escape is pressed', () => {
+    render(<NoticeModal />);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(noticeState.setNoticeModalOpen).toHaveBeenCalledWith(false, currentNotice);
+  });
+
   it('renders nothing when closed or without a notice', () => {
     noticeState.isNoticeModalOpen = false;
     const { rerender } = render(<NoticeModal />);

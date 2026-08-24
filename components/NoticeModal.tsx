@@ -1,18 +1,35 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, Megaphone, Check } from 'lucide-react';
 import { useStore } from '../store';
 
 export const NoticeModal: React.FC = () => {
   const { isNoticeModalOpen, currentNoticeDetail, setNoticeModalOpen } = useStore();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isNoticeModalOpen || !currentNoticeDetail) return;
+
+    dialogRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setNoticeModalOpen(false, currentNoticeDetail);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isNoticeModalOpen, currentNoticeDetail, setNoticeModalOpen]);
 
   if (!isNoticeModalOpen || !currentNoticeDetail) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="notice-modal-title"
+        tabIndex={-1}
         className="w-full max-w-[450px] max-h-[calc(100vh-2rem)] flex flex-col bg-card border border-border/50 rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] overflow-hidden scale-in-center animate-in zoom-in-95 duration-300"
       >
         {/* Header with Icon and Close */}
