@@ -20,6 +20,8 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const canManage = user?.role === 'ADMIN' || user?.role === 'DELEGATED_ADMIN';
   const [items, setItems] = useState<Announcement[]>([]);
   const [open, setOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailAnnouncement, setDetailAnnouncement] = useState<Announcement | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [error, setError] = useState('');
@@ -28,6 +30,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const pendingMarkRef = useRef(false);
   const seenUnreadIdsRef = useRef(new Set<string>());
   const openRef = useRef(open);
+  const announcementButtonRef = useRef<HTMLButtonElement>(null);
   const loadVersionRef = useRef(0);
 
   const authHeaders = useCallback((): Record<string, string> => {
@@ -57,7 +60,14 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   useEffect(() => {
     const unreadIds = new Set(items.filter((item) => item.unread).map((item) => item._id));
-    if ([...unreadIds].some((id) => !seenUnreadIdsRef.current.has(id))) setOpen(true);
+    const newUnread = items.find(
+      (item) => item.unread && !seenUnreadIdsRef.current.has(item._id),
+    );
+    if (newUnread) {
+      setOpen(true);
+      setDetailAnnouncement(newUnread);
+      setDetailOpen(true);
+    }
     seenUnreadIdsRef.current = unreadIds;
   }, [items]);
 
@@ -95,6 +105,21 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       }
     }
   }, [authHeaders]);
+
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    announcementButtonRef.current?.focus();
+    void markRead();
+  }, [markRead]);
+
+  useEffect(() => {
+    if (!detailOpen) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeDetail();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [closeDetail, detailOpen]);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
@@ -157,6 +182,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
     >
       {compact ? (
         <Menu.MenuButton
+          ref={announcementButtonRef}
           className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
           aria-label="公告"
           title="公告"
@@ -170,7 +196,10 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           )}
         </Menu.MenuButton>
       ) : (
-        <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
+        <Menu.MenuItem
+          className="select-item text-sm"
+          render={<Menu.MenuButton ref={announcementButtonRef} />}
+        >
           <Bell className="icon-md" aria-hidden="true" />
           公告
           {hasUnread && (
@@ -242,6 +271,39 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           </>
         )}
       </Menu.Menu>
+      {detailOpen && detailAnnouncement && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="announcement-detail-title"
+          tabIndex={-1}
+          className="fixed inset-x-4 top-20 z-[127] mx-auto max-h-[calc(100vh-6rem)] max-w-lg overflow-y-auto rounded-lg border border-border-medium bg-surface-primary p-5 shadow-xl sm:inset-x-auto"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <h2 id="announcement-detail-title" className="text-base font-semibold">
+              {detailAnnouncement.title}
+            </h2>
+            <button
+              type="button"
+              aria-label="关闭公告详情"
+              className="rounded p-1 text-text-secondary hover:bg-surface-hover"
+              onClick={closeDetail}
+            >
+              ×
+            </button>
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm text-text-secondary">
+            {detailAnnouncement.content}
+          </p>
+          <button
+            type="button"
+            className="mt-5 rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover"
+            onClick={closeDetail}
+          >
+            我知道了
+          </button>
+        </div>
+      )}
     </Menu.MenuProvider>
   );
 }

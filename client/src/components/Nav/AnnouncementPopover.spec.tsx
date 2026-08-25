@@ -69,6 +69,44 @@ describe('AnnouncementPopover', () => {
     );
   });
 
+  it('closes the dialog with its close button and restores focus to the announcement entry', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([{ _id: 'a-1', title: 'Close me', content: 'Body', unread: true }]),
+    );
+
+    render(<AnnouncementPopover compact />);
+    const user = userEvent.setup();
+    const entry = await screen.findByRole('button', { name: '公告' });
+    const dialog = await screen.findByRole('dialog', { name: 'Close me' });
+
+    await user.click(screen.getByRole('button', { name: '关闭公告详情' }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(entry).toHaveFocus();
+  });
+
+  it('closes the dialog with Escape while keeping the announcement entry usable', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([{ _id: 'a-1', title: 'Escape me', content: 'Body', unread: true }]),
+    );
+
+    render(<AnnouncementPopover compact />);
+    const user = userEvent.setup();
+    const entry = await screen.findByRole('button', { name: '公告' });
+    await screen.findByRole('dialog', { name: 'Escape me' });
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Escape me' })).not.toBeInTheDocument());
+    expect(entry).toHaveFocus();
+    await user.click(entry);
+    expect(screen.getByRole('menu')).toBeVisible();
+  });
+
   it('auto-opens and shows a red dot when an announcement is unread', async () => {
     let resolveRead: (response: unknown) => void = () => undefined;
     fetchMock.mockImplementation((url: string) => {
