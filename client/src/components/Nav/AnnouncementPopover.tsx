@@ -63,8 +63,6 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       })
       .catch(() => {
         if (loadVersion !== loadVersionRef.current) return false;
-        itemsRef.current = [];
-        setItems([]);
         return true;
       });
   }, [authHeaders, canManage]);

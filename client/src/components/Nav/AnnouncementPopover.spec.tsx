@@ -523,4 +523,36 @@ describe('AnnouncementPopover', () => {
     expect(await screen.findByLabelText('有新公告')).toBeInTheDocument();
     expect(readBodies).toEqual([JSON.stringify({ announcementIds: ['a-1'] })]);
   });
+
+  it('keeps the unread announcement visible when a focus refresh fails, then updates after retry', async () => {
+    let loadAttempts = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/announcements/read') return jsonResponse({ ok: true });
+      loadAttempts += 1;
+      if (loadAttempts === 2) return Promise.reject(new Error('network'));
+      if (loadAttempts === 3) return jsonResponse([]);
+      return jsonResponse([{ _id: 'a-1', title: 'Refresh me', content: 'Body', unread: true }]);
+    });
+
+    render(<AnnouncementPopover compact />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Refresh me' });
+    expect(within(dialog).getByText('Refresh me')).toBeInTheDocument();
+    expect(screen.getByLabelText('有新公告')).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(loadAttempts).toBe(2));
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Refresh me' })).toBeInTheDocument();
+      expect(screen.getByLabelText('有新公告')).toBeInTheDocument();
+    });
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(loadAttempts).toBe(3));
+    await waitFor(() => expect(screen.queryByLabelText('有新公告')).not.toBeInTheDocument());
+  });
 });
