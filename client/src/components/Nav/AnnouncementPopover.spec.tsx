@@ -102,6 +102,7 @@ describe('AnnouncementPopover', () => {
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Escape me' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(entry).toHaveFocus();
     await user.click(entry);
     expect(screen.getByRole('menu')).toBeVisible();

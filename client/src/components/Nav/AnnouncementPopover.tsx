@@ -108,6 +108,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   const closeDetail = useCallback(() => {
     setDetailOpen(false);
+    setOpen(false);
     announcementButtonRef.current?.focus();
     void markRead();
   }, [markRead]);
