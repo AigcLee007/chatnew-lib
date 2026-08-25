@@ -14,7 +14,10 @@ describe('ThemeToggleButton', () => {
         value={{
           theme,
           setTheme,
-          isDark: theme === 'dark',
+          setThemeRGB: jest.fn(),
+          setThemeDefinition: jest.fn(),
+          setThemeName: jest.fn(),
+          resetTheme: jest.fn(),
         }}
       >
         <ThemeToggleButton />
