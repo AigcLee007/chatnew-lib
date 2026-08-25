@@ -30,12 +30,13 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const [error, setError] = useState('');
   const itemsRef = useRef<Announcement[]>([]);
   const markingRef = useRef(false);
-  const pendingMarkRef = useRef(false);
+  const pendingMarkIdsRef = useRef(new Set<string>());
   const seenUnreadIdsRef = useRef(new Set<string>());
   const openRef = useRef(open);
   const announcementButtonRef = useRef<HTMLButtonElement>(null);
   const detailDialogRef = useRef<HTMLDivElement>(null);
   const loadVersionRef = useRef(0);
+  const itemsRevisionRef = useRef(0);
 
   const authHeaders = useCallback((): Record<string, string> => {
     const token = getTokenHeader();
@@ -49,6 +50,12 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       .then((nextItems) => {
         if (loadVersion !== loadVersionRef.current) return false;
         itemsRef.current = nextItems;
+        itemsRevisionRef.current += 1;
+        if (markingRef.current) {
+          nextItems.filter((item: Announcement) => item.unread).forEach((item: Announcement) => {
+            pendingMarkIdsRef.current.add(item._id);
+          });
+        }
         setItems(nextItems);
         return true;
       })
@@ -83,10 +90,11 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
     const announcementIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
     if (announcementIds.length === 0) return;
     if (markingRef.current) {
-      pendingMarkRef.current = true;
+      announcementIds.forEach((id) => pendingMarkIdsRef.current.add(id));
       return;
     }
     markingRef.current = true;
+    const requestRevision = itemsRevisionRef.current;
     try {
       const response = await fetch('/api/announcements/read', {
         method: 'POST',
@@ -94,17 +102,23 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
         body: JSON.stringify({ announcementIds }),
       });
       if (response.ok) {
-        itemsRef.current = itemsRef.current.map((item) =>
-          announcementIds.includes(item._id) ? { ...item, unread: false } : item,
-        );
-        setItems(itemsRef.current);
+        if (itemsRevisionRef.current === requestRevision) {
+          itemsRef.current = itemsRef.current.map((item) =>
+            announcementIds.includes(item._id) ? { ...item, unread: false } : item,
+          );
+          setItems(itemsRef.current);
+        } else {
+          itemsRef.current
+            .filter((item) => item.unread)
+            .forEach((item) => pendingMarkIdsRef.current.add(item._id));
+        }
       }
     } catch {
       // Keep unread state so the next menu open retries the request.
     } finally {
       markingRef.current = false;
-      if (pendingMarkRef.current) {
-        pendingMarkRef.current = false;
+      if (pendingMarkIdsRef.current.size > 0) {
+        pendingMarkIdsRef.current.clear();
         void markRead();
       }
     }

@@ -423,4 +423,42 @@ describe('AnnouncementPopover', () => {
 
     await waitFor(() => expect(readBodies).toContain(JSON.stringify({ announcementIds: ['a-2'] })));
   });
+
+  it('does not let an older read response clear a newer unread list response', async () => {
+    let loadCount = 0;
+    let readAttempts = 0;
+    let resolveInitialRead: (response: unknown) => void = () => undefined;
+    const readBodies: string[] = [];
+
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === '/api/announcements/read') {
+        readAttempts += 1;
+        readBodies.push(String(options?.body));
+        if (readAttempts === 1) {
+          return new Promise((resolve) => {
+            resolveInitialRead = resolve;
+          });
+        }
+        return jsonResponse({ ok: true });
+      }
+
+      loadCount += 1;
+      return jsonResponse([{ _id: 'a-1', title: 'Still unread', content: 'Body', unread: true }]);
+    });
+
+    render(<AnnouncementPopover compact />);
+
+    expect(await screen.findByText('Still unread')).toBeInTheDocument();
+    await waitFor(() => expect(readAttempts).toBe(1));
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(loadCount).toBe(2));
+
+    resolveInitialRead(jsonResponse({ ok: true }));
+
+    expect(await screen.findByLabelText('有新公告')).toBeInTheDocument();
+    await waitFor(() => expect(readBodies).toEqual([
+      JSON.stringify({ announcementIds: ['a-1'] }),
+      JSON.stringify({ announcementIds: ['a-1'] }),
+    ]));
+  });
 });
