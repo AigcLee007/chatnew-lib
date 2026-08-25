@@ -21,6 +21,7 @@ import store from '~/store';
 import ContactSupport from '~/components/Nav/ContactSupport';
 import AnnouncementPopover from '~/components/Nav/AnnouncementPopover';
 import QuotaSummary from '~/components/Nav/QuotaSummary';
+import { ThemeToggleButton } from '~/components/Appearance';
 
 const defaultInterface = getConfigDefaults().interface;
 
@@ -112,6 +113,7 @@ function Header({
           <QuotaSummary compact />
           <AnnouncementPopover compact />
           <ContactSupport compact />
+          <ThemeToggleButton />
         </div>
         <div className="hidden items-center gap-2 md:flex">
           <ExportAndShareMenu isSharedButtonEnabled={startupConfig?.sharedLinksEnabled ?? false} />
