@@ -14,6 +14,9 @@ type Announcement = {
   active?: boolean;
 };
 
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export default function AnnouncementPopover({ compact = false }: { compact?: boolean }) {
   const { user } = useAuthContext();
   const isAuthenticated = Boolean(user);
@@ -31,6 +34,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const seenUnreadIdsRef = useRef(new Set<string>());
   const openRef = useRef(open);
   const announcementButtonRef = useRef<HTMLButtonElement>(null);
+  const detailDialogRef = useRef<HTMLDivElement>(null);
   const loadVersionRef = useRef(0);
 
   const authHeaders = useCallback((): Record<string, string> => {
@@ -115,11 +119,50 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   useEffect(() => {
     if (!detailOpen) return undefined;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeDetail();
+    const dialog = detailDialogRef.current;
+    if (!dialog) return undefined;
+
+    const getFocusableElements = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const firstFocusable = getFocusableElements()[0] ?? dialog;
+    firstFocusable.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDetail();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+      if (!dialog.contains(activeElement)) {
+        event.preventDefault();
+        event.stopPropagation();
+        first.focus();
+      } else if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        event.stopPropagation();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        event.stopPropagation();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [closeDetail, detailOpen]);
 
   useEffect(() => {
@@ -274,6 +317,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       </Menu.Menu>
       {detailOpen && detailAnnouncement && (
         <div
+          ref={detailDialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="announcement-detail-title"

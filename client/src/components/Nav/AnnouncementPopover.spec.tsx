@@ -42,6 +42,28 @@ describe('AnnouncementPopover', () => {
     expect(dialog).toHaveTextContent('Please read this update.');
   });
 
+  it('moves focus into the dialog and loops Tab navigation within it', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([{ _id: 'a-1', title: 'Focus update', content: 'Body', unread: true }]),
+    );
+
+    render(<AnnouncementPopover compact />);
+    const user = userEvent.setup();
+    await screen.findByRole('dialog', { name: 'Focus update' });
+    const closeButton = screen.getByRole('button', { name: '关闭公告详情' });
+    const confirmButton = screen.getByRole('button', { name: '我知道了' });
+
+    await waitFor(() => expect(closeButton).toHaveFocus());
+    await user.tab();
+    expect(confirmButton).toHaveFocus();
+    await user.tab();
+    expect(closeButton).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(confirmButton).toHaveFocus();
+  });
+
   it('closes the unread announcement dialog and removes the red dot after confirming', async () => {
     fetchMock.mockImplementation((url: string) =>
       url === '/api/announcements/read'
