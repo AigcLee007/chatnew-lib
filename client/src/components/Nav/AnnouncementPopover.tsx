@@ -14,21 +14,29 @@ type Announcement = {
   active?: boolean;
 };
 
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export default function AnnouncementPopover({ compact = false }: { compact?: boolean }) {
   const { user } = useAuthContext();
   const isAuthenticated = Boolean(user);
   const canManage = user?.role === 'ADMIN' || user?.role === 'DELEGATED_ADMIN';
   const [items, setItems] = useState<Announcement[]>([]);
   const [open, setOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailAnnouncement, setDetailAnnouncement] = useState<Announcement | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [error, setError] = useState('');
   const itemsRef = useRef<Announcement[]>([]);
   const markingRef = useRef(false);
-  const pendingMarkRef = useRef(false);
+  const pendingMarkIdsRef = useRef(new Set<string>());
+  const activeMarkIdsRef = useRef(new Set<string>());
   const seenUnreadIdsRef = useRef(new Set<string>());
-  const openRef = useRef(open);
+  const announcementButtonRef = useRef<HTMLButtonElement>(null);
+  const detailDialogRef = useRef<HTMLDivElement>(null);
   const loadVersionRef = useRef(0);
+  const itemsRevisionRef = useRef(0);
 
   const authHeaders = useCallback((): Record<string, string> => {
     const token = getTokenHeader();
@@ -42,13 +50,19 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       .then((nextItems) => {
         if (loadVersion !== loadVersionRef.current) return false;
         itemsRef.current = nextItems;
+        itemsRevisionRef.current += 1;
+        if (markingRef.current) {
+          nextItems
+            .filter((item: Announcement) => item.unread)
+            .forEach((item: Announcement) => {
+              pendingMarkIdsRef.current.add(item._id);
+            });
+        }
         setItems(nextItems);
         return true;
       })
       .catch(() => {
         if (loadVersion !== loadVersionRef.current) return false;
-        itemsRef.current = [];
-        setItems([]);
         return true;
       });
   }, [authHeaders, canManage]);
@@ -57,22 +71,32 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   useEffect(() => {
     const unreadIds = new Set(items.filter((item) => item.unread).map((item) => item._id));
-    if ([...unreadIds].some((id) => !seenUnreadIdsRef.current.has(id))) setOpen(true);
+    const newUnread = items.find((item) => item.unread && !seenUnreadIdsRef.current.has(item._id));
+    if (newUnread) {
+      setOpen(false);
+      setDetailAnnouncement(newUnread);
+      setDetailOpen(true);
+    }
     seenUnreadIdsRef.current = unreadIds;
   }, [items]);
 
-  useEffect(() => {
-    openRef.current = open;
-  }, [open]);
-
   const markRead = useCallback(async () => {
-    const announcementIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
+    const unreadIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
+    pendingMarkIdsRef.current.forEach((id) => {
+      if (!unreadIds.includes(id)) pendingMarkIdsRef.current.delete(id);
+    });
+    const queuedIds = unreadIds.filter((id) => pendingMarkIdsRef.current.has(id));
+    const announcementIds = queuedIds.length > 0 ? queuedIds : unreadIds;
     if (announcementIds.length === 0) return;
     if (markingRef.current) {
-      pendingMarkRef.current = true;
+      unreadIds
+        .filter((id) => !activeMarkIdsRef.current.has(id))
+        .forEach((id) => pendingMarkIdsRef.current.add(id));
       return;
     }
     markingRef.current = true;
+    activeMarkIdsRef.current = new Set(announcementIds);
+    const requestRevision = itemsRevisionRef.current;
     try {
       const response = await fetch('/api/announcements/read', {
         method: 'POST',
@@ -80,30 +104,87 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
         body: JSON.stringify({ announcementIds }),
       });
       if (response.ok) {
-        itemsRef.current = itemsRef.current.map((item) =>
-          announcementIds.includes(item._id) ? { ...item, unread: false } : item,
-        );
-        setItems(itemsRef.current);
+        if (itemsRevisionRef.current === requestRevision) {
+          itemsRef.current = itemsRef.current.map((item) =>
+            announcementIds.includes(item._id) ? { ...item, unread: false } : item,
+          );
+          setItems(itemsRef.current);
+        } else {
+          itemsRef.current
+            .filter((item) => item.unread && !announcementIds.includes(item._id))
+            .forEach((item) => pendingMarkIdsRef.current.add(item._id));
+        }
       }
     } catch {
       // Keep unread state so the next menu open retries the request.
     } finally {
       markingRef.current = false;
-      if (pendingMarkRef.current) {
-        pendingMarkRef.current = false;
-        void markRead();
-      }
+      activeMarkIdsRef.current.clear();
+      announcementIds.forEach((id) => pendingMarkIdsRef.current.delete(id));
+      if (pendingMarkIdsRef.current.size > 0) void markRead();
     }
   }, [authHeaders]);
+
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    setOpen(false);
+    announcementButtonRef.current?.focus();
+    void markRead();
+  }, [markRead]);
+
+  useEffect(() => {
+    if (!detailOpen) return undefined;
+    const dialog = detailDialogRef.current;
+    if (!dialog) return undefined;
+
+    const getFocusableElements = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const firstFocusable = getFocusableElements()[0] ?? dialog;
+    firstFocusable.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDetail();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+      if (!dialog.contains(activeElement)) {
+        event.preventDefault();
+        event.stopPropagation();
+        first.focus();
+      } else if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        event.stopPropagation();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        event.stopPropagation();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [closeDetail, detailOpen]);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
     void load();
     const refreshOnFocus = () => {
-      const wasOpen = openRef.current;
-      void load().then((applied) => {
-        if (wasOpen && applied) return markRead();
-      });
+      void load();
     };
     window.addEventListener('focus', refreshOnFocus);
     return () => window.removeEventListener('focus', refreshOnFocus);
@@ -111,7 +192,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   useEffect(() => {
     if (open) void markRead();
-  }, [markRead, open]);
+  }, [items, markRead, open]);
 
   const publish = async () => {
     if (!title.trim() || !content.trim()) return;
@@ -157,6 +238,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
     >
       {compact ? (
         <Menu.MenuButton
+          ref={announcementButtonRef}
           className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
           aria-label="公告"
           title="公告"
@@ -170,7 +252,10 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           )}
         </Menu.MenuButton>
       ) : (
-        <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
+        <Menu.MenuItem
+          className="select-item text-sm"
+          render={<Menu.MenuButton ref={announcementButtonRef} />}
+        >
           <Bell className="icon-md" aria-hidden="true" />
           公告
           {hasUnread && (
@@ -242,6 +327,57 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           </>
         )}
       </Menu.Menu>
+      {detailOpen && detailAnnouncement && (
+        <div
+          ref={detailDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="announcement-detail-title"
+          tabIndex={-1}
+          className="fixed inset-0 z-[127] flex items-start justify-center bg-black/40 p-4 pt-20"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeDetail();
+          }}
+        >
+          <div
+            className="max-h-[calc(100vh-6rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-border-medium bg-surface-primary p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="announcement-detail-title" className="text-base font-semibold">
+                {detailAnnouncement.pinned && (
+                  <span
+                    aria-hidden="true"
+                    className="mr-1 inline-flex items-center gap-1 text-xs text-text-secondary"
+                  >
+                    <Pin className="size-3" aria-hidden="true" />
+                    置顶
+                  </span>
+                )}
+                {detailAnnouncement.title}
+              </h2>
+              <button
+                type="button"
+                aria-label="关闭公告详情"
+                className="rounded p-1 text-text-secondary hover:bg-surface-hover"
+                onClick={closeDetail}
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-3 whitespace-pre-wrap text-sm text-text-secondary">
+              {detailAnnouncement.content}
+            </p>
+            <button
+              type="button"
+              className="mt-5 rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover"
+              onClick={closeDetail}
+            >
+              我知道了
+            </button>
+          </div>
+        </div>
+      )}
     </Menu.MenuProvider>
   );
 }
