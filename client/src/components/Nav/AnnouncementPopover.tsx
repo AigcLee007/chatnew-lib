@@ -334,7 +334,10 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
             <div className="flex items-start justify-between gap-4">
               <h2 id="announcement-detail-title" className="text-base font-semibold">
                 {detailAnnouncement.pinned && (
-                  <span className="mr-1 inline-flex items-center gap-1 text-xs text-text-secondary">
+                  <span
+                    aria-hidden="true"
+                    className="mr-1 inline-flex items-center gap-1 text-xs text-text-secondary"
+                  >
                     <Pin className="size-3" aria-hidden="true" />
                     置顶
                   </span>
