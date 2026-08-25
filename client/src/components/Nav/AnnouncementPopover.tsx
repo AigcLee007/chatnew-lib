@@ -322,31 +322,45 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           aria-modal="true"
           aria-labelledby="announcement-detail-title"
           tabIndex={-1}
-          className="fixed inset-x-4 top-20 z-[127] mx-auto max-h-[calc(100vh-6rem)] max-w-lg overflow-y-auto rounded-lg border border-border-medium bg-surface-primary p-5 shadow-xl sm:inset-x-auto"
+          className="fixed inset-0 z-[127] flex items-start justify-center bg-black/40 p-4 pt-20"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeDetail();
+          }}
         >
-          <div className="flex items-start justify-between gap-4">
-            <h2 id="announcement-detail-title" className="text-base font-semibold">
-              {detailAnnouncement.title}
-            </h2>
+          <div
+            className="max-h-[calc(100vh-6rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-border-medium bg-surface-primary p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="announcement-detail-title" className="text-base font-semibold">
+                {detailAnnouncement.pinned && (
+                  <span className="mr-1 inline-flex items-center gap-1 text-xs text-text-secondary">
+                    <Pin className="size-3" aria-hidden="true" />
+                    置顶
+                  </span>
+                )}
+                {detailAnnouncement.title}
+              </h2>
+              <button
+                type="button"
+                aria-label="关闭公告详情"
+                className="rounded p-1 text-text-secondary hover:bg-surface-hover"
+                onClick={closeDetail}
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-3 whitespace-pre-wrap text-sm text-text-secondary">
+              {detailAnnouncement.content}
+            </p>
             <button
               type="button"
-              aria-label="关闭公告详情"
-              className="rounded p-1 text-text-secondary hover:bg-surface-hover"
+              className="mt-5 rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover"
               onClick={closeDetail}
             >
-              ×
+              我知道了
             </button>
           </div>
-          <p className="mt-3 whitespace-pre-wrap text-sm text-text-secondary">
-            {detailAnnouncement.content}
-          </p>
-          <button
-            type="button"
-            className="mt-5 rounded bg-accent-primary px-3 py-2 text-sm font-medium text-white hover:bg-accent-primary-hover"
-            onClick={closeDetail}
-          >
-            我知道了
-          </button>
         </div>
       )}
     </Menu.MenuProvider>

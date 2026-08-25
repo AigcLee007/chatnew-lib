@@ -42,6 +42,21 @@ describe('AnnouncementPopover', () => {
     expect(dialog).toHaveTextContent('Please read this update.');
   });
 
+  it('shows the pinned marker in the announcement detail dialog', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([
+            { _id: 'a-1', title: 'Pinned update', content: 'Body', pinned: true, unread: true },
+          ]),
+    );
+
+    render(<AnnouncementPopover compact />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Pinned update' });
+    expect(dialog).toHaveTextContent('置顶');
+  });
+
   it('moves focus into the dialog and loops Tab navigation within it', async () => {
     fetchMock.mockImplementation((url: string) =>
       url === '/api/announcements/read'
@@ -104,6 +119,24 @@ describe('AnnouncementPopover', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Close me' });
 
     await user.click(screen.getByRole('button', { name: '关闭公告详情' }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(entry).toHaveFocus();
+  });
+
+  it('closes the dialog when its backdrop is clicked and restores focus to the entry', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([{ _id: 'a-1', title: 'Backdrop update', content: 'Body', unread: true }]),
+    );
+
+    render(<AnnouncementPopover compact />);
+    const user = userEvent.setup();
+    const entry = await screen.findByRole('button', { name: '公告' });
+    const dialog = await screen.findByRole('dialog', { name: 'Backdrop update' });
+
+    await user.click(dialog);
 
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(entry).toHaveFocus();
