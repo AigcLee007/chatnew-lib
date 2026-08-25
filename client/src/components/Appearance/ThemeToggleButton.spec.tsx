@@ -27,7 +27,7 @@ describe('ThemeToggleButton', () => {
     return { ...utils, setTheme };
   };
 
-  it("switches from dark to light when clicked", () => {
+  it('switches from dark to light when clicked', () => {
     const { getByRole, setTheme } = renderWithTheme('dark');
 
     fireEvent.click(getByRole('button', { name: /theme/i }));
@@ -35,7 +35,7 @@ describe('ThemeToggleButton', () => {
     expect(setTheme).toHaveBeenCalledWith('light');
   });
 
-  it("switches from light to dark when clicked", () => {
+  it('switches from light to dark when clicked', () => {
     const { getByRole, setTheme } = renderWithTheme('light');
 
     fireEvent.click(getByRole('button', { name: /theme/i }));
@@ -43,7 +43,7 @@ describe('ThemeToggleButton', () => {
     expect(setTheme).toHaveBeenCalledWith('dark');
   });
 
-  it("switches from system to dark when the system preference is light", () => {
+  it('switches from system to dark when the system preference is light', () => {
     const { getByRole, setTheme } = renderWithTheme('system');
 
     fireEvent.click(getByRole('button', { name: /theme/i }));
