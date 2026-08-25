@@ -31,8 +31,8 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const itemsRef = useRef<Announcement[]>([]);
   const markingRef = useRef(false);
   const pendingMarkIdsRef = useRef(new Set<string>());
+  const activeMarkIdsRef = useRef(new Set<string>());
   const seenUnreadIdsRef = useRef(new Set<string>());
-  const openRef = useRef(open);
   const announcementButtonRef = useRef<HTMLButtonElement>(null);
   const detailDialogRef = useRef<HTMLDivElement>(null);
   const loadVersionRef = useRef(0);
@@ -52,9 +52,11 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
         itemsRef.current = nextItems;
         itemsRevisionRef.current += 1;
         if (markingRef.current) {
-          nextItems.filter((item: Announcement) => item.unread).forEach((item: Announcement) => {
-            pendingMarkIdsRef.current.add(item._id);
-          });
+          nextItems
+            .filter((item: Announcement) => item.unread)
+            .forEach((item: Announcement) => {
+              pendingMarkIdsRef.current.add(item._id);
+            });
         }
         setItems(nextItems);
         return true;
@@ -71,29 +73,31 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   useEffect(() => {
     const unreadIds = new Set(items.filter((item) => item.unread).map((item) => item._id));
-    const newUnread = items.find(
-      (item) => item.unread && !seenUnreadIdsRef.current.has(item._id),
-    );
+    const newUnread = items.find((item) => item.unread && !seenUnreadIdsRef.current.has(item._id));
     if (newUnread) {
-      setOpen(true);
+      setOpen(false);
       setDetailAnnouncement(newUnread);
       setDetailOpen(true);
     }
     seenUnreadIdsRef.current = unreadIds;
   }, [items]);
 
-  useEffect(() => {
-    openRef.current = open;
-  }, [open]);
-
   const markRead = useCallback(async () => {
-    const announcementIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
+    const unreadIds = itemsRef.current.filter((item) => item.unread).map((item) => item._id);
+    pendingMarkIdsRef.current.forEach((id) => {
+      if (!unreadIds.includes(id)) pendingMarkIdsRef.current.delete(id);
+    });
+    const queuedIds = unreadIds.filter((id) => pendingMarkIdsRef.current.has(id));
+    const announcementIds = queuedIds.length > 0 ? queuedIds : unreadIds;
     if (announcementIds.length === 0) return;
     if (markingRef.current) {
-      announcementIds.forEach((id) => pendingMarkIdsRef.current.add(id));
+      unreadIds
+        .filter((id) => !activeMarkIdsRef.current.has(id))
+        .forEach((id) => pendingMarkIdsRef.current.add(id));
       return;
     }
     markingRef.current = true;
+    activeMarkIdsRef.current = new Set(announcementIds);
     const requestRevision = itemsRevisionRef.current;
     try {
       const response = await fetch('/api/announcements/read', {
@@ -109,7 +113,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
           setItems(itemsRef.current);
         } else {
           itemsRef.current
-            .filter((item) => item.unread)
+            .filter((item) => item.unread && !announcementIds.includes(item._id))
             .forEach((item) => pendingMarkIdsRef.current.add(item._id));
         }
       }
@@ -117,10 +121,9 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       // Keep unread state so the next menu open retries the request.
     } finally {
       markingRef.current = false;
-      if (pendingMarkIdsRef.current.size > 0) {
-        pendingMarkIdsRef.current.clear();
-        void markRead();
-      }
+      activeMarkIdsRef.current.clear();
+      announcementIds.forEach((id) => pendingMarkIdsRef.current.delete(id));
+      if (pendingMarkIdsRef.current.size > 0) void markRead();
     }
   }, [authHeaders]);
 
@@ -183,10 +186,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
     if (!isAuthenticated) return undefined;
     void load();
     const refreshOnFocus = () => {
-      const wasOpen = openRef.current;
-      void load().then((applied) => {
-        if (wasOpen && applied) return markRead();
-      });
+      void load();
     };
     window.addEventListener('focus', refreshOnFocus);
     return () => window.removeEventListener('focus', refreshOnFocus);
@@ -194,7 +194,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
 
   useEffect(() => {
     if (open) void markRead();
-  }, [markRead, open]);
+  }, [items, markRead, open]);
 
   const publish = async () => {
     if (!title.trim() || !content.trim()) return;
