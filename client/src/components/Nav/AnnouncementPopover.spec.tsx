@@ -22,6 +22,53 @@ function jsonResponse(body: unknown, ok = true) {
 }
 
 describe('AnnouncementPopover', () => {
+  it('shows an unread announcement in a dialog named for its title', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([
+            {
+              _id: 'a-1',
+              title: 'Important update',
+              content: 'Please read this update.',
+              unread: true,
+            },
+          ]),
+    );
+
+    render(<AnnouncementPopover compact />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Important update' });
+    expect(dialog).toHaveTextContent('Please read this update.');
+  });
+
+  it('closes the unread announcement dialog and removes the red dot after confirming', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([
+            { _id: 'a-1', title: 'Read this', content: 'Announcement body', unread: true },
+          ]),
+    );
+
+    render(<AnnouncementPopover compact />);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '我知道了' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Read this' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('有新公告')).not.toBeInTheDocument();
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/announcements/read',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ announcementIds: ['a-1'] }),
+      }),
+    );
+  });
+
   it('auto-opens and shows a red dot when an announcement is unread', async () => {
     let resolveRead: (response: unknown) => void = () => undefined;
     fetchMock.mockImplementation((url: string) => {
