@@ -355,9 +355,14 @@ describe('AnnouncementPopover', () => {
   it('keeps the newest announcement response when an earlier load finishes last', async () => {
     let resolveInitialLoad: (response: unknown) => void = () => undefined;
     let resolveFocusLoad: (response: unknown) => void = () => undefined;
+    let resolveRead: (response: unknown) => void = () => undefined;
     let loadCount = 0;
     fetchMock.mockImplementation((url: string) => {
-      if (url === '/api/announcements/read') return new Promise(() => {});
+      if (url === '/api/announcements/read') {
+        return new Promise((resolve) => {
+          resolveRead = resolve;
+        });
+      }
       loadCount += 1;
       return new Promise((resolve) => {
         if (loadCount === 1) resolveInitialLoad = resolve;
@@ -382,6 +387,7 @@ describe('AnnouncementPopover', () => {
       within(screen.getByRole('dialog', { name: 'Newest' })).getByText('Newest'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('有新公告')).toBeInTheDocument();
+    resolveRead(jsonResponse({ ok: true }));
   });
 
   it('marks announcements from the latest overlapping focus refresh', async () => {
