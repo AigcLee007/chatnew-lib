@@ -310,10 +310,17 @@ describe('AnnouncementPopover', () => {
   it('reopens when a new unread announcement arrives after a failed read', async () => {
     let loadCount = 0;
     let readAttempts = 0;
+    let resolveRetryRead: (response: unknown) => void = () => undefined;
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/announcements/read') {
         readAttempts += 1;
-        return readAttempts === 1 ? Promise.reject(new Error('network')) : new Promise(() => {});
+        if (readAttempts === 1) return Promise.reject(new Error('network'));
+        if (readAttempts === 2) {
+          return new Promise((resolve) => {
+            resolveRetryRead = resolve;
+          });
+        }
+        return jsonResponse({ ok: true });
       }
       loadCount += 1;
       return jsonResponse(
@@ -341,6 +348,8 @@ describe('AnnouncementPopover', () => {
       within(await screen.findByRole('menu')).getByText('Fresh after failure'),
     ).toBeInTheDocument();
     await waitFor(() => expect(button).toHaveAttribute('aria-expanded', 'true'));
+    resolveRetryRead(jsonResponse({ ok: true }));
+    await waitFor(() => expect(readAttempts).toBe(3));
   });
 
   it('keeps the newest announcement response when an earlier load finishes last', async () => {
