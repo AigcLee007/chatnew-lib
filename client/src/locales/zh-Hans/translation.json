@@ -2391,5 +2391,6 @@
   "com_insights_start_date": "Start date",
   "com_insights_end_date": "End date",
   "com_insights_invalid_date_range": "Choose an end date after the start date, within {{days}} days.",
-  "com_insights_sparkline_accessibility": "{{label}} over time"
+  "com_insights_sparkline_accessibility": "{{label}} over time",
+  "com_ui_search_models_count": "搜索 {{0}} 个模型..."
 }
