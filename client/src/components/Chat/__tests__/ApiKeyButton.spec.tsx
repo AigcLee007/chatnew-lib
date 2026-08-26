@@ -128,9 +128,11 @@ describe('ApiKeyButton', () => {
   });
 
   it('keeps the dialog open and preserves the entered value on mutation error', async () => {
-    mutate.mockImplementation((_payload: unknown, options?: { onError?: (error: Error) => void }) => {
-      options?.onError?.(new Error('boom'));
-    });
+    mutate.mockImplementation(
+      (_payload: unknown, options?: { onError?: (error: Error) => void }) => {
+        options?.onError?.(new Error('boom'));
+      },
+    );
 
     render(<ApiKeyButton />);
 
