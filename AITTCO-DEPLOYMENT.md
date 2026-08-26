@@ -2,6 +2,11 @@
 
 This checkout routes the configured models through `https://api.aittco.com` and prompts each user for their own provider API key.
 
+## Production Update
+
+For the production server update procedure, including its fixed checkout path and Compose command,
+follow [AGENTS.md](AGENTS.md#production-server-updates).
+
 ## Provider routing
 
 | UI group | LibreChat endpoint | Gateway request shape |
