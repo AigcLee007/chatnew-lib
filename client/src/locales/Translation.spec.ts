@@ -10,6 +10,7 @@ import {
 import English from './en/translation.json';
 import Spanish from './es/translation.json';
 import French from './fr/translation.json';
+import SimplifiedChinese from './zh-Hans/translation.json';
 import { TranslationKeys } from '~/hooks';
 import i18n from './i18n';
 
@@ -47,6 +48,11 @@ describe('i18next translation tests', () => {
   it('should return the correct translation for a valid key in Spanish', async () => {
     await changeLanguageSafely('es');
     expect(i18n.t('com_ui_examples')).toBe(Spanish.com_ui_examples);
+  });
+
+  it('should include every English key in Simplified Chinese', () => {
+    const missingKeys = Object.keys(English).filter((key) => !(key in SimplifiedChinese));
+    expect(missingKeys).toEqual([]);
   });
 
   it('should fallback to English for an invalid language code', async () => {
