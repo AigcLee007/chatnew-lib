@@ -5,6 +5,7 @@ import { ArtifactModes } from 'librechat-data-provider';
 import { ChevronRight, WandSparkles } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
+import ToolHelp from './ToolHelp';
 
 interface ArtifactsSubMenuProps extends React.HTMLAttributes<HTMLButtonElement> {
   isArtifactsPinned: boolean;
@@ -42,7 +43,7 @@ const ArtifactsSubMenu = React.forwardRef<HTMLButtonElement, ArtifactsSubMenuPro
     const isCustomEnabled = artifactsMode === ArtifactModes.CUSTOM;
 
     return (
-      <>
+      <ToolHelp id="artifacts">
         <Ariakit.MenuProvider store={menuStore}>
           <Ariakit.MenuButton
             ref={ref}
@@ -144,7 +145,7 @@ const ArtifactsSubMenu = React.forwardRef<HTMLButtonElement, ArtifactsSubMenuPro
             </Ariakit.Menu>
           )}
         </Ariakit.MenuProvider>
-      </>
+      </ToolHelp>
     );
   },
 );

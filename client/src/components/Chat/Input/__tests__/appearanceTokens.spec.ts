@@ -26,4 +26,16 @@ describe('Composer appearance tokens', () => {
 
     expectedTokens.forEach((token) => expect(contents).toContain(token));
   });
+
+  it('documents the composer tool visibility and help behavior', () => {
+    const tools = source('ToolsDropdown.tsx');
+    const badgeRow = source('BadgeRow.tsx');
+    const skills = source('Skills.tsx');
+
+    expect(tools).toContain("import ToolHelp from './ToolHelp'");
+    expect(tools).toContain('<ToolHelp id="skills">');
+    expect(tools).not.toContain("localize('com_ui_web_search')");
+    expect(badgeRow).not.toContain("import WebSearch from './WebSearch'");
+    expect(skills).toContain("localize('com_ui_skills_menu_label')");
+  });
 });

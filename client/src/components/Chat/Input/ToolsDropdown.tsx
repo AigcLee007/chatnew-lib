@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { TooltipAnchor, DropdownPopup, PinIcon, VectorIcon } from '@librechat/client';
-import { Brain, Globe, ScrollText, Settings, Settings2, TerminalSquareIcon } from 'lucide-react';
+import { Brain, ScrollText, Settings2, TerminalSquareIcon } from 'lucide-react';
 import {
-  AuthType,
   Permissions,
   ArtifactModes,
   PermissionTypes,
@@ -22,6 +21,7 @@ import MCPSubMenu from '~/components/Chat/Input/MCPSubMenu';
 import { useGetStartupConfig } from '~/data-provider';
 import { useBadgeRowContext } from '~/Providers';
 import { cn } from '~/utils';
+import ToolHelp from './ToolHelp';
 
 interface ToolsDropdownProps {
   disabled?: boolean;
@@ -33,19 +33,8 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   const context = useBadgeRowContext();
   const { data: startupConfig } = useGetStartupConfig();
 
-  const {
-    codeEnabled,
-    memoryEnabled,
-    webSearchEnabled,
-    artifactsEnabled,
-    fileSearchEnabled,
-    skillsEnabled,
-  } = useAgentCapabilities(context?.agentsConfig?.capabilities ?? defaultAgentCapabilities);
-
-  const canUseWebSearch = useHasAccess({
-    permissionType: PermissionTypes.WEB_SEARCH,
-    permission: Permissions.USE,
-  });
+  const { codeEnabled, memoryEnabled, artifactsEnabled, fileSearchEnabled, skillsEnabled } =
+    useAgentCapabilities(context?.agentsConfig?.capabilities ?? defaultAgentCapabilities);
 
   const canRunCode = useHasAccess({
     permissionType: PermissionTypes.RUN_CODE,
@@ -72,40 +61,14 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
 
   const [isPopoverActive, setIsPopoverActive] = useState(false);
   const isDisabled = disabled ?? false;
-  const {
-    skills,
-    memory,
-    webSearch,
-    artifacts,
-    fileSearch,
-    mcpServerManager,
-    codeInterpreter,
-    searchApiKeyForm,
-  } = context ?? {};
+  const { skills, memory, artifacts, fileSearch, mcpServerManager, codeInterpreter } =
+    context ?? {};
 
-  const { setIsDialogOpen: setIsSearchDialogOpen, menuTriggerRef: searchMenuTriggerRef } =
-    searchApiKeyForm ?? {};
-  const {
-    isPinned: isSearchPinned,
-    setIsPinned: setIsSearchPinned,
-    authData: webSearchAuthData,
-  } = webSearch ?? {};
   const { isPinned: isCodePinned, setIsPinned: setIsCodePinned } = codeInterpreter ?? {};
   const { isPinned: isFileSearchPinned, setIsPinned: setIsFileSearchPinned } = fileSearch ?? {};
   const { isPinned: isArtifactsPinned, setIsPinned: setIsArtifactsPinned } = artifacts ?? {};
   const { isPinned: isSkillsPinned, setIsPinned: setIsSkillsPinned } = skills ?? {};
   const { isPinned: isMemoryPinned, setIsPinned: setIsMemoryPinned } = memory ?? {};
-
-  const showWebSearchSettings = useMemo(() => {
-    const authTypes = webSearchAuthData?.authTypes ?? [];
-    if (authTypes.length === 0) return true;
-    return !authTypes.every(([, authType]) => authType === AuthType.SYSTEM_DEFINED);
-  }, [webSearchAuthData?.authTypes]);
-
-  const handleWebSearchToggle = useCallback(() => {
-    const newValue = !webSearch?.toggleState;
-    webSearch?.debouncedChange({ value: newValue });
-  }, [webSearch]);
 
   const handleCodeInterpreterToggle = useCallback(() => {
     const newValue = !codeInterpreter?.toggleState;
@@ -164,10 +127,12 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
       hideOnClick: false,
       render: (props) => (
         <div {...props}>
-          <div className="flex items-center gap-2">
-            <VectorIcon className="icon-md" />
-            <span>{localize('com_assistants_file_search')}</span>
-          </div>
+          <ToolHelp id="fileSearch">
+            <div className="flex items-center gap-2">
+              <VectorIcon className="icon-md" />
+              <span>{localize('com_assistants_file_search')}</span>
+            </div>
+          </ToolHelp>
           <button
             type="button"
             onClick={(e) => {
@@ -190,70 +155,18 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
     });
   }
 
-  if (canUseWebSearch && webSearchEnabled) {
-    dropdownItems.push({
-      onClick: handleWebSearchToggle,
-      hideOnClick: false,
-      render: (props) => (
-        <div {...props}>
-          <div className="flex items-center gap-2">
-            <Globe className="icon-md" aria-hidden="true" />
-            <span>{localize('com_ui_web_search')}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {showWebSearchSettings && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsSearchDialogOpen?.(true);
-                }}
-                className={cn(
-                  'rounded p-1 transition-all duration-200',
-                  'hover:bg-surface-secondary hover:shadow-sm',
-                  'text-text-secondary hover:text-text-primary',
-                )}
-                aria-label="Configure web search"
-                ref={searchMenuTriggerRef}
-              >
-                <div className="h-4 w-4">
-                  <Settings className="h-4 w-4" aria-hidden="true" />
-                </div>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsSearchPinned?.(!isSearchPinned);
-              }}
-              className={cn(
-                'rounded p-1 transition-all duration-200',
-                'hover:bg-surface-secondary hover:shadow-sm',
-                !isSearchPinned && 'text-text-secondary hover:text-text-primary',
-              )}
-              aria-label={isSearchPinned ? 'Unpin' : 'Pin'}
-            >
-              <div className="h-4 w-4">
-                <PinIcon unpin={isSearchPinned} />
-              </div>
-            </button>
-          </div>
-        </div>
-      ),
-    });
-  }
-
   if (canUseSkills && skillsEnabled) {
     dropdownItems.push({
       onClick: handleSkillsToggle,
       hideOnClick: false,
       render: (props) => (
         <div {...props} data-testid="tools-menu-skills">
-          <div className="flex items-center gap-2">
-            <ScrollText className="icon-md" aria-hidden="true" />
-            <span>{localize('com_ui_skills')}</span>
-          </div>
+          <ToolHelp id="skills">
+            <div className="flex items-center gap-2">
+              <ScrollText className="icon-md" aria-hidden="true" />
+              <span>{localize('com_ui_skills_menu_label')}</span>
+            </div>
+          </ToolHelp>
           <button
             type="button"
             onClick={(e) => {
@@ -282,10 +195,12 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
       hideOnClick: false,
       render: (props) => (
         <div {...props} data-testid="tools-menu-memory">
-          <div className="flex items-center gap-2">
-            <Brain className="icon-md" aria-hidden="true" />
-            <span>{localize('com_ui_memory')}</span>
-          </div>
+          <ToolHelp id="memory">
+            <div className="flex items-center gap-2">
+              <Brain className="icon-md" aria-hidden="true" />
+              <span>{localize('com_ui_memory')}</span>
+            </div>
+          </ToolHelp>
           <button
             type="button"
             onClick={(e) => {
@@ -314,10 +229,12 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
       hideOnClick: false,
       render: (props) => (
         <div {...props}>
-          <div className="flex items-center gap-2">
-            <TerminalSquareIcon className="icon-md" aria-hidden="true" />
-            <span>{localize('com_ui_run_code')}</span>
-          </div>
+          <ToolHelp id="runCode">
+            <div className="flex items-center gap-2">
+              <TerminalSquareIcon className="icon-md" aria-hidden="true" />
+              <span>{localize('com_ui_run_code')}</span>
+            </div>
+          </ToolHelp>
           <div className="flex items-center gap-1">
             <button
               type="button"

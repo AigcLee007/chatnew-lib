@@ -29,7 +29,7 @@ function Skills() {
       <CheckboxButton
         checked={skillsActive}
         setValue={debouncedChange}
-        label={localize('com_ui_skills')}
+        label={localize('com_ui_skills_menu_label')}
         isCheckedClassName={badgeAccents.cyan}
         icon={<ScrollText className="icon-md" aria-hidden="true" />}
       />
