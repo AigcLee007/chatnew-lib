@@ -51,7 +51,7 @@ function ModelSelectorContent() {
   const nonCatalogEndpoints = (mappedEndpoints ?? []).filter(
     (endpoint) => !regularEndpoints.includes(endpoint),
   );
-  const modelCount = buildModelCatalog(regularEndpoints, catalogSpecs).length;
+  const modelCount = buildModelCatalog(regularEndpoints, catalogSpecs, localize).length;
   const supplementarySearchResults = searchResults?.filter((item) => {
     if ('name' in item && 'label' in item) {
       return specializedSpecs.includes(item);

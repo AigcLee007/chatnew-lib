@@ -1,7 +1,13 @@
 import type { useLocalize } from '~/hooks';
 import type { Endpoint } from '~/common';
+import type { TModelSpec } from 'librechat-data-provider';
+import zh from '~/locales/zh-Hans/translation.json';
+import en from '~/locales/en/translation.json';
 import { filterItems } from '../utils';
 import { buildModelCatalog, filterModelCatalog, groupModelCatalog } from '../catalog';
+
+const localizeZh = (key: keyof typeof en) => zh[key] ?? en[key];
+const localizeEn = (key: keyof typeof en) => en[key];
 
 const agentsEndpoint: Endpoint = {
   value: 'agents',
@@ -28,13 +34,45 @@ describe('model selector utilities', () => {
       icon: null,
       models: [{ name: 'gemini-3.5-flash-preview' }, { name: 'custom-model' }],
     };
-    const entries = buildModelCatalog([endpoint], []);
+    const entries = buildModelCatalog([endpoint], [], localizeZh);
     expect(entries.map((entry) => entry.model)).toEqual([
       'gemini-3.5-flash-preview',
       'custom-model',
     ]);
     expect(entries[0]).toMatchObject({ group: 'GEMINI', name: 'Gemini 3.5 Flash' });
+    expect(entries[0].description).toContain('快速');
+    expect(entries[1].description).toContain('快速');
     expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(2);
+  });
+
+  it('provides a Chinese fallback description for unknown provider models', () => {
+    const endpoint: Endpoint = {
+      value: 'anthropic',
+      label: 'Anthropic',
+      hasModels: true,
+      icon: null,
+      models: [{ name: 'new-claude-model' }],
+    };
+
+    const [entry] = buildModelCatalog([endpoint], [], localizeZh);
+    expect(entry.description).toBe('适合长文本分析、写作与复杂推理。');
+  });
+
+  it('provides a Chinese fallback description for model specs without one', () => {
+    const [entry] = buildModelCatalog(
+      [],
+      [
+        {
+          name: 'custom-spec',
+          label: 'Custom Spec',
+          group: 'custom',
+          preset: {},
+        } as TModelSpec,
+      ],
+      localizeZh,
+    );
+
+    expect(entry.description).toBe('适合通用对话、写作与任务处理。');
   });
 
   it('searches descriptions and keeps unknown models', () => {
@@ -45,9 +83,41 @@ describe('model selector utilities', () => {
       icon: null,
       models: [{ name: 'future-model' }],
     };
-    const entries = buildModelCatalog([endpoint], []);
+    const entries = buildModelCatalog([endpoint], [], localizeZh);
     expect(filterModelCatalog(entries, 'future')).toHaveLength(1);
     expect(filterModelCatalog(entries, 'missing')).toEqual([]);
+  });
+
+  it('localizes descriptions and searches the displayed Chinese text', () => {
+    const endpoint: Endpoint = {
+      value: 'google',
+      label: 'Google',
+      hasModels: true,
+      icon: null,
+      models: [{ name: 'gemini-3.5-flash-preview' }],
+    };
+    expect(buildModelCatalog([endpoint], [], localizeEn)[0].description).toContain('low latency');
+    expect(filterModelCatalog(buildModelCatalog([endpoint], [], localizeZh), '延迟')).toHaveLength(
+      1,
+    );
+  });
+
+  it('uses the underlying model for fallback without overwriting configured descriptions', () => {
+    const entries = buildModelCatalog(
+      [],
+      [
+        {
+          name: 'empty',
+          group: 'My models',
+          preset: { endpoint: 'gateway', model: 'claude-opus-5' },
+          description: '  ',
+        },
+        { name: 'custom', preset: { endpoint: 'google' }, description: '管理员填写的说明' },
+      ] as TModelSpec[],
+      localizeZh,
+    );
+    expect(entries[0].description).toBe('适合长文本分析、写作与复杂推理。');
+    expect(entries[1].description).toBe('管理员填写的说明');
   });
 
   it('matches endpoint search aliases', () => {

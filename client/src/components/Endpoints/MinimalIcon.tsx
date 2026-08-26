@@ -1,15 +1,9 @@
 import { Feather } from 'lucide-react';
 import { EModelEndpoint, alternateName } from 'librechat-data-provider';
-import {
-  Sparkles,
-  BedrockIcon,
-  AnthropicIcon,
-  AzureMinimalIcon,
-  OpenAIMinimalIcon,
-  GoogleMinimalIcon,
-  CustomMinimalIcon,
-} from '@librechat/client';
+import { Sparkles, BedrockIcon, AzureMinimalIcon, CustomMinimalIcon } from '@librechat/client';
 import UnknownIcon from '~/hooks/Endpoint/UnknownIcon';
+import ProviderBrandIcon from '~/components/Endpoints/ProviderBrandIcon';
+import { getProviderBrand } from '~/components/Endpoints/provider';
 import { IconProps } from '~/common';
 import { cn } from '~/utils';
 
@@ -28,12 +22,15 @@ const MinimalIcon: React.FC<IconProps> = (props) => {
       name: props.chatGptLabel ?? 'ChatGPT',
     },
     [EModelEndpoint.openAI]: {
-      icon: <OpenAIMinimalIcon className={iconClassName} />,
+      icon: <ProviderBrandIcon brand="OPENAI" className={iconClassName ?? 'size-5'} />,
       name: props.chatGptLabel ?? 'ChatGPT',
     },
-    [EModelEndpoint.google]: { icon: <GoogleMinimalIcon />, name: props.modelLabel ?? 'Google' },
+    [EModelEndpoint.google]: {
+      icon: <ProviderBrandIcon brand="GEMINI" className={iconClassName ?? 'size-5'} />,
+      name: props.modelLabel ?? 'Google',
+    },
     [EModelEndpoint.anthropic]: {
-      icon: <AnthropicIcon className="icon-md shrink-0 dark:text-white" />,
+      icon: <ProviderBrandIcon brand="ANTHROPIC" className={iconClassName ?? 'size-5'} />,
       name: props.modelLabel ?? 'Claude',
     },
     [EModelEndpoint.custom]: {
@@ -57,6 +54,10 @@ const MinimalIcon: React.FC<IconProps> = (props) => {
   };
 
   let { icon, name } = endpointIcons[endpoint] ?? endpointIcons.default;
+  const brand = getProviderBrand(props.model, endpoint);
+  if (brand && !iconURL) {
+    icon = <ProviderBrandIcon brand={brand} className={iconClassName ?? 'size-5'} />;
+  }
   if (iconURL && endpointIcons[iconURL] != null) {
     ({ icon, name } = endpointIcons[iconURL]);
   }

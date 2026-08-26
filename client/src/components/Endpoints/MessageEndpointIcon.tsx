@@ -17,6 +17,8 @@ import {
 import UnknownIcon from '~/hooks/Endpoint/UnknownIcon';
 import { IconProps } from '~/common';
 import { cn } from '~/utils';
+import ProviderBrandIcon from './ProviderBrandIcon';
+import { getProviderBrand } from './provider';
 
 type EndpointIcon = {
   icon: React.ReactNode | React.JSX.Element;
@@ -174,6 +176,11 @@ const MessageEndpointIcon: React.FC<IconProps> = (props) => {
     endpoint != null && endpoint && endpointIcons[endpoint]
       ? (endpointIcons[endpoint] ?? {})
       : (endpointIcons.default as EndpointIcon);
+
+  const providerBrand = getProviderBrand(model, endpoint);
+  if (providerBrand && !iconURL) {
+    icon = <ProviderBrandIcon brand={providerBrand} className="size-full" size={size} />;
+  }
 
   if (iconURL && endpointIcons[iconURL]) {
     ({ icon, bg, name } = endpointIcons[iconURL]);

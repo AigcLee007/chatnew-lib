@@ -1,17 +1,16 @@
 import { Feather } from 'lucide-react';
 import { EModelEndpoint } from 'librechat-data-provider';
 import {
-  GPTIcon,
   Sparkles,
   BedrockIcon,
   AssistantIcon,
-  AnthropicIcon,
   AzureMinimalIcon,
-  GoogleMinimalIcon,
   CustomMinimalIcon,
 } from '@librechat/client';
 import type { IconMapProps, AgentIconMapProps, IconsRecord } from '~/common';
 import UnknownIcon from './UnknownIcon';
+import ProviderBrandIcon from '~/components/Endpoints/ProviderBrandIcon';
+import { getProviderBrand } from '~/components/Endpoints/provider';
 import { cn } from '~/utils';
 
 const AssistantAvatar = ({
@@ -60,9 +59,24 @@ const Bedrock = ({ className = '' }: IconMapProps) => {
 
 export const icons: IconsRecord = {
   [EModelEndpoint.azureOpenAI]: AzureMinimalIcon,
-  [EModelEndpoint.openAI]: GPTIcon,
-  [EModelEndpoint.anthropic]: AnthropicIcon,
-  [EModelEndpoint.google]: GoogleMinimalIcon,
+  [EModelEndpoint.openAI]: (props) => (
+    <ProviderBrandIcon
+      brand={getProviderBrand(props.model, EModelEndpoint.openAI) ?? 'OPENAI'}
+      {...props}
+    />
+  ),
+  [EModelEndpoint.anthropic]: (props) => (
+    <ProviderBrandIcon
+      brand={getProviderBrand(props.model, EModelEndpoint.anthropic) ?? 'ANTHROPIC'}
+      {...props}
+    />
+  ),
+  [EModelEndpoint.google]: (props) => (
+    <ProviderBrandIcon
+      brand={getProviderBrand(props.model, EModelEndpoint.google) ?? 'GEMINI'}
+      {...props}
+    />
+  ),
   [EModelEndpoint.custom]: CustomMinimalIcon,
   [EModelEndpoint.assistants]: AssistantAvatar,
   [EModelEndpoint.azureAssistants]: AssistantAvatar,

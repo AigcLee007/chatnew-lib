@@ -124,7 +124,10 @@ export default function CatalogList({
   const localize = useLocalize();
   const favorites = useFavorites();
   const { searchValue } = useModelSelectorContext();
-  const entries = useMemo(() => buildModelCatalog(endpoints, modelSpecs), [endpoints, modelSpecs]);
+  const entries = useMemo(
+    () => buildModelCatalog(endpoints, modelSpecs, localize),
+    [endpoints, modelSpecs, localize],
+  );
   const filtered = useMemo(() => filterModelCatalog(entries, searchValue), [entries, searchValue]);
   const groups = useMemo(() => groupModelCatalog(filtered), [filtered]);
 

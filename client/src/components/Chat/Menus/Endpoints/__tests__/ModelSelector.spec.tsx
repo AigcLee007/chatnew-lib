@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { getConfigDefaults } from 'librechat-data-provider';
+import type { TStartupConfig } from 'librechat-data-provider';
 import type { Endpoint, SelectedValues } from '~/common';
 import ModelSelector from '../ModelSelector';
 import mockEn from '~/locales/en/translation.json';
@@ -105,7 +106,7 @@ jest.mock('~/hooks', () => ({
 async function openSelector() {
   mockSearchValue = '';
   const user = userEvent.setup();
-  render(<ModelSelector startupConfig={getConfigDefaults()} />);
+  render(<ModelSelector startupConfig={getConfigDefaults() as unknown as TStartupConfig} />);
   await user.click(screen.getByTestId('model-selector-button'));
   await screen.findByRole('combobox');
   return user;

@@ -5,6 +5,8 @@ import { getIconKey, getEntity, getIconEndpoint } from '~/utils';
 import ConvoIconURL from '~/components/Endpoints/ConvoIconURL';
 import { icons } from '~/hooks/Endpoint/Icons';
 import { isImageURL } from '~/utils/icons';
+import ProviderBrandIcon from './ProviderBrandIcon';
+import { getProviderBrand } from './provider';
 
 export default function ConvoIcon({
   conversation,
@@ -49,6 +51,7 @@ export default function ConvoIcon({
   const endpointIconURL = getEndpointField(endpointsConfig, endpoint, 'iconURL');
   const iconKey = getIconKey({ endpoint, endpointsConfig, endpointIconURL });
   const Icon = icons[iconKey] ?? null;
+  const providerBrand = getProviderBrand(conversation?.model, endpoint);
 
   return (
     <>
@@ -65,7 +68,9 @@ export default function ConvoIcon({
         />
       ) : (
         <div className={containerClassName}>
-          {endpoint && Icon != null && (
+          {endpoint && providerBrand && !endpointIconURL ? (
+            <ProviderBrandIcon brand={providerBrand} className={className} size={size} />
+          ) : endpoint && Icon ? (
             <Icon
               size={size}
               context={context}
@@ -76,7 +81,7 @@ export default function ConvoIcon({
               agentName={name}
               avatar={avatar}
             />
-          )}
+          ) : null}
         </div>
       )}
     </>
