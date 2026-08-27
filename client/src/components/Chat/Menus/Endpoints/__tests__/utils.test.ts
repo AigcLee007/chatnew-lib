@@ -32,17 +32,27 @@ describe('model selector utilities', () => {
       label: 'Google',
       hasModels: true,
       icon: null,
-      models: [{ name: 'gemini-3.5-flash-preview' }, { name: 'custom-model' }],
+      models: [
+        { name: 'gemini-3.5-flash-preview' },
+        { name: 'gemini-3.7-flash' },
+        { name: 'custom-model' },
+      ],
     };
     const entries = buildModelCatalog([endpoint], [], localizeZh);
     expect(entries.map((entry) => entry.model)).toEqual([
       'gemini-3.5-flash-preview',
+      'gemini-3.7-flash',
       'custom-model',
     ]);
     expect(entries[0]).toMatchObject({ group: 'GEMINI', name: 'Gemini 3.5 Flash' });
+    expect(entries[1]).toMatchObject({
+      group: 'GEMINI',
+      model: 'gemini-3.7-flash',
+      name: 'Gemini 3.7 Flash',
+    });
     expect(entries[0].description).toContain('快速');
     expect(entries[1].description).toContain('快速');
-    expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(2);
+    expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(3);
   });
 
   it('provides a Chinese fallback description for unknown provider models', () => {
