@@ -67,6 +67,11 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '擅长细致分析、长文本处理与复杂推理。',
     group: 'ANTHROPIC',
   },
+  'claude-opus-5': {
+    name: 'Claude Opus 5',
+    description: '擅长细致分析、长文本处理与复杂推理。',
+    group: 'ANTHROPIC',
+  },
   'claude-sonnet-5': {
     name: 'Claude Sonnet 5',
     description: '平衡写作、分析与编程能力，适合日常专业工作。',

@@ -68,6 +68,23 @@ describe('model selector utilities', () => {
     expect(entry.description).toBe('适合长文本分析、写作与复杂推理。');
   });
 
+  it('uses human-readable labels for configured Claude model IDs', () => {
+    const endpoint: Endpoint = {
+      value: 'anthropic',
+      label: 'Anthropic',
+      hasModels: true,
+      icon: null,
+      models: [{ name: 'claude-opus-5' }],
+    };
+
+    const [entry] = buildModelCatalog([endpoint], [], localizeZh);
+    expect(entry).toMatchObject({
+      model: 'claude-opus-5',
+      name: 'Claude Opus 5',
+      group: 'ANTHROPIC',
+    });
+  });
+
   it('provides a Chinese fallback description for model specs without one', () => {
     const [entry] = buildModelCatalog(
       [],
