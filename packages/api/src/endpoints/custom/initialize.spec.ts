@@ -62,6 +62,7 @@ function createParams(overrides: {
   });
 
   const db = {
+    getUserKey: jest.fn().mockResolvedValue(overrides.userApiKey ?? 'sk-user-key'),
     getUserKeyValues: jest.fn().mockResolvedValue({
       apiKey: overrides.userApiKey ?? 'sk-user-key',
       baseURL: overrides.userBaseURL ?? 'https://user-api.example.com/v1',
@@ -121,10 +122,33 @@ describe('initializeCustom – Agents API user key resolution', () => {
 
       await initializeCustom(params);
 
-      expect(params.db.getUserKeyValues).toHaveBeenCalledWith({
+      expect(params.db.getUserKey).toHaveBeenCalledWith({
         userId: 'user-1',
         name: 'aittco_shared',
       });
+    },
+  );
+
+  it.each(['OpenAI', 'xAI'])(
+    'reads the plain-text shared key with getUserKey for %s',
+    async (endpoint) => {
+      const params = createParams({
+        apiKey: AuthType.USER_PROVIDED,
+        baseURL: 'https://api.example.com/v1',
+      });
+      params.endpoint = endpoint;
+      const getUserKey = jest.fn().mockResolvedValue('sk-plain-text-shared-key');
+      params.db.getUserKey = getUserKey;
+      params.db.getUserKeyValues = jest.fn().mockRejectedValue(new Error('plain text is not JSON'));
+
+      await initializeCustom(params);
+
+      expect(getUserKey).toHaveBeenCalledWith({ userId: 'user-1', name: 'aittco_shared' });
+      expect(mockGetOpenAIConfig).toHaveBeenCalledWith(
+        'sk-plain-text-shared-key',
+        expect.any(Object),
+        endpoint,
+      );
     },
   );
 

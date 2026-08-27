@@ -22,7 +22,7 @@ import { getScopedTokenConfigKey } from '~/endpoints/keys';
 import { getCustomEndpointConfig } from '~/app/config';
 import { fetchModels } from '~/endpoints/models';
 import { validateEndpointURL } from '~/auth';
-import { getAittcoKeyName } from '~/auth/sharedKey';
+import { AITTCO_SHARED_KEY_NAME, getAittcoKeyName } from '~/auth/sharedKey';
 import { tokenConfigCache } from '~/cache';
 
 const { PROXY } = process.env;
@@ -215,10 +215,13 @@ export async function initializeCustom({
 
   let userValues = null;
   if (userProvidesKey || userProvidesURL) {
-    userValues = await db.getUserKeyValues({
-      userId: req.user?.id ?? '',
-      name: getAittcoKeyName(endpoint),
-    });
+    const userId = req.user?.id ?? '';
+    const keyName = getAittcoKeyName(endpoint);
+    if (keyName === AITTCO_SHARED_KEY_NAME) {
+      userValues = { apiKey: await db.getUserKey({ userId, name: keyName }) };
+    } else {
+      userValues = await db.getUserKeyValues({ userId, name: keyName });
+    }
   }
 
   const apiKey = userProvidesKey || userProvidesURL ? userValues?.apiKey : CUSTOM_API_KEY;
