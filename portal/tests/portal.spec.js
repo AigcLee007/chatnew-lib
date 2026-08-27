@@ -27,4 +27,13 @@ test.describe('ChatVIP version portal', () => {
     await page.goto(portalUrl);
     await expect(page.locator('.version-card').first()).toHaveAttribute('data-version', 'new');
   });
+
+  test('keeps both choices visible in a standard desktop first viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 760 });
+    await page.goto(portalUrl);
+    for (const selector of ['[data-version="new"] .card-cta', '[data-version="classic"] .card-cta']) {
+      const bottom = await page.locator(selector).evaluate((element) => element.getBoundingClientRect().bottom);
+      expect(bottom).toBeLessThanOrEqual(760);
+    }
+  });
 });
