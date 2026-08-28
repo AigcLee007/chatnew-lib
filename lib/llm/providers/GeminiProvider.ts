@@ -99,10 +99,7 @@ export class GeminiProvider extends BaseProvider {
       const finalMessages = apiMessages;
 
       // --- 模型 ID 映射 ---
-      let apiModel = model as string;
-      if (model === 'gemini-3.1-flash-preview' as any) {
-        apiModel = 'gemini-3.1-flash-lite-preview';
-      }
+      const apiModel = model as string;
 
       // Build request body (no temperature for Gemini)
       // 提高输出限制到 32768，减少截断问题

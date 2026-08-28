@@ -3,7 +3,7 @@
  */
 
 import { ILLMProvider } from './types';
-import { AnthropicProvider, GeminiNativeProvider, GeminiProvider, OpenAIProvider } from './providers';
+import { AnthropicProvider, GeminiNativeProvider, GeminiProvider, GrokProvider, OpenAIProvider } from './providers';
 
 // ============================================================================
 // Provider Registry
@@ -14,6 +14,7 @@ const providers: ILLMProvider[] = [
   new GeminiNativeProvider(),  // 优先匹配 -v 后缀模型
   new GeminiProvider(),
   new AnthropicProvider(),
+  new GrokProvider(),
   new OpenAIProvider(),
 ];
 

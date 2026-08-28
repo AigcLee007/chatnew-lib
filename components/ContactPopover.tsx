@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Headphones, MessageCircle } from 'lucide-react';
+import { appAssetUrl } from '../lib/base-path';
 
 export const ContactPopover: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,7 +44,7 @@ export const ContactPopover: React.FC = () => {
           <div className="p-5 flex flex-col items-center text-center">
             <div className="w-44 h-44 rounded-2xl border border-border/60 bg-white p-2 shadow-sm">
               <img
-                src="/wechat.png"
+                src={appAssetUrl('wechat.png')}
                 alt="客服微信二维码"
                 className="w-full h-full object-cover rounded-xl"
               />

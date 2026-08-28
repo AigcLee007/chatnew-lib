@@ -4,6 +4,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
 import { NoticeModal } from './components/NoticeModal';
 import { useStore } from './store';
+import { appAssetUrl } from './lib/base-path';
 
 const VERSION_STORAGE_KEY = 'aittco_app_version_seen';
 
@@ -67,7 +68,7 @@ const App: React.FC = () => {
 
     const checkVersion = async () => {
       try {
-        const response = await fetch(`/app-version.json?t=${Date.now()}`, { cache: 'no-store' });
+        const response = await fetch(`${appAssetUrl('app-version.json')}?t=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) return;
         const data = await response.json();
         const remoteVersion = typeof data?.version === 'string' ? data.version : '';

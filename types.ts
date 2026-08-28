@@ -2,11 +2,16 @@ export type Role = 'user' | 'assistant' | 'system';
 
 export type ModelId =
   | 'gemini-3.1-pro-preview'
-  | 'gemini-3.1-flash-preview'
+  | 'gemini-3.5-flash-preview'
+  | 'gpt-5.6-sol'
+  | 'gpt-5.6-terra'
   | 'gpt-5.4'
   | 'gpt-5.5'
   | 'gpt-image-2'
-  | 'claude-opus-4-6'
+  | 'grok-4.6'
+  | 'grok-4.5'
+  | 'claude-opus-5'
+  | 'claude-sonnet-5'
   | 'claude-opus-4-7'
   | 'claude-opus-4-8';
 

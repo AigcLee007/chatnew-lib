@@ -41,6 +41,7 @@ export interface ImageGenerationOptions {
   model?: string;
   attachments?: Attachment[];
   params?: GptImage2Params;
+  signal?: AbortSignal;
 }
 
 // ============================================================================
@@ -109,6 +110,50 @@ export interface StreamChoice {
 export interface StreamChunkResponse {
   choices?: StreamChoice[];
   usage?: UsageStats;
+}
+
+export interface ResponseInputTextPart {
+  type: 'input_text';
+  text: string;
+}
+
+export interface ResponseInputImagePart {
+  type: 'input_image';
+  image_url: string;
+}
+
+export type ResponseInputContentPart = ResponseInputTextPart | ResponseInputImagePart;
+
+export interface ResponseInputMessage {
+  role: 'user' | 'assistant';
+  content: string | ResponseInputContentPart[];
+}
+
+export interface ResponsesRequestBody {
+  model: string;
+  instructions: string;
+  input: ResponseInputMessage[];
+  stream: true;
+  max_output_tokens: number;
+}
+
+export interface ResponsesUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+}
+
+export interface ResponsesStreamEvent {
+  type?: string;
+  delta?: string;
+  message?: string;
+  error?: { message?: string };
+  response?: {
+    usage?: ResponsesUsage;
+    error?: { message?: string };
+    incomplete_details?: { reason?: string };
+  };
+  usage?: ResponsesUsage;
 }
 
 /** Chat completion request body */

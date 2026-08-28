@@ -110,7 +110,8 @@ export async function generateImage(
   prompt: string,
   model: string = 'gpt-image-2',
   attachments: Attachment[] = [],
-  params?: GptImage2Params
+  params?: GptImage2Params,
+  signal?: AbortSignal
 ): Promise<ImageGenerationResult> {
   const provider = LLMFactory.getProvider(model);
   
@@ -124,6 +125,7 @@ export async function generateImage(
     model,
     attachments,
     params,
+    signal,
   });
 }
 

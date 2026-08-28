@@ -251,6 +251,14 @@ describe('LLMFactory', () => {
     expect(provider.supportsModel('gpt-5.2-all')).toBe(true);
   });
 
+  it('should return GrokProvider for grok models', async () => {
+    const { LLMFactory } = await import('../../lib/llm');
+
+    const provider = LLMFactory.getProvider('grok-4.6');
+    expect(provider.name).toBe('Grok');
+    expect(provider.supportsModel('grok-4.6')).toBe(true);
+  });
+
   it('should return GeminiProvider as default for unknown models', async () => {
     const { LLMFactory } = await import('../../lib/llm');
     

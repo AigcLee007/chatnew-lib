@@ -90,7 +90,7 @@ export class GeminiNativeProvider extends BaseProvider {
   supportsModel(modelId: string): boolean {
     return [
       'gemini-3.1-pro-preview', 
-      'gemini-3.1-flash-preview'
+      'gemini-3.5-flash-preview'
     ].includes(modelId);
   }
 
@@ -113,11 +113,7 @@ export class GeminiNativeProvider extends BaseProvider {
     try {
       validateApiKey(apiKey);
 
-      // --- 妯″瀷 ID 鏄犲皠 ---
-      let apiModel = model as string;
-      if (model === 'gemini-3.1-flash-preview' as any) {
-        apiModel = 'gemini-3.1-flash-lite-preview';
-      }
+      const apiModel = model as string;
       // 0. 娓呮礂鍘嗗彶娑堟伅锛岀‘淇濅互 user 缁撳熬
       // ========================================================================
       let validMessages = [...messages];

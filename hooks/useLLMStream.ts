@@ -295,6 +295,8 @@ export function useLLMStream(): UseLLMStreamReturn {
     } = params;
 
     setIsStreaming(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const botMsgId = existingMsgId || uuidv4();
     const botMsg: Message = {
@@ -311,7 +313,7 @@ export function useLLMStream(): UseLLMStreamReturn {
     }
 
     try {
-      const imageResult = await generateImage(apiKey, prompt, model, attachments, imageParams);
+      const imageResult = await generateImage(apiKey, prompt, model, attachments, imageParams, controller.signal);
       const outputImages = (imageResult.images || []).map((image, index) => {
         const imageContent = image.startsWith('data:image') || image.startsWith('http')
           ? image
@@ -337,10 +339,15 @@ export function useLLMStream(): UseLLMStreamReturn {
       onComplete?.(finalMsg);
     } catch (err: unknown) {
       const error = err as Error;
-      const errorMsg = `\n\n> **生图失败**: ${error.message}`;
+      const errorMsg = error.name === 'AbortError'
+        ? '\n\n**[已停止]**'
+        : `\n\n> **生图失败**: ${error.message}`;
       onError?.(botMsgId, botMsg.content + errorMsg);
     } finally {
       setIsStreaming(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   }, []);
 

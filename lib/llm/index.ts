@@ -28,7 +28,7 @@ export type {
 export { LLMFactory, getProvider, registerProvider, getAllProviders } from './LLMFactory';
 
 // Providers (for direct use or extension)
-export { AnthropicProvider, BaseProvider, GeminiProvider, OpenAIProvider } from './providers';
+export { AnthropicProvider, BaseProvider, GeminiProvider, GrokProvider, OpenAIProvider } from './providers';
 
 // Utilities (for testing and extension)
 export { fetchWithRetry, validateApiKey, API_BASE, CORE_SYSTEM_IDENTITY } from './utils';

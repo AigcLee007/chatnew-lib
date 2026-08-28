@@ -68,12 +68,13 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
     typeof localStorage !== 'undefined'
       ? (() => {
           const storedModel = localStorage.getItem('aittco_model');
+          if (storedModel === 'gemini-3.1-flash-preview') return 'gemini-3.5-flash-preview';
           if (storedModel === 'gpt-5.2-all') return 'gpt-5.4';
           if (storedModel === 'gpt-5.2-thinking' || storedModel === 'gpt-5.3-codex') return 'gpt-5.5';
           if (storedModel === 'gemini-2.5-flash-image') return 'gpt-image-2';
-          return (storedModel as ModelId) || 'gemini-3.1-flash-preview';
+          return (storedModel as ModelId) || 'gemini-3.5-flash-preview';
         })()
-      : 'gemini-3.1-flash-preview',
+      : 'gemini-3.5-flash-preview',
   userSystemPrompt:
     typeof localStorage !== 'undefined' ? localStorage.getItem('aittco_system_prompt') || '' : '',
   workMode:
@@ -103,7 +104,9 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
   },
 
   setModel: (model) => {
-    const migratedModel = model === ('gpt-5.2-all' as ModelId)
+    const migratedModel = model === ('gemini-3.1-flash-preview' as ModelId)
+      ? 'gemini-3.5-flash-preview'
+      : model === ('gpt-5.2-all' as ModelId)
       ? 'gpt-5.4'
       : model === ('gpt-5.2-thinking' as ModelId) || model === ('gpt-5.3-codex' as ModelId)
       ? 'gpt-5.5'

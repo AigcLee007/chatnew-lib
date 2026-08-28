@@ -2,6 +2,7 @@
 import { useStore } from '../store';
 import { db } from '../lib/db';
 import { checkBalance, BalanceResult } from '../lib/api-client';
+import { appAssetUrl } from '../lib/base-path';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   X,
@@ -38,13 +39,16 @@ const ADMIN_SK = 'sk-K9OJf52OughwT8vizrDKJpvMebzutpbKVXxxhYe8EZFF0nm7';
 
 const MODEL_OPTIONS: { id: ModelId; label: string; desc: string }[] = [
   { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', desc: '高质量推理与复杂任务' },
-  { id: 'gemini-3.1-flash-preview', label: 'gemini-3.1-flash-preview', desc: '速度快，适合高频对话' },
+  { id: 'gemini-3.5-flash-preview', label: 'gemini-3.5-flash-preview', desc: '速度快，适合高频对话' },
   { id: 'gpt-5.5', label: 'GPT-5.5', desc: 'OpenAI 最新旗舰，适合高难度推理与复杂任务' },
   { id: 'gpt-5.4', label: 'Gpt-5.4', desc: '通用能力均衡' },
   { id: 'gpt-image-2', label: 'gpt-image-2', desc: 'OpenAI 生图模型' },
-  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', desc: 'Anthropic 最新旗舰，擅长深度推理与长任务分析' },
+  { id: 'grok-4.6', label: 'Grok 4.6', desc: 'xAI 高性能推理模型，适合复杂分析与代码任务' },
+  { id: 'grok-4.5', label: 'Grok 4.5', desc: 'xAI 通用模型，适合日常对话与业务分析' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', desc: 'Anthropic 旗舰模型，适合深度推理与长任务分析' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', desc: '速度与能力兼顾，适合日常专业任务' },
+  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', desc: 'Anthropic Claude 高质量推理模型' },
   { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', desc: 'Anthropic Claude 高质量推理模型' },
-  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', desc: 'Anthropic Claude 高质量推理模型' },
 ];
 
 const PROMPT_PRESETS = [
@@ -121,7 +125,7 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const prompts = useLiveQuery(() => db.prompts.orderBy('createdAt').reverse().toArray(), []);
 
   const canUseWebSearch = useMemo(
-    () => defaultModel === 'gemini-3.1-pro-preview' || defaultModel === 'gemini-3.1-flash-preview',
+    () => defaultModel === 'gemini-3.1-pro-preview' || defaultModel === 'gemini-3.5-flash-preview',
     [defaultModel]
   );
 
@@ -262,11 +266,13 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (data.settings) {
           setApiKey(data.settings.apiKey || '');
           const importedModel = data.settings.defaultModel;
-          const migratedModel = importedModel === 'gpt-5.2-all'
+          const migratedModel = importedModel === 'gemini-3.1-flash-preview'
+            ? 'gemini-3.5-flash-preview'
+            : importedModel === 'gpt-5.2-all'
             ? 'gpt-5.4'
             : importedModel === 'gpt-5.2-thinking' || importedModel === 'gpt-5.3-codex'
             ? 'gpt-5.5'
-            : importedModel || 'gemini-3.1-flash-preview';
+            : importedModel || 'gemini-3.5-flash-preview';
           setModel(migratedModel as ModelId);
           setUserSystemPrompt(data.settings.userSystemPrompt || '');
           if (data.settings.theme && data.settings.theme !== theme) {
@@ -447,7 +453,7 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   className="relative w-36 h-36 rounded-2xl border border-border bg-card p-2 shadow-xl transition-transform hover:scale-[1.03] cursor-zoom-in"
                   title="点击放大二维码"
                 >
-                  <img src="/wechat.png" alt="微信二维码" className="w-full h-full object-cover rounded-xl" />
+                  <img src={appAssetUrl('wechat.png')} alt="微信二维码" className="w-full h-full object-cover rounded-xl" />
                 </button>
                 <div className="mt-3 text-sm text-muted-foreground">扫码联系技术支持</div>
                 <div className="mt-1 text-xs text-muted-foreground/70">点击二维码可放大</div>
@@ -627,7 +633,7 @@ export const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <X size={18} />
             </button>
             <img
-              src="/wechat.png"
+              src={appAssetUrl('wechat.png')}
               alt="微信二维码放大预览"
               className="w-[360px] h-[360px] max-w-[78vw] max-h-[78vw] object-contain rounded-xl"
               onClick={(e) => e.stopPropagation()}

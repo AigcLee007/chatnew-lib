@@ -6,8 +6,11 @@ import {
   ChatOptions,
   ImageGenerationOptions,
   UsageStats,
-  ChatCompletionRequestBody,
-  StreamChunkResponse,
+  ApiMessage,
+  ResponseInputMessage,
+  ResponsesRequestBody,
+  ResponsesStreamEvent,
+  ResponsesUsage,
 } from '../types';
 import { BaseProvider } from './BaseProvider';
 import { fetchWithRetry, validateApiKey, API_BASE } from '../utils';
@@ -20,13 +23,14 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   async generateImage(options: ImageGenerationOptions) {
-    const { apiKey, prompt, model = 'gpt-image-2', attachments = [], params } = options;
+    const { apiKey, prompt, model = 'gpt-image-2', attachments = [], params, signal } = options;
 
     validateApiKey(apiKey);
 
     const response = await fetch('/api/image/generate-v2', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal,
       body: JSON.stringify({
         apiKey,
         model,
@@ -77,34 +81,15 @@ export class OpenAIProvider extends BaseProvider {
       const systemContext = this.buildSystemContext(userSystemPrompt, model);
       const apiMessages = this.buildApiMessages(messages, systemContext);
 
-      const primaryBody: ChatCompletionRequestBody = {
+      const body: ResponsesRequestBody = {
         model,
-        messages: apiMessages,
+        instructions: this.buildResponsesInstructions(apiMessages),
+        input: this.buildResponsesInput(apiMessages),
         stream: true,
-        stream_options: { include_usage: true },
-        temperature: 0.7,
-        // Keep conservative for compatibility across relay routes.
-        max_tokens: 8192,
+        max_output_tokens: 8192,
       };
 
-      let response: Response;
-      try {
-        response = await this.sendRequest(apiKey, primaryBody, signal);
-      } catch (primaryErr) {
-        if (!this.shouldRetryWithCompatibilityPayload(primaryErr)) {
-          throw primaryErr;
-        }
-
-        // Some keys/routes reject stream_options or max_tokens and return 5xx.
-        const fallbackBody: ChatCompletionRequestBody = {
-          model,
-          messages: apiMessages,
-          stream: true,
-          temperature: 0.7,
-        };
-
-        response = await this.sendRequest(apiKey, fallbackBody, signal, 1);
-      }
+      const response = await this.sendRequest(apiKey, body, signal);
 
       if (!response.ok) {
         throw new Error(`API request failed: ${response.status} ${response.statusText}`);
@@ -126,12 +111,12 @@ export class OpenAIProvider extends BaseProvider {
 
   private async sendRequest(
     apiKey: string,
-    body: ChatCompletionRequestBody,
+    body: ResponsesRequestBody,
     signal?: AbortSignal,
     retries = 2
   ): Promise<Response> {
     return fetchWithRetry(
-      `${API_BASE}/chat/completions`,
+      `${API_BASE}/responses`,
       {
         method: 'POST',
         headers: {
@@ -145,18 +130,76 @@ export class OpenAIProvider extends BaseProvider {
     );
   }
 
-  private shouldRetryWithCompatibilityPayload(error: unknown): boolean {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (!msg) return false;
+  private buildResponsesInput(apiMessages: ApiMessage[]): ResponseInputMessage[] {
+    return apiMessages
+      .filter((message) => message.role !== 'system')
+      .map((message) => ({
+        role: message.role as 'user' | 'assistant',
+        content: Array.isArray(message.content)
+          ? message.content.map((part) =>
+              part.type === 'text'
+                ? { type: 'input_text' as const, text: part.text }
+                : { type: 'input_image' as const, image_url: part.image_url.url }
+            )
+          : message.content,
+      }));
+  }
 
-    const isServerError = /\b5\d{2}\b/.test(msg);
-    const mightBeCompatibilityIssue =
-      msg.includes('stream_options') ||
-      msg.includes('max_tokens') ||
-      msg.includes('unsupported') ||
-      msg.includes('invalid_request');
+  private buildResponsesInstructions(apiMessages: ApiMessage[]): string {
+    return apiMessages
+      .filter((message) => message.role === 'system')
+      .map((message) =>
+        Array.isArray(message.content)
+          ? message.content
+              .filter((part) => part.type === 'text')
+              .map((part) => part.text)
+              .join('\n')
+          : message.content
+      )
+      .filter(Boolean)
+      .join('\n\n');
+  }
 
-    return isServerError || mightBeCompatibilityIssue;
+  private toUsageStats(usage?: ResponsesUsage): UsageStats | undefined {
+    if (!usage) return undefined;
+    const promptTokens = usage.input_tokens || 0;
+    const completionTokens = usage.output_tokens || 0;
+    return {
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: usage.total_tokens ?? promptTokens + completionTokens,
+    };
+  }
+
+  private processEvent(
+    event: ResponsesStreamEvent,
+    onChunk: (chunk: string, isThinking?: boolean) => void
+  ): UsageStats | undefined {
+    if (event.type === 'response.output_text.delta' && event.delta) {
+      onChunk(event.delta, false);
+    }
+
+    if (
+      (event.type === 'response.reasoning_text.delta' ||
+        event.type === 'response.reasoning_summary_text.delta') &&
+      event.delta
+    ) {
+      onChunk(event.delta, true);
+    }
+
+    if (event.type === 'error' || event.type === 'response.failed') {
+      throw new Error(
+        event.message || event.error?.message || event.response?.error?.message || 'Responses API request failed'
+      );
+    }
+
+    if (event.type === 'response.incomplete') {
+      throw new Error(
+        event.response?.incomplete_details?.reason || 'Responses API returned an incomplete response'
+      );
+    }
+
+    return this.toUsageStats(event.response?.usage || event.usage);
   }
 
   private async processStream(
@@ -166,51 +209,39 @@ export class OpenAIProvider extends BaseProvider {
   ): Promise<void> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
-    let done = false;
     let finalUsage: UsageStats | undefined;
     let buffer = '';
 
-    while (!done) {
+    while (true) {
+      let value: Uint8Array | undefined;
+      let done = false;
       try {
-        const { value, done: doneReading } = await reader.read();
-        done = doneReading;
-
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (dataStr === '[DONE]') break;
-            try {
-              const json: StreamChunkResponse = JSON.parse(dataStr);
-
-              if (json.usage) {
-                finalUsage = {
-                  prompt_tokens: json.usage.prompt_tokens || 0,
-                  completion_tokens: json.usage.completion_tokens || 0,
-                  total_tokens: json.usage.total_tokens || 0,
-                };
-              }
-
-              const delta = json.choices?.[0]?.delta;
-              const text = delta?.content || '';
-              const reasoning = delta?.reasoning_content || '';
-              if (reasoning) onChunk(reasoning, true);
-              if (text) onChunk(text, false);
-            } catch {
-              // Ignore malformed chunk.
-            }
-          }
-        }
+        ({ value, done } = await reader.read());
       } catch (readError: unknown) {
         const error = readError as Error & { name?: string };
         if (error.name === 'AbortError') throw readError;
         onChunk('\n\n**[网络中断]**');
         throw readError;
+      }
+
+      if (done) break;
+      if (!value) continue;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const dataStr = line.replace(/^data:\s*/, '').trim();
+        if (!dataStr || dataStr === '[DONE]') continue;
+        try {
+          const usage = this.processEvent(JSON.parse(dataStr), onChunk);
+          if (usage) finalUsage = usage;
+        } catch (error) {
+          if (error instanceof SyntaxError) continue;
+          throw error;
+        }
       }
     }
 
@@ -220,21 +251,10 @@ export class OpenAIProvider extends BaseProvider {
       const dataStr = tail.replace('data: ', '').trim();
       if (dataStr && dataStr !== '[DONE]') {
         try {
-          const json: StreamChunkResponse = JSON.parse(dataStr);
-          if (json.usage) {
-            finalUsage = {
-              prompt_tokens: json.usage.prompt_tokens || 0,
-              completion_tokens: json.usage.completion_tokens || 0,
-              total_tokens: json.usage.total_tokens || 0,
-            };
-          }
-          const delta = json.choices?.[0]?.delta;
-          const text = delta?.content || '';
-          const reasoning = delta?.reasoning_content || '';
-          if (reasoning) onChunk(reasoning, true);
-          if (text) onChunk(text, false);
-        } catch {
-          // Ignore malformed tail chunk.
+          const usage = this.processEvent(JSON.parse(dataStr), onChunk);
+          if (usage) finalUsage = usage;
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
         }
       }
     }

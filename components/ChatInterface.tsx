@@ -20,6 +20,7 @@ import {
   shouldAutoUpdateMemory
 } from '../lib/conversation-memory';
 import { countTokens } from '../lib/token';
+import { appAssetUrl } from '../lib/base-path';
 import { Attachment, ConversationMemory, GptImage2Params, Message, ModelId, ResearchPlan, WorkMode } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -51,6 +52,7 @@ import {
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { NoticePopover } from './NoticePopover';
 import { ContactPopover } from './ContactPopover';
+import { GrokLogo } from './GrokLogo';
 
 // 馃洝锔?鍏煎鎬т慨澶嶏細鍦?HTTP 鐜涓嬪洖閫€鍒?Math.random
 const safeUuid = (): string => {
@@ -748,7 +750,7 @@ export const ChatInterface: React.FC = () => {
     setShowModelMenu(false);
   };
 
-  type ModelProvider = 'GEMINI' | 'OPENAI' | 'ANTHROPIC';
+  type ModelProvider = 'GEMINI' | 'OPENAI' | 'GROK' | 'ANTHROPIC';
 
   const ModelLogo: React.FC<{ provider: ModelProvider; className?: string }> = ({ provider, className }) => {
     if (provider === 'GEMINI') {
@@ -770,8 +772,11 @@ export const ChatInterface: React.FC = () => {
     }
     if (provider === 'ANTHROPIC') {
       return (
-        <img src="/logo/claude-ai-icon.svg" alt="" className={className} aria-hidden="true" />
+        <img src={appAssetUrl('logo/claude-ai-icon.svg')} alt="" className={className} aria-hidden="true" />
       );
+    }
+    if (provider === 'GROK') {
+      return <GrokLogo className={className} size={16} />;
     }
     return (
       <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -790,9 +795,9 @@ export const ChatInterface: React.FC = () => {
     provider: ModelProvider;
   }> = [
     {
-      id: 'gemini-3.1-flash-preview',
-      name: 'Gemini-3.1-flash',
-      desc: 'Gemini 3.1 Flash：主打速度与低延迟，适合日常高频对话。',
+      id: 'gemini-3.5-flash-preview',
+      name: 'Gemini-3.5-flash',
+      desc: 'Gemini 3.5 Flash：主打速度与低延迟，适合日常高频对话。',
       provider: 'GEMINI',
     },
     {
@@ -802,9 +807,21 @@ export const ChatInterface: React.FC = () => {
       provider: 'GEMINI',
     },
     {
+      id: 'gpt-5.6-sol',
+      name: 'GPT-5.6 Sol',
+      desc: 'GPT-5.6 Sol：最新旗舰级推理与编码模型，适合复杂问题分析、代码生成、系统架构设计和高难度任务处理。',
+      provider: 'OPENAI',
+    },
+    {
+      id: 'gpt-5.6-terra',
+      name: 'GPT-5.6 Terra',
+      desc: 'GPT-5.6 Terra：智能与成本更均衡的模型，适合大多数生产环境应用、内容生成、文档处理和业务分析。',
+      provider: 'OPENAI',
+    },
+    {
       id: 'gpt-5.5',
       name: 'GPT-5.5',
-      desc: 'GPT-5.5：OpenAI 最新旗舰模型，适合高难度推理、复杂分析、长文写作与代码任务。',
+      desc: 'GPT-5.5：OpenAI 上一代旗舰模型，适合高难度推理、复杂分析、长文写作与代码任务。',
       provider: 'OPENAI',
     },
     {
@@ -820,21 +837,39 @@ export const ChatInterface: React.FC = () => {
       provider: 'OPENAI',
     },
     {
+      id: 'grok-4.6',
+      name: 'Grok 4.6',
+      desc: 'Grok 4.6：xAI 高性能推理模型，适合复杂分析、代码与长任务。',
+      provider: 'GROK',
+    },
+    {
+      id: 'grok-4.5',
+      name: 'Grok 4.5',
+      desc: 'Grok 4.5：xAI 通用模型，适合日常对话、写作与业务分析。',
+      provider: 'GROK',
+    },
+    {
+      id: 'claude-opus-5',
+      name: 'Claude Opus 5',
+      desc: 'Claude Opus 5：Anthropic 旗舰模型，适合深度推理、复杂代码与长任务分析。',
+      provider: 'ANTHROPIC',
+    },
+    {
+      id: 'claude-sonnet-5',
+      name: 'Claude Sonnet 5',
+      desc: 'Claude Sonnet 5：兼顾速度与能力，适合代码、写作与业务分析。',
+      provider: 'ANTHROPIC',
+    },
+    {
       id: 'claude-opus-4-8',
       name: 'Claude Opus 4.8',
-      desc: 'Claude Opus 4.8：Anthropic 最新旗舰模型，擅长深度推理、科研阅读、复杂写作与长任务分析。',
+      desc: 'Claude Opus 4.8：高质量推理、科研阅读、复杂写作与长任务分析。',
       provider: 'ANTHROPIC',
     },
     {
       id: 'claude-opus-4-7',
       name: 'Claude Opus 4.7',
       desc: 'Anthropic Claude Opus 4.7：高质量推理、写作与复杂分析。',
-      provider: 'ANTHROPIC',
-    },
-    {
-      id: 'claude-opus-4-6',
-      name: 'Claude Opus 4.6',
-      desc: 'Anthropic Claude Opus 4.6：高质量推理、写作与复杂分析。',
       provider: 'ANTHROPIC',
     },
   ];
@@ -848,6 +883,7 @@ export const ChatInterface: React.FC = () => {
   const groupedModels = {
     GEMINI: filteredModels.filter((m) => m.provider === 'GEMINI'),
     OPENAI: filteredModels.filter((m) => m.provider === 'OPENAI'),
+    GROK: filteredModels.filter((m) => m.provider === 'GROK'),
     ANTHROPIC: filteredModels.filter((m) => m.provider === 'ANTHROPIC'),
   };
   const modeOptions: Array<{
@@ -973,7 +1009,7 @@ export const ChatInterface: React.FC = () => {
                 </div>
 
                 <div className="max-h-[420px] overflow-y-auto p-2">
-                  {(['GEMINI', 'OPENAI', 'ANTHROPIC'] as const).map((provider) => (
+                  {(['GEMINI', 'OPENAI', 'GROK', 'ANTHROPIC'] as const).map((provider) => (
                     <div key={provider} className="mb-2 last:mb-0">
                       <div className="px-2 py-1 text-[10px] tracking-[0.18em] text-muted-foreground/80 font-semibold">
                         {provider}
@@ -1044,9 +1080,11 @@ export const ChatInterface: React.FC = () => {
                       className="fill-foreground"
                     />
                   </svg>
+                ) : store.defaultModel.includes('grok') ? (
+                  <GrokLogo className="w-16 h-16 md:w-20 md:h-20" size={80} />
                 ) : store.defaultModel.includes('claude') ? (
                   <img
-                    src="/logo/claude-ai-icon.svg"
+                    src={appAssetUrl('logo/claude-ai-icon.svg')}
                     alt=""
                     aria-hidden="true"
                     className="w-16 h-16 md:w-20 md:h-20 object-contain"
@@ -1401,7 +1439,7 @@ export const ChatInterface: React.FC = () => {
               </button>
 
               {(store.defaultModel === 'gemini-3.1-pro-preview' ||
-                store.defaultModel === 'gemini-3.1-flash-preview') && (
+                store.defaultModel === 'gemini-3.5-flash-preview') && (
                 <button
                   onClick={(e) => { e.stopPropagation(); store.toggleWebSearch(); }}
                   className={`p-2 md:p-3 rounded-full transition-colors shrink-0 ${store.isWebSearchEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}

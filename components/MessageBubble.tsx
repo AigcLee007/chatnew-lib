@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { appAssetUrl } from '../lib/base-path';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
@@ -33,6 +34,7 @@ import { ArtifactPreview } from './ArtifactPreview';
 import { MermaidDiagram } from './MermaidDiagram';
 import { exportToWord } from '../lib/word-exporter';
 import { exportToPPT } from '../lib/ppt-exporter';
+import { GrokLogo } from './GrokLogo';
 
 interface Props {
   message: Message;
@@ -389,11 +391,13 @@ const MessageBubbleInner: React.FC<Props> = ({ message, isStreaming, onRegenerat
             </svg>
           ) : message.model?.includes('claude') ? (
             <img
-              src="/logo/claude-ai-icon.svg"
+              src={appAssetUrl('logo/claude-ai-icon.svg')}
               alt=""
               aria-hidden="true"
               className="w-5 h-5 object-contain"
             />
+          ) : message.model?.includes('grok') ? (
+            <GrokLogo className="w-5 h-5" size={20} />
           ) : (
             // Google Gemini Logo
             <svg className="w-5 h-5" viewBox="0 0 28 28" fill="none">

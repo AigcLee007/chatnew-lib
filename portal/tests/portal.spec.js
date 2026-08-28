@@ -14,7 +14,7 @@ test.describe('ChatVIP version portal', () => {
     await page.goto(portalUrl);
     await expect(page.locator('[data-version="new"] .card-cta')).toHaveAttribute(
       'href',
-      'https://chat.aittco.com',
+      'https://chat.aittco.com/',
     );
     await expect(page.locator('[data-version="classic"] .card-cta')).toHaveAttribute(
       'href',

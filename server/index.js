@@ -23,6 +23,9 @@ const MINERU_TOKEN = process.env.MINERU_TOKEN || '';
 const MINERU_PARSE_TIMEOUT_MS = 5 * 60 * 1000;
 const MINERU_POLL_INTERVAL_MS = 3000;
 const AITTCO_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const IMAGE_GENERATION_REQUEST_TIMEOUT_MS = 2 * 60 * 1000;
+const IMAGE_TASK_POLL_TIMEOUT_MS = 20 * 1000;
+const IMAGE_TASK_TOTAL_TIMEOUT_MS = 2 * 60 * 1000;
 const GPT_IMAGE2_SIZE_PATTERN = /^\s*(\d+)\s*[xX×]\s*(\d+)\s*$/;
 const GPT_IMAGE2_RATIO_PATTERN = /^\s*(\d+(?:\.\d+)?)\s*[:xX×]\s*(\d+(?:\.\d+)?)\s*$/;
 const GPT_IMAGE2_SIZE_MULTIPLE = 16;
@@ -32,6 +35,22 @@ const GPT_IMAGE2_MIN_PIXELS = 655360;
 const GPT_IMAGE2_MAX_PIXELS = 8294400;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchWithTimeout = async (url, options, timeoutMs, timeoutMessage) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) {
+        if (controller.signal.aborted) {
+            throw new Error(timeoutMessage || `上游请求超时（>${Math.round(timeoutMs / 1000)}s）`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+};
 
 const roundGptImage2ToMultiple = (value, multiple = GPT_IMAGE2_SIZE_MULTIPLE) =>
     Math.max(multiple, Math.round(Number(value || 0) / multiple) * multiple);
@@ -355,15 +374,18 @@ const parseDataUrlToBlob = (dataUrl, fallbackName = 'image') => {
 
 const pollGptImageTaskResult = async ({ apiKey, taskId }) => {
     const encodedTaskId = encodeURIComponent(taskId);
+    const deadline = Date.now() + IMAGE_TASK_TOTAL_TIMEOUT_MS;
     for (let attempt = 0; attempt < 45; attempt += 1) {
         await sleep(attempt === 0 ? 1000 : 2000);
-        const response = await fetch(`${AITTCO_BASE}/v1/images/tasks/${encodedTaskId}`, {
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) break;
+        const response = await fetchWithTimeout(`${AITTCO_BASE}/v1/images/tasks/${encodedTaskId}`, {
             method: 'GET',
             headers: {
                 Authorization: `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
-        });
+        }, Math.min(IMAGE_TASK_POLL_TIMEOUT_MS, remainingMs), '图片任务状态查询超时');
 
         if (!response.ok) {
             throw new Error(await buildUpstreamError(response, `图片任务查询失败 (${response.status})`));
@@ -764,13 +786,13 @@ app.post('/api/image/generate-v2', async (req, res) => {
                 }
             });
 
-            response = await fetch(`${AITTCO_BASE}/v1/images/edits`, {
+            response = await fetchWithTimeout(`${AITTCO_BASE}/v1/images/edits`, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${apiKey}`,
                 },
                 body: formData,
-            });
+            }, IMAGE_GENERATION_REQUEST_TIMEOUT_MS, '图片编辑请求超时，请稍后重试');
         } else {
             const payload = {
                 model: upstreamModel,
@@ -790,6 +812,7 @@ app.post('/api/image/generate-v2', async (req, res) => {
                 method: 'POST',
                 apiKey,
                 body: payload,
+                timeoutMs: IMAGE_GENERATION_REQUEST_TIMEOUT_MS,
             });
         }
 
