@@ -20,6 +20,12 @@ export function parseImageResponse(data: { id?: string; data?: OpenAIItem[]; can
   return { images, requestedCount: 1, successCount: images.length ? 1 : 0, failedCount: images.length ? 0 : 1, model: '' as ImageGenerationResponse['model'], requestId: data.id ?? '' };
 }
 
+export function parseOpenAIImageResults(data: Parameters<typeof parseImageResponse>[0]): ImageResult[] {
+  return parseImageResponse(data).images;
+}
+
+export const parseOpenAIResponse = parseOpenAIImageResults;
+
 function toBuffer(data: string): Buffer {
   const match = data.match(/^data:[^,]+,(.*)$/s);
   return Buffer.from(match ? match[1] : data, match ? 'base64' : 'base64');
