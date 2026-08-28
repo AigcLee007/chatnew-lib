@@ -69,4 +69,4 @@ export { parseGeminiResponse };
 export const generateGeminiImage = generateWithGemini;
 export const parseGeminiImageResults = (
   data: Parameters<typeof parseGeminiResponse>[0],
-): ImageResult[] => parseGeminiResponse(data).images;
+): ImageGenerationResult[] => parseGeminiResponse(data).images;
