@@ -19,6 +19,13 @@ describe('image generation validation', () => {
     expect(result.errors.map((error) => error.field)).toEqual(expect.arrayContaining(['model', 'size', 'prompt', 'count']));
   });
 
+  it('requires supported image mime types and valid base64 payloads', () => {
+    const result = validateImageGenerationRequest({ ...valid(), images: [{ data: 'data:image/gif;base64,YWJj', mimeType: 'image/gif' }] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.map((error) => error.field)).toEqual(expect.arrayContaining(['images[0].mimeType', 'images[0].data']));
+    expect(validateImageGenerationRequest({ ...valid(), images: [{ data: 'YWJj', mimeType: 'image/png' }] }).valid).toBe(true);
+  });
+
   it('rejects oversized and excessive reference images', () => {
     const result = validateImageGenerationRequest({
       ...valid(),

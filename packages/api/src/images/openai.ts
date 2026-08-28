@@ -3,6 +3,17 @@ import FormData from 'form-data';
 import type { ImageGenerationRequest, ImageGenerationResponse, ImageResult } from 'librechat-data-provider';
 import type { ImageAdapterConfig } from './gemini';
 
+export const OPENAI_IMAGE_SIZES: Record<ImageGenerationRequest['size'], string> = {
+  '1:1': '1024x1024',
+  '16:9': '1536x1024',
+  '9:16': '1024x1536',
+  '4:3': '1536x1024',
+  '3:4': '1024x1536',
+  '5:4': '1536x1024',
+  '4:5': '1024x1536',
+  '21:9': '1536x1024',
+};
+
 interface OpenAIItem { b64_json?: string; url?: string; image?: string | { url?: string; data?: string; mimeType?: string }; image_url?: string | { url?: string }; }
 
 export function parseImageResponse(data: { id?: string; data?: OpenAIItem[]; candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string }; image?: string; image_url?: string | { url?: string } }> } }> }): ImageGenerationResponse {
@@ -36,13 +47,13 @@ export async function generateWithOpenAI(config: ImageAdapterConfig, request: Im
   const headers = { Authorization: `Bearer ${config.apiKey}` };
   let response;
   if (!request.images?.length) {
-    response = await axios.post(`${base}/v1/images/generations`, { model: request.model, prompt: request.prompt, n: 1, size: request.size, quality: request.resolution }, { headers, timeout: config.timeoutMs });
+    response = await axios.post(`${base}/v1/images/generations`, { model: request.model, prompt: request.prompt, n: 1, size: OPENAI_IMAGE_SIZES[request.size] }, { headers, timeout: config.timeoutMs });
   } else {
     const form = new FormData();
     form.append('model', request.model);
     form.append('prompt', request.prompt);
     form.append('n', '1');
-    form.append('size', request.size);
+    form.append('size', OPENAI_IMAGE_SIZES[request.size]);
     request.images.forEach((image, index) => form.append(index === 0 ? 'image' : 'image[]', toBuffer(image.data), { filename: `reference-${index}.png`, contentType: image.mimeType }));
     response = await axios.post(`${base}/v1/images/edits`, form, { headers: { ...headers, ...form.getHeaders() }, timeout: config.timeoutMs });
   }

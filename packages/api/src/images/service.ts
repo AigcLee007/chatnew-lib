@@ -15,7 +15,7 @@ export async function generateImages(config: ImageAdapterConfig, request: ImageG
   let requestId = '';
   settled.forEach((result) => {
     if (result.status === 'fulfilled') {
-      images.push(...result.value.images.map((image) => ({ ...image, index: images.length + image.index })));
+      images.push(...result.value.images.slice(0, 1).map((image) => ({ ...image, index: images.length })));
       requestId ||= result.value.requestId;
     }
   });

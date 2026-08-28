@@ -18,7 +18,7 @@ describe('image adapters', () => {
   it('uses OpenAI generations without references and edits multipart with references', async () => {
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-1', data: [{ b64_json: 'abc' }] } });
     await generateWithOpenAI({ apiKey: 'key', baseUrl: 'https://api.example.com' }, { model: 'gpt-image-2', prompt: 'cat', size: '1:1', resolution: '1K', count: 1 });
-    expect(mockedAxios.post).toHaveBeenCalledWith(expect.stringContaining('/v1/images/generations'), expect.objectContaining({ model: 'gpt-image-2', n: 1 }), expect.anything());
+    expect(mockedAxios.post).toHaveBeenCalledWith(expect.stringContaining('/v1/images/generations'), expect.objectContaining({ model: 'gpt-image-2', n: 1, size: '1024x1024' }), expect.anything());
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-2', data: [{ url: 'https://img' }] } });
     await generateWithOpenAI({ apiKey: 'key', baseUrl: 'https://api.example.com' }, { model: 'gpt-image-2', prompt: 'edit', images: [{ data: 'abc', mimeType: 'image/png' }], size: '1:1', resolution: '1K', count: 1 });
     expect(mockedAxios.post).toHaveBeenCalledWith(expect.stringContaining('/v1/images/edits'), expect.anything(), expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer key' }) }));
