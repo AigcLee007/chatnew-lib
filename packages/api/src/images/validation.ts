@@ -17,7 +17,7 @@ function imageBytes(data: string): number {
     const encoded = data.slice(data.indexOf(',') + 1).replace(/\s/g, '');
     return Math.floor((encoded.length * 3) / 4) - (encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0);
   }
-  return Buffer.byteLength(data, 'utf8');
+  return isValidBase64(data) ? Buffer.from(data, 'base64').length : Buffer.byteLength(data, 'utf8');
 }
 
 function isValidBase64(data: string): boolean {
