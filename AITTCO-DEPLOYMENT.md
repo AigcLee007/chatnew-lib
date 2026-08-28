@@ -7,6 +7,18 @@ This checkout routes the configured models through `https://api.aittco.com` and 
 For the production server update procedure, including its fixed checkout path and Compose command,
 follow [AGENTS.md](AGENTS.md#production-server-updates).
 
+The production checkout is built from the team's repository. Confirm the server remote before an
+update:
+
+```bash
+cd /opt/chatnew-lib
+git remote get-url origin
+```
+
+It must print `https://github.com/AigcLee007/chatnew-lib.git`. The production Compose file builds
+the `api` and `client` services locally from `Dockerfile.multi`; it does not use the upstream
+LibreChat API image.
+
 ## Provider routing
 
 | UI group | LibreChat endpoint | Gateway request shape |

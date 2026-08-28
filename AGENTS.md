@@ -2,17 +2,23 @@ See CLAUDE.md.
 
 ## Production Server Updates
 
-The production checkout is `/opt/chatnew-lib`. For every application update, use these commands
+The production checkout is `/opt/chatnew-lib`, and its `origin` remote must be
+`https://github.com/AigcLee007/chatnew-lib.git`. For every application update, use these commands
 from the server without substituting a different repository path, remote, Compose file, or build
 strategy:
 
 ```bash
 cd /opt/chatnew-lib
 git pull --ff-only origin main
-docker compose -f deploy-compose.yml build --no-cache api client
+docker compose -f deploy-compose.yml config --quiet
+docker compose -f deploy-compose.yml build --pull api client
 docker compose -f deploy-compose.yml up -d api client
-docker ps
+docker compose -f deploy-compose.yml ps
 ```
+
+The `api` and `client` services must show local `build:` entries targeting
+`api-build` and `nginx-client`; they must not use the upstream
+`registry.librechat.ai/danny-avila/librechat-dev-api` image.
 
 ## Frontend theming and styling
 
