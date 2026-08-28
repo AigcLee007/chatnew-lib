@@ -17,6 +17,17 @@ interface:
     - file_search
     - skills
 
+# First-time default only; users with an existing model selection keep it.
+modelSpecs:
+  prioritize: false
+  list:
+    - name: gemini-3-7-flash-default
+      label: Gemini 3.7 Flash
+      softDefault: true
+      preset:
+        endpoint: google
+        model: gemini-3.7-flash
+
 endpoints:
   agents:
     disableBuilder: false
