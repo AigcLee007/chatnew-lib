@@ -14,6 +14,7 @@ import type {
   ImageResult,
   ReferenceImage,
 } from './types';
+import type { ImageResult as RootImageResult } from '../index';
 
 describe('image generation contract', () => {
   it('defines the supported models, aspect ratios, and resolutions', () => {
@@ -57,5 +58,11 @@ describe('image generation contract', () => {
     const resolution: ImageResolution = IMAGE_RESOLUTIONS[0];
 
     expect([model, aspectRatio, resolution]).toEqual(['gemini-3-pro-image-preview', '1:1', '1K']);
+  });
+
+  it('exports the generated image result from the data-provider entry point', () => {
+    const result: RootImageResult = { data: 'data:image/png;base64,abc', mimeType: 'image/png', index: 0 };
+
+    expect(result.index).toBe(0);
   });
 });

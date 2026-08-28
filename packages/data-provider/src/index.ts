@@ -71,6 +71,7 @@ export type {
   ImageGenerationResponse,
   ImageModel,
   ImageResolution,
+  ImageResult,
   ImageResult as ImageGenerationResult,
   ReferenceImage,
 } from './images/types';
