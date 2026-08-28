@@ -5,9 +5,9 @@
 ## 域名映射
 
 ```text
-chatvip.aittco.com          -> 本目录静态文件
-chat.aittco.com              -> D:\chat-libre\LibreChat（新版）
-chatvvip.aittco.com          -> D:\chatvip.aittco.com\chatvip-ai-chat-main（经典版）
+chatvip.aittco.com/         -> 本目录静态选择页
+chatvip.aittco.com/main/    -> D:\chatvip.aittco.com\chatvip-ai-chat-main（经典版）
+chat.aittco.com/            -> D:\chat-libre\LibreChat（新版）
 ```
 
 ## 本地预览
@@ -22,10 +22,10 @@ npx serve portal -l 4173
 
 ## 上线前检查
 
-1. 为三个域名创建 DNS A 记录并申请覆盖三个域名的 HTTPS 证书。
-2. 先独立确认 `https://chat.aittco.com` 和 `https://chatvvip.aittco.com` 可访问、登录和流式输出正常。
-3. 让 Nginx 根域名指向本目录，不要覆盖两个聊天服务的端口或数据卷。
-4. 从外部浏览器点击两个 CTA，确认地址分别为新版和经典版。
+1. 为 `chatvip.aittco.com`、`chat.aittco.com` 创建 DNS A 记录并申请 HTTPS 证书。
+2. 经典版生产构建需使用 `base=/main/`，再由 Nginx 将 `/main/` 代理到经典版服务。
+3. 让 Nginx 的 `chatvip.aittco.com` 根路径提供本目录，并将 `/api/` 代理到经典版 API。
+4. 从外部浏览器确认选择页、`/main/` 经典版和新版均可访问、登录和流式输出正常。
 
 ## 回滚
 

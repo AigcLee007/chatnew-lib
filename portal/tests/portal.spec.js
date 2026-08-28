@@ -18,7 +18,7 @@ test.describe('ChatVIP version portal', () => {
     );
     await expect(page.locator('[data-version="classic"] .card-cta')).toHaveAttribute(
       'href',
-      'https://chatvvip.aittco.com',
+      'https://chatvip.aittco.com/main/',
     );
   });
 
