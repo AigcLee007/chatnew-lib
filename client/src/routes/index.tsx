@@ -22,6 +22,7 @@ import ChatRoute from './ChatRoute';
 import Search from './Search';
 import Root from './Root';
 import SetupKey from './SetupKey';
+import ImageGeneration from './ImageGeneration';
 
 const AuthLayout = () => (
   <AuthContextProvider>
@@ -143,6 +144,10 @@ export const router = createBrowserRouter(
             {
               path: 'search',
               element: <Search />,
+            },
+            {
+              path: 'image-generation',
+              element: <ImageGeneration />,
             },
             {
               path: 'prompts',
