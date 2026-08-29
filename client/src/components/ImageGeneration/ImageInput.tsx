@@ -7,10 +7,9 @@ import type {
   ImageModel,
   ImageResolution,
 } from 'librechat-data-provider';
-import { ImagePlus, Upload, X } from 'lucide-react';
+import { ImagePlus, Plus, X } from 'lucide-react';
 import type { ReferenceUpload } from './types';
 import { useLocalize } from '~/hooks';
-import { cn } from '~/utils';
 
 const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -145,21 +144,58 @@ export default function ImageInput({
           </Label>
           <span className="text-xs text-text-secondary">{references.length}/5</span>
         </div>
-        <button
-          type="button"
-          disabled={disabled || references.length >= 5}
-          className={cn('flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-medium px-4 text-sm text-text-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50')}
-          onClick={() => fileInputRef.current?.click()}
+        <div
+          className="flex flex-wrap gap-2 rounded-lg border border-border-light bg-surface-secondary/30 p-2"
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
-            addFiles(Array.from(event.dataTransfer.files));
+            addFiles(Array.from(event.dataTransfer?.files ?? []));
           }}
-          onPaste={(event) => addFiles(Array.from(event.clipboardData.files))}
+          onPaste={(event) => addFiles(Array.from(event.clipboardData?.files ?? []))}
         >
-          <Upload className="size-5" aria-hidden="true" />
-          <span>{localize('com_ui_image_generation_drag_images')}</span>
-        </button>
+          {references.map((reference) => (
+            <div
+              key={reference.id}
+              draggable={!disabled}
+              className="group relative size-16 shrink-0 overflow-hidden rounded-lg border border-border-light bg-surface-secondary sm:size-20"
+              onDragStart={() => {
+                draggedReferenceId.current = reference.id;
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (draggedReferenceId.current && draggedReferenceId.current !== reference.id) {
+                  onReorderReferences(draggedReferenceId.current, reference.id);
+                }
+                draggedReferenceId.current = null;
+              }}
+            >
+              <img src={reference.data} alt={reference.name} className="h-full w-full object-cover" />
+              <IconButton
+                label={localize('com_ui_image_generation_remove_reference')}
+                size="xs"
+                shape="square"
+                className="absolute right-1 top-1 bg-surface-primary shadow-sm"
+                disabled={disabled}
+                title={localize('com_ui_image_generation_remove_reference')}
+                onClick={() => onRemoveReference(reference.id)}
+              >
+                <X className="size-4" aria-hidden="true" />
+              </IconButton>
+            </div>
+          ))}
+          {references.length < 5 && (
+            <button
+              type="button"
+              aria-label={localize('com_ui_image_generation_add_reference')}
+              disabled={disabled}
+              className="relative size-16 shrink-0 rounded-lg border border-dashed border-border-medium text-text-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 sm:size-20"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2" aria-hidden="true" />
+            </button>
+          )}
+        </div>
         <input
           ref={fileInputRef}
           id="image-generation-reference-upload"
@@ -173,45 +209,6 @@ export default function ImageInput({
             event.target.value = '';
           }}
         />
-        {references.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {references.map((reference) => (
-              <div
-                key={reference.id}
-                draggable={!disabled}
-                className="group relative size-16 shrink-0 overflow-hidden rounded-lg border border-border-light bg-surface-secondary sm:size-20"
-                onDragStart={() => {
-                  draggedReferenceId.current = reference.id;
-                }}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  if (draggedReferenceId.current && draggedReferenceId.current !== reference.id) {
-                    onReorderReferences(draggedReferenceId.current, reference.id);
-                  }
-                  draggedReferenceId.current = null;
-                }}
-              >
-                <img
-                  src={reference.data}
-                  alt={reference.name}
-                  className="h-full w-full object-cover"
-                />
-                <IconButton
-                  label={localize('com_ui_image_generation_remove_reference')}
-                  size="xs"
-                  shape="square"
-                  className="absolute right-1 top-1 bg-surface-primary shadow-sm"
-                  disabled={disabled}
-                  title={localize('com_ui_image_generation_remove_reference')}
-                  onClick={() => onRemoveReference(reference.id)}
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </IconButton>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="flex flex-col gap-2">

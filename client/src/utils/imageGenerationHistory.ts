@@ -45,11 +45,12 @@ interface Metadata {
   imageMimeType: string;
   referenceMimeTypes: string[];
   referenceNames: string[];
-  prompt?: string;
+  promptBlobKey: string;
 }
 
 const objectUrls = new Set<string>();
 const entryObjectUrls = new Map<string, string[]>();
+let metadataWriteQueue = Promise.resolve();
 
 function available(): boolean {
   return typeof indexedDB !== 'undefined' && typeof window !== 'undefined';
@@ -127,6 +128,16 @@ async function getBlob(db: IDBDatabase, key: string): Promise<Blob | undefined> 
   return request<Blob | undefined>(transaction, (store) => store.get(key));
 }
 
+function readBlobText(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') return blob.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read prompt'));
+    reader.readAsText(blob);
+  });
+}
+
 async function removeBlob(db: IDBDatabase, key: string): Promise<void> {
   const transaction = db.transaction(STORE_NAME, 'readwrite');
   await request(transaction, (store) => store.delete(key));
@@ -139,11 +150,13 @@ export async function saveImageGenerationHistory(
   const id = crypto.randomUUID();
   const createdAt = Date.now();
   const imageBlobKey = `${id}:image`;
+  const promptBlobKey = `${id}:prompt`;
   const references = input.references ?? [];
   const referenceBlobKeys = references.map((_, index) => `${id}:reference:${index}`);
   try {
     const db = await openDatabase();
     await putBlob(db, imageBlobKey, await blobForImage(input.image));
+    await putBlob(db, promptBlobKey, new Blob([input.prompt], { type: 'text/plain' }));
     await Promise.all(
       references.map(async (reference, index) => putBlob(db, referenceBlobKeys[index], await blobForImage(reference))),
     );
@@ -155,12 +168,16 @@ export async function saveImageGenerationHistory(
       size: input.size,
       resolution: input.resolution,
       imageBlobKey,
+      promptBlobKey,
       referenceBlobKeys,
       imageMimeType: input.image.mimeType,
       referenceMimeTypes: references.map((reference) => reference.mimeType),
-      referenceNames: references.map((reference) => reference.name ?? 'reference-image'),
+      referenceNames: references.map((reference) => (reference as ReferenceImage & { name?: string }).name ?? 'reference-image'),
     };
-    writeMetadata([metadata, ...readMetadata()]);
+    metadataWriteQueue = metadataWriteQueue.then(() => {
+      writeMetadata([metadata, ...readMetadata()]);
+    });
+    await metadataWriteQueue;
     db.close();
     return {
       ...input,
@@ -182,31 +199,37 @@ export async function loadImageGenerationHistory(limit = 20, offset = 0): Promis
       readMetadata().slice(offset, offset + limit).map(async (metadata) => {
         const imageBlob = await getBlob(db, metadata.imageBlobKey);
         if (!imageBlob) return null;
+        const promptBlob = metadata.promptBlobKey ? await getBlob(db, metadata.promptBlobKey) : undefined;
+        const prompt = promptBlob
+          ? await readBlobText(promptBlob).catch(() => metadata.promptSummary)
+          : metadata.promptSummary;
         const imageData = createObjectUrl(imageBlob);
         const references = await Promise.all(
           metadata.referenceBlobKeys.map(async (key, index) => {
             const blob = await getBlob(db, key);
             return blob
-              ? {
+              ? ({
                   data: createObjectUrl(blob),
                   mimeType: metadata.referenceMimeTypes[index],
-                  name: metadata.referenceNames[index],
-                }
+                } as ReferenceImage)
               : null;
           }),
         );
-        const urls = [imageData, ...references.filter(Boolean).map((reference) => reference!.data)];
+        const restoredReferences = references.filter(
+          (reference): reference is ReferenceImage => reference !== null,
+        );
+        const urls = [imageData, ...restoredReferences.map((reference) => reference.data)];
         entryObjectUrls.set(metadata.id, urls.filter(Boolean));
         return {
           id: metadata.id,
           createdAt: metadata.createdAt,
           model: metadata.model,
-          prompt: metadata.promptSummary,
+          prompt,
           promptSummary: metadata.promptSummary,
           size: metadata.size,
           resolution: metadata.resolution,
           image: { data: imageData, mimeType: metadata.imageMimeType, index: 0 },
-          references: references.filter((reference): reference is ReferenceImage => reference !== null),
+          references: restoredReferences,
         };
       }),
     );
@@ -229,7 +252,11 @@ export async function deleteImageGenerationHistory(id: string): Promise<void> {
   entryObjectUrls.delete(id);
   try {
     const db = await openDatabase();
-    await Promise.all([metadata.imageBlobKey, ...metadata.referenceBlobKeys].map((key) => removeBlob(db, key)));
+    await Promise.all(
+      [metadata.imageBlobKey, metadata.promptBlobKey, ...metadata.referenceBlobKeys]
+        .filter(Boolean)
+        .map((key) => removeBlob(db, key)),
+    );
     db.close();
     writeMetadata(readMetadata().filter((entry) => entry.id !== id));
     releaseImageGenerationObjectUrls();

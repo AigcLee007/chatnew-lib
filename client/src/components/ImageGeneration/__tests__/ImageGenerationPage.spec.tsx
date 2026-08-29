@@ -112,6 +112,13 @@ describe('ImageGenerationPage', () => {
     expect(screen.getByText(/up to five reference images/i)).toBeInTheDocument();
   });
 
+  it('uses an inline add-reference tile instead of a separate upload area', () => {
+    renderPage();
+
+    expect(screen.getByRole('button', { name: /add reference image/i })).toBeInTheDocument();
+    expect(screen.queryByText(/click, drop, or paste reference images/i)).not.toBeInTheDocument();
+  });
+
   it('submits the selected settings and renders generated images', async () => {
     const user = userEvent.setup();
     const fetchSpy = jest.fn().mockImplementation(() =>
@@ -185,7 +192,7 @@ describe('ImageGenerationPage', () => {
     renderPage();
     const file = new File(['image'], 'pasted.png', { type: 'image/png' });
 
-    fireEvent.paste(screen.getByText(/click, drop, or paste reference images/i), {
+    fireEvent.paste(screen.getByRole('button', { name: /add reference image/i }), {
       clipboardData: { files: [file] },
     });
 
@@ -249,7 +256,7 @@ describe('ImageGenerationPage', () => {
       'generated-image-1.png',
     );
 
-    await user.click(screen.getByRole('button', { name: /copy/i }));
+    await user.click(screen.getByRole('button', { name: /copy image/i }));
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith('data:image/png;base64,aGVsbG8='),
     );
@@ -262,6 +269,45 @@ describe('ImageGenerationPage', () => {
 
     await user.click(screen.getByRole('button', { name: /delete/i }));
     expect(screen.queryByRole('img', { name: /generated image 1/i })).not.toBeInTheDocument();
+  });
+
+  it('copies the prompt that produced a generated image', async () => {
+    const user = userEvent.setup();
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    renderPage();
+
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+    await screen.findByRole('img', { name: /generated image 1/i });
+    await user.click(screen.getByRole('button', { name: /copy prompt/i }));
+
+    expect(writeText).toHaveBeenCalledWith('A summer garden');
+  });
+
+  it('shows the model and generated time when an image card is focused', async () => {
+    const user = userEvent.setup();
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    renderPage();
+
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+    await screen.findByRole('img', { name: /generated image 1/i });
+    expect(screen.getByText(/Gemini Pro Image/i)).toBeInTheDocument();
+    expect(screen.getByText(/generated:/i)).toBeInTheDocument();
+  });
+
+  it('keeps the action bar and timestamp in separate bottom corners', async () => {
+    const user = userEvent.setup();
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    renderPage();
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+    const image = await screen.findByRole('img', { name: /generated image 1/i });
+    const card = image.closest('article');
+    expect(card?.querySelector('.bottom-2.left-2')).toBeInTheDocument();
+    expect(card?.querySelector('.bottom-2.right-2')).toBeInTheDocument();
   });
 
   it('opens generated images in a full-screen preview and closes it', async () => {

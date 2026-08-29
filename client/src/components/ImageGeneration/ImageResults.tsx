@@ -1,5 +1,5 @@
-import { Button, IconButton } from '@librechat/client';
-import { Clipboard, Download, Pencil, Trash2 } from 'lucide-react';
+import { IconButton } from '@librechat/client';
+import { Clipboard, Download, FileText, Pencil, Trash2 } from 'lucide-react';
 import type { ImageGenerationResult } from 'librechat-data-provider';
 import { triggerDownload } from '~/utils';
 import { useEffect, useState } from 'react';
@@ -9,6 +9,12 @@ const imageSource = (image: ImageGenerationResult): string =>
   image.data.startsWith('data:') || /^(?:blob:|https?:\/\/)/i.test(image.data)
     ? image.data
     : `data:${image.mimeType};base64,${image.data}`;
+
+const modelLabels: Record<string, string> = {
+  'gemini-3-pro-image-preview': 'Gemini Pro Image',
+  'gemini-3.1-flash-image-preview': 'Gemini Flash Image',
+  'gpt-image-2': 'GPT Image 2',
+};
 
 async function copyImage(source: string, mimeType: string): Promise<void> {
   if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
@@ -21,29 +27,37 @@ async function copyImage(source: string, mimeType: string): Promise<void> {
 }
 
 interface ImageResultsProps {
-  images: ImageGenerationResult[];
+  items: ImageResultItem[];
   onDelete: (index: number) => void;
   onContinueEditing: (image: ImageGenerationResult) => void;
   layout?: 'grid' | 'waterfall';
 }
 
-export default function ImageResults({ images, onDelete, onContinueEditing, layout = 'grid' }: ImageResultsProps) {
+export interface ImageResultItem {
+  image: ImageGenerationResult;
+  model: string;
+  prompt: string;
+  createdAt: number;
+}
+
+export default function ImageResults({ items, onDelete, onContinueEditing, layout = 'grid' }: ImageResultsProps) {
   const localize = useLocalize();
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedPromptIndex, setCopiedPromptIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (previewIndex === null) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setPreviewIndex(null);
-      if (event.key === 'ArrowRight') setPreviewIndex((index) => (index === null ? 0 : (index + 1) % images.length));
-      if (event.key === 'ArrowLeft') setPreviewIndex((index) => (index === null ? 0 : (index - 1 + images.length) % images.length));
+      if (event.key === 'ArrowRight') setPreviewIndex((index) => (index === null ? 0 : (index + 1) % items.length));
+      if (event.key === 'ArrowLeft') setPreviewIndex((index) => (index === null ? 0 : (index - 1 + items.length) % items.length));
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [previewIndex, images.length]);
+  }, [previewIndex, items.length]);
 
-  if (images.length === 0) {
+  if (items.length === 0) {
     return (
       <div className={layout === 'waterfall' ? 'columns-1 gap-4 sm:columns-2 lg:columns-4' : ''}>
         <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-border-light p-6 text-sm text-text-secondary">
@@ -55,21 +69,28 @@ export default function ImageResults({ images, onDelete, onContinueEditing, layo
 
   return (
     <div className={layout === 'waterfall' ? 'columns-1 gap-4 sm:columns-2 lg:columns-4' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
-      {images.map((image, index) => {
+      {items.map(({ image, model, prompt, createdAt }, index) => {
         const source = imageSource(image);
         return (
           <article
             key={`${image.index}-${index}`}
-            className={layout === 'waterfall' ? 'mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
+            className={layout === 'waterfall' ? 'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'group relative overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
           >
+            <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/60 px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              {localize('com_ui_image_generation_model_label', { 0: modelLabels[model] ?? model })}
+            </div>
+            <div className="pointer-events-none absolute bottom-2 right-2 z-10 max-w-[42%] truncate rounded-full bg-black/60 px-2 py-1 text-[11px] whitespace-nowrap text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              {localize('com_ui_image_generation_generated_at', { 0: new Date(createdAt).toLocaleString() })}
+            </div>
             <img
               src={source}
               alt={`${localize('com_ui_image_generation_result')} ${index + 1}`}
               className="w-full cursor-zoom-in object-contain"
               onClick={() => setPreviewIndex(index)}
+              tabIndex={0}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setPreviewIndex(index); }}
             />
-            <div className="flex items-center justify-between gap-2 p-2">
-              <div className="flex items-center gap-1">
+            <div className="absolute bottom-2 left-2 z-10 flex max-w-[52%] items-center gap-1 overflow-x-auto rounded-full bg-black/55 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <IconButton
                   label={localize('com_ui_download')}
                   size="sm"
@@ -93,6 +114,23 @@ export default function ImageResults({ images, onDelete, onContinueEditing, layo
                 >
                   <Clipboard className="size-4" aria-hidden="true" />
                 </IconButton>
+                <IconButton
+                  label={localize('com_ui_image_generation_copy_prompt')}
+                  size="sm"
+                  shape="square"
+                  title={localize('com_ui_image_generation_copy_prompt')}
+                  onClick={() => {
+                    const copy = navigator.clipboard?.writeText(prompt);
+                    if (copy) {
+                      void copy.then(() => {
+                        setCopiedPromptIndex(index);
+                        window.setTimeout(() => setCopiedPromptIndex(null), 1600);
+                      });
+                    }
+                  }}
+                >
+                  <FileText className="size-4" aria-hidden="true" />
+                </IconButton>
                 {copiedIndex === index && (
                   <span className="text-xs text-text-secondary" role="status">
                     {localize('com_ui_image_generation_copied')}
@@ -108,16 +146,25 @@ export default function ImageResults({ images, onDelete, onContinueEditing, layo
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                 </IconButton>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => onContinueEditing(image)}>
-                <Pencil className="size-4" aria-hidden="true" />
-                {localize('com_ui_image_generation_continue_editing')}
-              </Button>
+                <IconButton
+                  label={localize('com_ui_image_generation_continue_editing')}
+                  size="sm"
+                  shape="square"
+                  title={localize('com_ui_image_generation_continue_editing')}
+                  onClick={() => onContinueEditing(image)}
+                >
+                  <Pencil className="size-4" aria-hidden="true" />
+                </IconButton>
+                {copiedPromptIndex === index && (
+                  <span className="sr-only" role="status">
+                    {localize('com_ui_image_generation_prompt_copied')}
+                  </span>
+                )}
             </div>
           </article>
         );
       })}
-      {previewIndex !== null && images[previewIndex] && (
+      {previewIndex !== null && items[previewIndex] && (
         <div
           role="dialog"
           aria-modal="true"
@@ -126,7 +173,7 @@ export default function ImageResults({ images, onDelete, onContinueEditing, layo
           onClick={() => setPreviewIndex(null)}
         >
           <img
-            src={imageSource(images[previewIndex])}
+            src={imageSource(items[previewIndex].image)}
             alt={`${localize('com_ui_image_generation_result')} ${previewIndex + 1}`}
             className="max-h-full max-w-full object-contain"
             onClick={(event) => event.stopPropagation()}

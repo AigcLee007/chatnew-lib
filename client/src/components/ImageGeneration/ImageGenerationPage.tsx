@@ -11,7 +11,7 @@ import type {
   ImageResolution,
 } from 'librechat-data-provider';
 import ImageInput from './ImageInput';
-import ImageResults from './ImageResults';
+import ImageResults, { type ImageResultItem } from './ImageResults';
 import type { ReferenceUpload } from './types';
 import { useLocalize } from '~/hooks';
 import {
@@ -70,7 +70,7 @@ export default function ImageGenerationPage() {
   const [resolution, setResolution] = useState<ImageResolution>('1K');
   const [count, setCount] = useState<ImageCount>(1);
   const [references, setReferences] = useState<ReferenceUpload[]>([]);
-  const [images, setImages] = useState<ImageGenerationResult[]>([]);
+  const [imageItems, setImageItems] = useState<ImageResultItem[]>([]);
   const [error, setError] = useState<string>();
   const [isGenerating, setIsGenerating] = useState(false);
   const [history, setHistory] = useState<ImageGenerationHistoryEntry[]>([]);
@@ -142,7 +142,9 @@ export default function ImageGenerationPage() {
         setError(errorMessage(payload, localize('com_ui_image_gen_failed')));
         return;
       }
-      setImages((current) => [...payload.images, ...current]);
+      const createdAt = Date.now();
+      const generatedItems = payload.images.map((image) => ({ image, model, prompt: request.prompt, createdAt }));
+      setImageItems((current) => [...generatedItems, ...current]);
       const saved = await Promise.all(
         payload.images.map((image) =>
           saveImageGenerationHistory({ model, prompt: request.prompt, size, resolution, image, references: request.images }),
@@ -260,10 +262,10 @@ export default function ImageGenerationPage() {
             {localize('com_ui_image_generation_results')}
           </h2>
           <ImageResults
-            images={images}
-            onDelete={(index) =>
-              setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
-            }
+            items={imageItems}
+            onDelete={(index) => {
+              setImageItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+            }}
             onContinueEditing={continueEditing}
           />
         </section>
@@ -277,7 +279,7 @@ export default function ImageGenerationPage() {
             </button>
           </div>
           <ImageResults
-            images={history.map((entry) => entry.image)}
+            items={history.map((entry) => ({ image: entry.image, model: entry.model, prompt: entry.prompt, createdAt: entry.createdAt }))}
             layout="waterfall"
             onDelete={(index) => {
               const entry = history[index];
@@ -290,7 +292,7 @@ export default function ImageGenerationPage() {
               const references = entry?.references.map((reference, referenceIndex) => ({
                 ...reference,
                 id: `history-${entry.id}-${referenceIndex}`,
-                name: reference.name ?? `history-reference-${referenceIndex + 1}.png`,
+                name: (reference as ReferenceUpload).name ?? `history-reference-${referenceIndex + 1}.png`,
               }));
               void continueEditing(image, references);
             }}
