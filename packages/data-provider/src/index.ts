@@ -62,3 +62,15 @@ export * from './parameterSettings';
 export * from './agentToolOptions';
 /* code-execution sandbox */
 export * from './codeEnvRef';
+/* image generation */
+export * from './images/constants';
+export type {
+  ImageAspectRatio,
+  ImageCount,
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+  ImageModel,
+  ImageResolution,
+  ImageResult as ImageGenerationResult,
+  ReferenceImage,
+} from './images/types';

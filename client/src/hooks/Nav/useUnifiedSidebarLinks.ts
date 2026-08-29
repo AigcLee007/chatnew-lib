@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { BarChart3, MessagesSquare } from 'lucide-react';
+import { BarChart3, ImagePlus, MessagesSquare } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField, SystemRoles } from 'librechat-data-provider';
@@ -67,9 +67,20 @@ export default function useUnifiedSidebarLinks() {
       id: 'conversations',
       Component: ConversationsSection,
     };
+    const imageGenerationLink: NavLink = {
+      title: 'com_ui_image_generation',
+      label: '',
+      icon: ImagePlus,
+      id: 'image-generation',
+      onClick: () => {
+        if (!location.pathname.startsWith('/image-generation')) {
+          navigate('/image-generation');
+        }
+      },
+    };
 
     if (!insightsFeatureEnabled || insightsAccess?.access !== true) {
-      return [conversationLink, ...sideNavLinks];
+      return [conversationLink, imageGenerationLink, ...sideNavLinks];
     }
 
     const insightsLink: NavLink = {
@@ -87,7 +98,7 @@ export default function useUnifiedSidebarLinks() {
     const nextLinks = [...sideNavLinks];
     nextLinks.splice(mcpIndex >= 0 ? mcpIndex + 1 : nextLinks.length, 0, insightsLink);
 
-    return [conversationLink, ...nextLinks];
+    return [conversationLink, imageGenerationLink, ...nextLinks];
   }, [insightsAccess?.access, insightsFeatureEnabled, location.pathname, navigate, sideNavLinks]);
 
   return links;

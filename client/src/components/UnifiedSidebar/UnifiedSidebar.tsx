@@ -55,6 +55,12 @@ function UnifiedSidebar() {
 
   const links = useUnifiedSidebarLinks();
   const isInsightsRoute = location.pathname.startsWith('/insights');
+  const isImageGenerationRoute = location.pathname.startsWith('/image-generation');
+  const routeActiveId = isInsightsRoute
+    ? 'insights'
+    : isImageGenerationRoute
+      ? 'image-generation'
+      : undefined;
   const panelExpanded = expanded && !isInsightsRoute;
 
   const handleCollapse = useCallback(
@@ -184,7 +190,7 @@ function UnifiedSidebar() {
               expanded={expanded}
               onClose={handleCollapse}
               onLeaveInsights={handleLeaveInsights}
-              routeActiveId={isInsightsRoute ? 'insights' : undefined}
+              routeActiveId={routeActiveId}
             />
             <nav
               id="chat-history-nav"
@@ -195,7 +201,7 @@ function UnifiedSidebar() {
             <MobileShortcutTargets
               links={links}
               onLeaveInsights={handleLeaveInsights}
-              routeActiveId={isInsightsRoute ? 'insights' : undefined}
+              routeActiveId={routeActiveId}
             />
             <MobileBottomBar links={links} onNewChat={handleCollapse} />
           </ActivePanelProvider>

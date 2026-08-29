@@ -405,7 +405,11 @@ if (cluster.isMaster) {
     /** Middleware */
     app.use(requestContextMiddleware);
     app.use(noIndex);
-    app.use(express.json({ limit: '3mb' }));
+    const jsonParser = express.json({ limit: '3mb' });
+    app.use((req, res, next) => {
+      if (req.path === '/api/images' || req.path.startsWith('/api/images/')) return next();
+      return jsonParser(req, res, next);
+    });
     app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
     app.use(handleJsonParseError);
@@ -482,6 +486,7 @@ if (cluster.isMaster) {
     app.use('/api/config', preAuthTenantMiddleware, optionalJwtAuth, routes.config);
     app.use('/api/assistants', routes.assistants);
     app.use('/api/files', await routes.files.initialize());
+    app.use('/api/images', routes.images);
     app.use('/images/', createValidateImageRequest(appConfig.secureImageLinks), routes.staticRoute);
     app.use('/api/share', preAuthTenantMiddleware, routes.share);
     app.use('/api/roles', routes.roles);

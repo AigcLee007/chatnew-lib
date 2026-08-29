@@ -39,10 +39,12 @@ const mcp = require('./mcp');
 const rum = require('./rum');
 const insights = require('./insights');
 const announcements = require('./announcements');
+const images = require('./images');
 
 module.exports = {
   insights,
   announcements,
+  images,
   rum,
   mcp,
   auth,
