@@ -263,6 +263,19 @@ describe('ImageGenerationPage', () => {
     expect(screen.queryByRole('img', { name: /generated image 1/i })).not.toBeInTheDocument();
   });
 
+  it('opens generated images in a full-screen preview and closes it', async () => {
+    const user = userEvent.setup();
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    renderPage();
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+    const image = await screen.findByRole('img', { name: /generated image 1/i });
+    await user.click(image);
+    expect(screen.getByRole('dialog', { name: /image preview/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /close/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('converts a generated image URL to a data URL before continuing to edit', async () => {
     const user = userEvent.setup();
     const imageUrl = 'https://images.example.test/generated.png';

@@ -2421,5 +2421,8 @@
   "com_model_desc_grok_46": "A general-purpose model for analysis and conversational work.",
   "com_model_desc_grok_45": "A flexible model for everyday reasoning and writing.",
   "com_model_desc_claude_opus": "Advanced reasoning for nuanced analysis and long-form work.",
-  "com_model_desc_claude_sonnet": "A balanced model for writing, analysis and coding."
+  "com_model_desc_claude_sonnet": "A balanced model for writing, analysis and coding.",
+  "com_ui_image_generation_preview": "Image preview",
+  "com_ui_image_generation_copy_image": "Copy image",
+  "com_ui_image_generation_copied": "Image copied"
 }

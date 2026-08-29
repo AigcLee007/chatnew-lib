@@ -2,6 +2,7 @@ import { Button, IconButton } from '@librechat/client';
 import { Clipboard, Download, Pencil, Trash2 } from 'lucide-react';
 import type { ImageGenerationResult } from 'librechat-data-provider';
 import { triggerDownload } from '~/utils';
+import { useEffect, useState } from 'react';
 import { useLocalize } from '~/hooks';
 
 const imageSource = (image: ImageGenerationResult): string =>
@@ -27,6 +28,19 @@ interface ImageResultsProps {
 
 export default function ImageResults({ images, onDelete, onContinueEditing }: ImageResultsProps) {
   const localize = useLocalize();
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (previewIndex === null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewIndex(null);
+      if (event.key === 'ArrowRight') setPreviewIndex((index) => (index === null ? 0 : (index + 1) % images.length));
+      if (event.key === 'ArrowLeft') setPreviewIndex((index) => (index === null ? 0 : (index - 1 + images.length) % images.length));
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [previewIndex, images.length]);
 
   if (images.length === 0) {
     return (
@@ -48,7 +62,8 @@ export default function ImageResults({ images, onDelete, onContinueEditing }: Im
             <img
               src={source}
               alt={`${localize('com_ui_image_generation_result')} ${index + 1}`}
-              className="aspect-square w-full object-cover"
+              className="aspect-square w-full cursor-zoom-in object-cover"
+              onClick={() => setPreviewIndex(index)}
             />
             <div className="flex items-center justify-between gap-2 p-2">
               <div className="flex items-center gap-1">
@@ -62,14 +77,24 @@ export default function ImageResults({ images, onDelete, onContinueEditing }: Im
                   <Download className="size-4" aria-hidden="true" />
                 </IconButton>
                 <IconButton
-                  label={localize('com_ui_copy')}
+                  label={localize('com_ui_image_generation_copy_image')}
                   size="sm"
                   shape="square"
-                  title={localize('com_ui_copy')}
-                  onClick={() => void copyImage(source, image.mimeType)}
+                  title={localize('com_ui_image_generation_copy_image')}
+                  onClick={() =>
+                    void copyImage(source, image.mimeType).then(() => {
+                      setCopiedIndex(index);
+                      window.setTimeout(() => setCopiedIndex(null), 1600);
+                    })
+                  }
                 >
                   <Clipboard className="size-4" aria-hidden="true" />
                 </IconButton>
+                {copiedIndex === index && (
+                  <span className="text-xs text-text-secondary" role="status">
+                    {localize('com_ui_image_generation_copied')}
+                  </span>
+                )}
                 <IconButton
                   label={localize('com_ui_delete')}
                   variant="destructive"
@@ -89,6 +114,30 @@ export default function ImageResults({ images, onDelete, onContinueEditing }: Im
           </article>
         );
       })}
+      {previewIndex !== null && images[previewIndex] && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={localize('com_ui_image_generation_preview')}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewIndex(null)}
+        >
+          <img
+            src={imageSource(images[previewIndex])}
+            alt={`${localize('com_ui_image_generation_result')} ${previewIndex + 1}`}
+            className="max-h-full max-w-full object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+          <button
+            type="button"
+            aria-label={localize('com_ui_close')}
+            className="absolute right-4 top-4 text-2xl text-white"
+            onClick={() => setPreviewIndex(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
