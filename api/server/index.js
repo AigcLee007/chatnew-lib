@@ -247,7 +247,11 @@ const startServer = async () => {
   app.use('/api/agents/chat', agentStartupIngressMiddleware);
   app.use(metricsMiddleware);
   app.use(noIndex);
-  app.use(express.json({ limit: '3mb' }));
+  const jsonParser = express.json({ limit: '3mb' });
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/images')) return next();
+    return jsonParser(req, res, next);
+  });
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
   app.use(handleJsonParseError);
 

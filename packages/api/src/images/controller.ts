@@ -4,6 +4,7 @@ import { generateImages } from './service';
 
 export const IMAGE_GENERATION_KEY_NAME = 'aittco_shared';
 export const DEFAULT_AITTCO_API_URL = 'https://api.aittco.com';
+export const DEFAULT_IMAGE_MAX_INPUT_BYTES = 60 * 1024 * 1024;
 
 type GetUserKey = (params: { userId: string; name: string }) => Promise<unknown>;
 
@@ -40,6 +41,20 @@ function apiBaseUrl(): string {
 function timeoutMs(): number | undefined {
   const value = Number(process.env.AITTCO_IMAGE_TIMEOUT_MS);
   return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function maxInputBytes(): number {
+  const value = Number(process.env.AITTCO_IMAGE_MAX_INPUT_BYTES);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_IMAGE_MAX_INPUT_BYTES;
+}
+
+function bodySize(body: unknown): number {
+  if (body == null) return 0;
+  try {
+    return Buffer.byteLength(JSON.stringify(body), 'utf8');
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
 }
 
 function hasClientCredentials(body: unknown): boolean {
@@ -106,6 +121,10 @@ export function createImageGenerationController(deps: ImageGenerationControllerD
       );
     }
 
+    if (bodySize(req.body) > maxInputBytes()) {
+      return responseError(res, 413, 'IMAGE_TOO_LARGE', 'Image generation request is too large');
+    }
+
     let apiKey: string | undefined;
     try {
       const stored = await deps.getUserKey({ userId, name: IMAGE_GENERATION_KEY_NAME });
@@ -157,7 +176,22 @@ export function createImageGenerationController(deps: ImageGenerationControllerD
       if (isTimeoutError(error)) {
         return responseError(res, 504, 'IMAGE_TIMEOUT', 'Image generation timed out');
       }
-      if (upstreamStatus(error) === 429) {
+      const status = upstreamStatus(error);
+      if (status === 401) {
+        return responseError(res, 401, 'IMAGE_INVALID_API_KEY', 'AITTCO API key was rejected');
+      }
+      if (status === 403) {
+        return responseError(
+          res,
+          403,
+          'IMAGE_MODEL_OR_CONTENT_REJECTED',
+          'AITTCO rejected the model or content',
+        );
+      }
+      if (status === 413) {
+        return responseError(res, 413, 'IMAGE_TOO_LARGE', 'Image generation request is too large');
+      }
+      if (status === 429) {
         return responseError(
           res,
           429,

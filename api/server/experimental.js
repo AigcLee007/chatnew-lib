@@ -405,7 +405,11 @@ if (cluster.isMaster) {
     /** Middleware */
     app.use(requestContextMiddleware);
     app.use(noIndex);
-    app.use(express.json({ limit: '3mb' }));
+    const jsonParser = express.json({ limit: '3mb' });
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/images')) return next();
+      return jsonParser(req, res, next);
+    });
     app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
     app.use(handleJsonParseError);

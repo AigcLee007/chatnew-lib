@@ -1,10 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ImageGenerationRequest, ImageGenerationResponse } from 'librechat-data-provider';
 import { generateImages } from './service';
-import {
-  createImageGenerationController,
-  IMAGE_GENERATION_KEY_NAME,
-} from './controller';
+import { createImageGenerationController, IMAGE_GENERATION_KEY_NAME } from './controller';
 
 jest.mock('./service', () => ({ generateImages: jest.fn() }));
 
@@ -116,6 +113,29 @@ describe('image generation controller', () => {
     });
   });
 
+  it('accepts a request larger than the global 3 MB parser limit', async () => {
+    const res = createResponse();
+    const largeRequest = {
+      ...requestBody,
+      images: [{ data: 'A'.repeat(3 * 1024 * 1024), mimeType: 'image/png' }],
+    };
+    await controller(createRequest(largeRequest), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mockedGenerateImages).toHaveBeenCalled();
+  });
+
+  it('rejects payloads above the configured input limit', async () => {
+    process.env.AITTCO_IMAGE_MAX_INPUT_BYTES = '100';
+    const res = createResponse();
+    await controller(createRequest({ ...requestBody, prompt: 'x'.repeat(200) }), res);
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'IMAGE_TOO_LARGE',
+      message: 'Image generation request is too large',
+    });
+    delete process.env.AITTCO_IMAGE_MAX_INPUT_BYTES;
+  });
+
   it('returns partial results with a stable partial error marker', async () => {
     mockedGenerateImages.mockResolvedValueOnce({ ...result, successCount: 1, failedCount: 1 });
     const res = createResponse();
@@ -131,7 +151,25 @@ describe('image generation controller', () => {
   });
 
   it.each([
-    [{ response: { status: 429 } }, 'IMAGE_RATE_LIMITED', 429, 'AITTCO is rate limiting image generation'],
+    [{ response: { status: 401 } }, 'IMAGE_INVALID_API_KEY', 401, 'AITTCO API key was rejected'],
+    [
+      { response: { status: 403 } },
+      'IMAGE_MODEL_OR_CONTENT_REJECTED',
+      403,
+      'AITTCO rejected the model or content',
+    ],
+    [
+      { response: { status: 413 } },
+      'IMAGE_TOO_LARGE',
+      413,
+      'Image generation request is too large',
+    ],
+    [
+      { response: { status: 429 } },
+      'IMAGE_RATE_LIMITED',
+      429,
+      'AITTCO is rate limiting image generation',
+    ],
     [{ code: 'ECONNABORTED' }, 'IMAGE_TIMEOUT', 504, 'Image generation timed out'],
     [{ response: { status: 500 } }, 'IMAGE_UPSTREAM_ERROR', 502, 'AITTCO image generation failed'],
   ])('maps upstream failures to stable responses', async (error, code, status, message) => {
