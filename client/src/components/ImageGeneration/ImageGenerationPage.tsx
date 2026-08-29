@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Spinner } from '@librechat/client';
 import { IMAGE_MODELS } from 'librechat-data-provider';
 import type {
@@ -14,6 +14,14 @@ import ImageInput from './ImageInput';
 import ImageResults from './ImageResults';
 import type { ReferenceUpload } from './types';
 import { useLocalize } from '~/hooks';
+import {
+  clearImageGenerationHistory,
+  deleteImageGenerationHistory,
+  loadImageGenerationHistory,
+  releaseImageGenerationObjectUrls,
+  saveImageGenerationHistory,
+} from '~/utils/imageGenerationHistory';
+import type { ImageGenerationHistoryEntry } from '~/utils/imageGenerationHistory';
 
 const MAX_REFERENCE_IMAGES = 5;
 
@@ -65,6 +73,23 @@ export default function ImageGenerationPage() {
   const [images, setImages] = useState<ImageGenerationResult[]>([]);
   const [error, setError] = useState<string>();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [history, setHistory] = useState<ImageGenerationHistoryEntry[]>([]);
+  const [historyOffset, setHistoryOffset] = useState(20);
+  const [historyAvailable, setHistoryAvailable] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void loadImageGenerationHistory(20).then((entries) => {
+      if (active) {
+        setHistory(entries);
+        setHistoryAvailable(entries.length >= 20);
+      }
+    });
+    return () => {
+      active = false;
+      releaseImageGenerationObjectUrls();
+    };
+  }, []);
 
   const addFiles = (files: File[]) => {
     void Promise.all(
@@ -114,6 +139,15 @@ export default function ImageGenerationPage() {
         return;
       }
       setImages((current) => [...payload.images, ...current]);
+      const saved = await Promise.all(
+        payload.images.map((image) =>
+          saveImageGenerationHistory({ model, prompt: request.prompt, size, resolution, image, references: request.images }),
+        ),
+      );
+      setHistory((current) => [
+        ...saved.filter((entry): entry is ImageGenerationHistoryEntry => entry !== null),
+        ...current,
+      ]);
       if (payload.failedCount > 0)
         setError(payload.message ?? localize('com_ui_image_generation_partial'));
     } catch (caughtError) {
@@ -127,11 +161,12 @@ export default function ImageGenerationPage() {
     }
   };
 
-  const continueEditing = async (image: ImageGenerationResult) => {
+  const continueEditing = async (image: ImageGenerationResult, historyReferences?: ReferenceUpload[]) => {
     try {
       const data = await referenceDataForImage(image);
       setReferences((current) =>
         [
+          ...(historyReferences ?? []),
           {
             id: `generated-${image.index}-${crypto.randomUUID()}`,
             name: `generated-image-${image.index + 1}.png`,
@@ -145,6 +180,20 @@ export default function ImageGenerationPage() {
     } catch {
       setError(localize('com_ui_image_generation_upload_error'));
     }
+  };
+
+  const loadMoreHistory = async () => {
+    const entries = await loadImageGenerationHistory(20, historyOffset);
+    setHistory((current) => [...current, ...entries]);
+    setHistoryOffset((offset) => offset + entries.length);
+    setHistoryAvailable(entries.length === 20);
+  };
+
+  const clearHistory = async () => {
+    await clearImageGenerationHistory();
+    setHistory([]);
+    setHistoryOffset(20);
+    setHistoryAvailable(false);
   };
 
   return (
@@ -213,6 +262,39 @@ export default function ImageGenerationPage() {
             }
             onContinueEditing={continueEditing}
           />
+        </section>
+        <section className="min-w-0 rounded-lg border border-border-light bg-surface-primary-alt p-4 sm:p-5 lg:col-span-2">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-text-primary">
+              {localize('com_ui_image_generation_history')}
+            </h2>
+            <button type="button" className="text-sm text-text-secondary" onClick={() => void clearHistory()}>
+              {localize('com_ui_clear')}
+            </button>
+          </div>
+          <ImageResults
+            images={history.map((entry) => entry.image)}
+            onDelete={(index) => {
+              const entry = history[index];
+              if (!entry) return;
+              void deleteImageGenerationHistory(entry.id);
+              setHistory((current) => current.filter((_, itemIndex) => itemIndex !== index));
+            }}
+            onContinueEditing={(image) => {
+              const entry = history.find((item) => item.image.data === image.data);
+              const references = entry?.references.map((reference, referenceIndex) => ({
+                ...reference,
+                id: `history-${entry.id}-${referenceIndex}`,
+                name: reference.name ?? `history-reference-${referenceIndex + 1}.png`,
+              }));
+              void continueEditing(image, references);
+            }}
+          />
+          {historyAvailable && history.length > 0 && (
+            <button type="button" className="mt-4 text-sm text-text-secondary" onClick={() => void loadMoreHistory()}>
+              {localize('com_ui_load_more')}
+            </button>
+          )}
         </section>
       </div>
     </main>
