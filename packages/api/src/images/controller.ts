@@ -8,6 +8,7 @@ export const DEFAULT_IMAGE_MAX_INPUT_BYTES: number = 60 * 1024 * 1024;
 
 export const imageGenerationBodyErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (error?.type === 'entity.too.large' || error?.status === 413) {
+    if (!isResponseWritable(res)) return;
     res.status(413).json({
       error: 'IMAGE_TOO_LARGE',
       message: 'Image generation request is too large',
@@ -15,6 +16,7 @@ export const imageGenerationBodyErrorHandler: ErrorRequestHandler = (error, _req
     return;
   }
   if (error?.type === 'entity.parse.failed') {
+    if (!isResponseWritable(res)) return;
     res.status(400).json({
       error: 'IMAGE_INVALID_REQUEST',
       message: 'Invalid image generation request',
@@ -240,7 +242,7 @@ export function createImageGenerationController(deps: ImageGenerationControllerD
           ...(timeoutMs() ? { timeoutMs: timeoutMs() } : {}),
         };
         const result = await runGeneration(config, body);
-        if (abortContext.isDisconnected()) return res;
+        if (abortContext.isDisconnected() || !isResponseWritable(res)) return res;
         if (result.successCount === 0 && result.requestedCount > 0) {
           return responseError(res, 502, 'IMAGE_UPSTREAM_ERROR', 'AITTCO image generation failed');
         }

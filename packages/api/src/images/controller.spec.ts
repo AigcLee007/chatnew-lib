@@ -217,6 +217,26 @@ describe('image generation controller', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [Object.assign(new Error('too large'), { type: 'entity.too.large', status: 413 })],
+    [
+      Object.assign(new SyntaxError('Unexpected token'), {
+        type: 'entity.parse.failed',
+        status: 400,
+      }),
+    ],
+  ])('does not write a parser error after the response closes', (error) => {
+    const res = createResponse();
+    Object.defineProperty(res, 'writableEnded', { value: true });
+    const next = jest.fn();
+
+    imageGenerationBodyErrorHandler(error, {} as Request, res, next);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('maps malformed JSON parser errors to a stable 400 response', () => {
     const res = createResponse();
     const next = jest.fn();
@@ -249,6 +269,20 @@ describe('image generation controller', () => {
       error: 'IMAGE_PARTIAL_FAILURE',
       message: 'Some images could not be generated',
     });
+  });
+
+  it.each([
+    ['a complete generation', result],
+    ['a partial generation', { ...result, successCount: 1, failedCount: 1 }],
+  ])('does not write %s after the response closes', async (_description, generationResult) => {
+    mockedGenerateImages.mockResolvedValueOnce(generationResult);
+    const res = createResponse();
+    Object.defineProperty(res, 'writableEnded', { value: true });
+
+    await controller(createRequest({ ...requestBody, count: generationResult.requestedCount }), res);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
   });
 
   it.each([
