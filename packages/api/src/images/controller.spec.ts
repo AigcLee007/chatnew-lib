@@ -157,6 +157,18 @@ describe('image generation controller', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('maps malformed JSON parser errors to a stable 400 response', () => {
+    const res = createResponse();
+    const next = jest.fn();
+    imageGenerationBodyErrorHandler(new SyntaxError('Unexpected token'), {} as Request, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'IMAGE_INVALID_REQUEST',
+      message: 'Invalid image generation request',
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('returns partial results with a stable partial error marker', async () => {
     mockedGenerateImages.mockResolvedValueOnce({ ...result, successCount: 1, failedCount: 1 });
     const res = createResponse();

@@ -63,4 +63,14 @@ describe('image generation service', () => {
     expect(mockedGemini).not.toHaveBeenCalled();
     expect(result.successCount).toBe(3);
   });
+
+  it('propagates the first upstream error when every image request fails', async () => {
+    const upstreamError = Object.assign(new Error('rate limited'), {
+      response: { status: 429 },
+    });
+    mockedGemini.mockRejectedValue(upstreamError);
+    await expect(
+      generateImages({ apiKey: 'k', baseUrl: 'https://example.com' }, request),
+    ).rejects.toBe(upstreamError);
+  });
 });

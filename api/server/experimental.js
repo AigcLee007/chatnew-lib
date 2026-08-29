@@ -407,7 +407,7 @@ if (cluster.isMaster) {
     app.use(noIndex);
     const jsonParser = express.json({ limit: '3mb' });
     app.use((req, res, next) => {
-      if (req.path.startsWith('/api/images')) return next();
+      if (req.path === '/api/images' || req.path.startsWith('/api/images/')) return next();
       return jsonParser(req, res, next);
     });
     app.use(express.urlencoded({ extended: true, limit: '3mb' }));

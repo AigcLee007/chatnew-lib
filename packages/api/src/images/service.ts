@@ -22,14 +22,20 @@ export async function generateImages(
   const settled = await Promise.allSettled(tasks);
   const images: ImageGenerationResult[] = [];
   let requestId = '';
+  const failures: unknown[] = [];
   settled.forEach((result) => {
     if (result.status === 'fulfilled') {
       images.push(
         ...result.value.images.slice(0, 1).map((image) => ({ ...image, index: images.length })),
       );
       requestId ||= result.value.requestId;
+    } else {
+      failures.push(result.reason);
     }
   });
+  if (images.length === 0 && failures.length > 0) {
+    throw failures[0];
+  }
   const successCount = images.length;
   return {
     images,
@@ -38,6 +44,20 @@ export async function generateImages(
     failedCount: request.count - successCount,
     model: request.model,
     requestId,
+    ...(failures.length > 0
+      ? {
+          errors: failures.map((error) => ({
+            status:
+              error && typeof error === 'object' && 'response' in error
+                ? (error as { response?: { status?: number } }).response?.status
+                : undefined,
+            code:
+              error && typeof error === 'object' && 'code' in error
+                ? String((error as { code?: unknown }).code)
+                : 'UPSTREAM_ERROR',
+          })),
+        }
+      : {}),
   };
 }
 
