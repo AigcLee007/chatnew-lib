@@ -66,7 +66,7 @@ export async function generateWithGemini(
 }
 
 export { parseGeminiResponse };
-export const generateGeminiImage = generateWithGemini;
+export const generateGeminiImage: typeof generateWithGemini = generateWithGemini;
 export const parseGeminiImageResults = (
   data: Parameters<typeof parseGeminiResponse>[0],
 ): ImageGenerationResult[] => parseGeminiResponse(data).images;

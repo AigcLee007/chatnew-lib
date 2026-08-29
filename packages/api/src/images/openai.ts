@@ -88,7 +88,7 @@ export function parseOpenAIImageResults(
   return parseImageResponse(data).images;
 }
 
-export const parseOpenAIResponse = parseOpenAIImageResults;
+export const parseOpenAIResponse: typeof parseOpenAIImageResults = parseOpenAIImageResults;
 
 function toBuffer(data: string): Buffer {
   const match = data.match(/^data:[^,]+,(.*)$/s);
@@ -134,4 +134,4 @@ export async function generateWithOpenAI(
   return { ...parsed, model: request.model, requestedCount: request.count };
 }
 
-export const generateOpenAIImage = generateWithOpenAI;
+export const generateOpenAIImage: typeof generateWithOpenAI = generateWithOpenAI;

@@ -109,7 +109,7 @@ export function createImageGenerationController(deps: ImageGenerationControllerD
     let apiKey: string | undefined;
     try {
       const stored = await deps.getUserKey({ userId, name: IMAGE_GENERATION_KEY_NAME });
-      if (typeof stored === 'string' && stored.trim() && stored !== 'user_provided')
+      if (typeof stored === 'string' && stored.trim() && stored.trim() !== 'user_provided')
         apiKey = stored.trim();
     } catch (error) {
       if (!isMissingKeyError(error)) {

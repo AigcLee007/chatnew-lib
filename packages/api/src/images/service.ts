@@ -41,4 +41,7 @@ export async function generateImages(
   };
 }
 
-export const generateImage = generateImages;
+export const generateImage = (
+  config: ImageAdapterConfig,
+  request: ImageGenerationRequest,
+): Promise<ImageGenerationResponse> => generateImages(config, request);
