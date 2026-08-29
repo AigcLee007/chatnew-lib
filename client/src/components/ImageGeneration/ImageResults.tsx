@@ -5,7 +5,7 @@ import { triggerDownload } from '~/utils';
 import { useLocalize } from '~/hooks';
 
 const imageSource = (image: ImageGenerationResult): string =>
-  image.data.startsWith('data:') || /^https?:\/\//i.test(image.data)
+  image.data.startsWith('data:') || /^(?:blob:|https?:\/\/)/i.test(image.data)
     ? image.data
     : `data:${image.mimeType};base64,${image.data}`;
 

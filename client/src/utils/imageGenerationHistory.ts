@@ -48,6 +48,7 @@ interface Metadata {
 }
 
 const objectUrls = new Set<string>();
+const entryObjectUrls = new Map<string, string[]>();
 
 function available(): boolean {
   return typeof indexedDB !== 'undefined' && typeof window !== 'undefined';
@@ -193,6 +194,8 @@ export async function loadImageGenerationHistory(limit = 20, offset = 0): Promis
               : null;
           }),
         );
+        const urls = [imageData, ...references.filter(Boolean).map((reference) => reference!.data)];
+        entryObjectUrls.set(metadata.id, urls.filter(Boolean));
         return {
           id: metadata.id,
           createdAt: metadata.createdAt,
@@ -217,6 +220,12 @@ export async function deleteImageGenerationHistory(id: string): Promise<void> {
   if (!available()) return;
   const metadata = readMetadata().find((entry) => entry.id === id);
   if (!metadata) return;
+  const urls = entryObjectUrls.get(id) ?? [];
+  urls.forEach((url) => {
+    if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    objectUrls.delete(url);
+  });
+  entryObjectUrls.delete(id);
   try {
     const db = await openDatabase();
     await Promise.all([metadata.imageBlobKey, ...metadata.referenceBlobKeys].map((key) => removeBlob(db, key)));
@@ -231,6 +240,7 @@ export async function deleteImageGenerationHistory(id: string): Promise<void> {
 export async function clearImageGenerationHistory(): Promise<void> {
   objectUrls.forEach((url) => URL.revokeObjectURL(url));
   objectUrls.clear();
+  entryObjectUrls.clear();
   if (!available()) {
     localStorage.removeItem(INDEX_KEY);
     return;
@@ -250,3 +260,4 @@ export function releaseImageGenerationObjectUrls(): void {
   objectUrls.forEach((url) => URL.revokeObjectURL(url));
   objectUrls.clear();
 }
+  prompt?: string;

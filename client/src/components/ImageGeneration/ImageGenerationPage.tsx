@@ -42,7 +42,7 @@ function sourceForImage(image: ImageGenerationResult): string {
 
 async function referenceDataForImage(image: ImageGenerationResult): Promise<string> {
   const source = sourceForImage(image);
-  if (!/^https?:\/\//i.test(source)) return source;
+  if (!/^(?:blob:|https?:\/\/)/i.test(source)) return source;
 
   const response = await fetch(source);
   if (!response.ok) throw new Error('Unable to read generated image');
@@ -185,7 +185,7 @@ export default function ImageGenerationPage() {
   const loadMoreHistory = async () => {
     const entries = await loadImageGenerationHistory(20, historyOffset);
     setHistory((current) => [...current, ...entries]);
-    setHistoryOffset((offset) => offset + entries.length);
+    setHistoryOffset((offset) => offset + 20);
     setHistoryAvailable(entries.length === 20);
   };
 
