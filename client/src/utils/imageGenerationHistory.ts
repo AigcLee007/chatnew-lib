@@ -45,6 +45,7 @@ interface Metadata {
   imageMimeType: string;
   referenceMimeTypes: string[];
   referenceNames: string[];
+  prompt?: string;
 }
 
 const objectUrls = new Set<string>();
@@ -260,4 +261,3 @@ export function releaseImageGenerationObjectUrls(): void {
   objectUrls.forEach((url) => URL.revokeObjectURL(url));
   objectUrls.clear();
 }
-  prompt?: string;
