@@ -56,6 +56,11 @@ const createResponse = (body: unknown, ok = true) =>
     json: () => Promise.resolve(body),
   } as Response);
 
+const setFetchMock = (mock: jest.Mock) => {
+  global.fetch = mock as unknown as typeof fetch;
+  return mock;
+};
+
 const generatedImage = (data = 'aGVsbG8=') => ({
   data,
   mimeType: 'image/png',
@@ -111,7 +116,7 @@ describe('ImageGenerationPage', () => {
     const fetchSpy = jest.fn().mockImplementation(() =>
       createResponse(generatedResponse()),
     );
-    global.fetch = fetchSpy;
+    setFetchMock(fetchSpy);
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -135,11 +140,13 @@ describe('ImageGenerationPage', () => {
 
   it('shows the API error and enables generation again', async () => {
     const user = userEvent.setup();
-    global.fetch = jest
-      .fn()
-      .mockImplementation(() =>
-        createResponse({ message: 'Image generation is unavailable' }, false),
-      );
+    setFetchMock(
+      jest
+        .fn()
+        .mockImplementation(() =>
+          createResponse({ message: 'Image generation is unavailable' }, false),
+        ),
+    );
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -187,14 +194,14 @@ describe('ImageGenerationPage', () => {
   it('disables generation controls and aborts the request when cancelled', async () => {
     const user = userEvent.setup();
     let requestSignal: AbortSignal | undefined;
-    global.fetch = jest.fn().mockImplementation((_url, options: RequestInit) => {
+    setFetchMock(jest.fn().mockImplementation((_url, options: RequestInit) => {
       requestSignal = options.signal ?? undefined;
       return new Promise((_resolve, reject) =>
         requestSignal?.addEventListener('abort', () =>
           reject(new DOMException('The operation was aborted', 'AbortError')),
         ),
       );
-    });
+    }));
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -210,9 +217,11 @@ describe('ImageGenerationPage', () => {
 
   it('shows a partial failure message while retaining successful images', async () => {
     const user = userEvent.setup();
-    global.fetch = jest
-      .fn()
-      .mockImplementation(() => createResponse({ ...generatedResponse(), failedCount: 1 }));
+    setFetchMock(
+      jest
+        .fn()
+        .mockImplementation(() => createResponse({ ...generatedResponse(), failedCount: 1 })),
+    );
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -226,7 +235,7 @@ describe('ImageGenerationPage', () => {
     const user = userEvent.setup();
     const writeText = jest.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
-    global.fetch = jest.fn().mockImplementation(() => createResponse(generatedResponse()));
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -266,7 +275,7 @@ describe('ImageGenerationPage', () => {
           blob: () => Promise.resolve(new Blob(['image'], { type: 'image/png' })),
         }),
       );
-    global.fetch = fetchSpy;
+    setFetchMock(fetchSpy);
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -284,10 +293,12 @@ describe('ImageGenerationPage', () => {
   it('shows an error when a generated image URL cannot be read for editing', async () => {
     const user = userEvent.setup();
     const imageUrl = 'https://images.example.test/generated.png';
-    global.fetch = jest
-      .fn()
-      .mockImplementationOnce(() => createResponse(generatedResponse([generatedImage(imageUrl)])))
-      .mockRejectedValueOnce(new Error('Network error'));
+    setFetchMock(
+      jest
+        .fn()
+        .mockImplementationOnce(() => createResponse(generatedResponse([generatedImage(imageUrl)])))
+        .mockRejectedValueOnce(new Error('Network error')),
+    );
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');

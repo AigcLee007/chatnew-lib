@@ -14,6 +14,7 @@ const MAX_PROMPT_SUMMARY = 120;
 
 export interface ImageGenerationHistoryInput {
   model: ImageModel;
+  prompt: string;
   size: ImageAspectRatio;
   resolution: ImageResolution;
   image: ImageGenerationResult;
@@ -36,7 +37,6 @@ interface Metadata {
   id: string;
   createdAt: number;
   model: ImageModel;
-  prompt: string;
   promptSummary: string;
   size: ImageAspectRatio;
   resolution: ImageResolution;

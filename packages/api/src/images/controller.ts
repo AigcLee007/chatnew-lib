@@ -4,7 +4,8 @@ import { generateImages } from './service';
 
 export const IMAGE_GENERATION_KEY_NAME = 'aittco_shared';
 export const DEFAULT_AITTCO_API_URL = 'https://api.aittco.com';
-export const DEFAULT_IMAGE_MAX_INPUT_BYTES: number = 60 * 1024 * 1024;
+// Five 10 MiB references expand to roughly 66.7 MiB as Base64 JSON.
+export const DEFAULT_IMAGE_MAX_INPUT_BYTES: number = 80 * 1024 * 1024;
 
 export const imageGenerationBodyErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (error?.type === 'entity.too.large' || error?.status === 413) {

@@ -30,6 +30,33 @@ LibreChat API image.
 
 The BaseURL is fixed by the administrator. Users can provide API keys through the LibreChat Web UI, but cannot replace the gateway address.
 
+## Image generation
+
+The standalone **Image generation** page uses the same per-user gateway key named
+`aittco_shared`. The page supports text-to-image, up to five reference images, the
+aspect ratios `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `5:4`, `4:5`, and `21:9`, and
+resolutions `1K`, `2K`, and `4K`. The three available models are
+`gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, and `gpt-image-2`.
+
+Each upstream model call produces one image. Choosing 2-4 images makes the API run
+that many single-image calls in parallel and return the successful results.
+
+Configure these optional API settings in `.env`:
+
+```dotenv
+AITTCO_API_URL=https://api.aittco.com
+AITTCO_IMAGE_TIMEOUT_MS=120000
+AITTCO_IMAGE_MAX_INPUT_BYTES=83886080
+AITTCO_IMAGE_MAX_REFERENCES=5
+AITTCO_IMAGE_MAX_COUNT=4
+```
+
+`AITTCO_IMAGE_MAX_INPUT_BYTES` applies to the JSON request body. It defaults to 80
+MiB because Base64 expands five 10 MiB reference files to roughly 67 MiB. Each
+individual reference is still limited to 10 MiB by request validation. API keys
+are read from the authenticated user's `aittco_shared` entry and are never stored
+in browser history.
+
 ## Prepare the host
 
 Run the following from PowerShell:
