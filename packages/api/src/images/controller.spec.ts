@@ -1,7 +1,11 @@
 import type { Request, Response } from 'express';
 import type { ImageGenerationRequest, ImageGenerationResponse } from 'librechat-data-provider';
 import { generateImages } from './service';
-import { createImageGenerationController, IMAGE_GENERATION_KEY_NAME } from './controller';
+import {
+  createImageGenerationController,
+  imageGenerationBodyErrorHandler,
+  IMAGE_GENERATION_KEY_NAME,
+} from './controller';
 
 jest.mock('./service', () => ({ generateImages: jest.fn() }));
 
@@ -134,6 +138,23 @@ describe('image generation controller', () => {
       message: 'Image generation request is too large',
     });
     delete process.env.AITTCO_IMAGE_MAX_INPUT_BYTES;
+  });
+
+  it('maps body-parser oversized payload errors to IMAGE_TOO_LARGE', () => {
+    const res = createResponse();
+    const next = jest.fn();
+    imageGenerationBodyErrorHandler(
+      Object.assign(new Error('too large'), { type: 'entity.too.large', status: 413 }),
+      {} as Request,
+      res,
+      next,
+    );
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'IMAGE_TOO_LARGE',
+      message: 'Image generation request is too large',
+    });
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('returns partial results with a stable partial error marker', async () => {
