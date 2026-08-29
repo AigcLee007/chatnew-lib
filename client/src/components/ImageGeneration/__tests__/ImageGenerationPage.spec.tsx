@@ -306,8 +306,8 @@ describe('ImageGenerationPage', () => {
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
     const image = await screen.findByRole('img', { name: /generated image 1/i });
     const card = image.closest('article');
-    expect(card?.querySelector('.bottom-2.left-2')).toBeInTheDocument();
-    expect(card?.querySelector('.bottom-2.right-2')).toBeInTheDocument();
+    expect(card?.querySelector('.bottom-3.left-3')).toBeInTheDocument();
+    expect(card?.querySelector('.bottom-0')).toBeInTheDocument();
   });
 
   it('opens generated images in a full-screen preview and closes it', async () => {

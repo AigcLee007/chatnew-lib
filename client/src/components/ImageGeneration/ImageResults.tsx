@@ -76,10 +76,10 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
             key={`${image.index}-${index}`}
             className={layout === 'waterfall' ? 'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'group relative overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
           >
-            <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/60 px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-3 pb-7 pt-3 text-right text-[11px] font-medium tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {localize('com_ui_image_generation_model_label', { 0: modelLabels[model] ?? model })}
             </div>
-            <div className="pointer-events-none absolute bottom-2 right-2 z-10 max-w-[42%] truncate rounded-full bg-black/60 px-2 py-1 text-[11px] whitespace-nowrap text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-3 pb-3 pt-10 text-right text-[11px] font-medium tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {localize('com_ui_image_generation_generated_at', { 0: new Date(createdAt).toLocaleString() })}
             </div>
             <img
@@ -90,11 +90,12 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
               tabIndex={0}
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setPreviewIndex(index); }}
             />
-            <div className="absolute bottom-2 left-2 z-10 flex max-w-[52%] items-center gap-1 overflow-x-auto rounded-full bg-black/55 p-1.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="absolute bottom-3 left-3 z-20 flex max-w-[58%] items-center gap-1.5 overflow-x-auto opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <IconButton
                   label={localize('com_ui_download')}
                   size="sm"
                   shape="square"
+                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
                   title={localize('com_ui_download')}
                   onClick={() => triggerDownload(source, `generated-image-${index + 1}.png`)}
                 >
@@ -104,6 +105,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_image_generation_copy_image')}
                   size="sm"
                   shape="square"
+                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
                   title={localize('com_ui_image_generation_copy_image')}
                   onClick={() =>
                     void copyImage(source, image.mimeType).then(() => {
@@ -118,6 +120,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_image_generation_copy_prompt')}
                   size="sm"
                   shape="square"
+                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
                   title={localize('com_ui_image_generation_copy_prompt')}
                   onClick={() => {
                     const copy = navigator.clipboard?.writeText(prompt);
@@ -141,6 +144,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   variant="destructive"
                   size="sm"
                   shape="square"
+                  className="rounded-full bg-red-600/90 text-white shadow-sm backdrop-blur-sm hover:bg-red-600"
                   title={localize('com_ui_delete')}
                   onClick={() => onDelete(index)}
                 >
@@ -150,6 +154,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_image_generation_continue_editing')}
                   size="sm"
                   shape="square"
+                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
                   title={localize('com_ui_image_generation_continue_editing')}
                   onClick={() => onContinueEditing(image)}
                 >
