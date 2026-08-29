@@ -4,7 +4,7 @@ import { generateImages } from './service';
 
 export const IMAGE_GENERATION_KEY_NAME = 'aittco_shared';
 export const DEFAULT_AITTCO_API_URL = 'https://api.aittco.com';
-export const DEFAULT_IMAGE_MAX_INPUT_BYTES = 60 * 1024 * 1024;
+export const DEFAULT_IMAGE_MAX_INPUT_BYTES: number = 60 * 1024 * 1024;
 
 type GetUserKey = (params: { userId: string; name: string }) => Promise<unknown>;
 
