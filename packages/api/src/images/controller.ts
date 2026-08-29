@@ -1,10 +1,21 @@
-import type { Request, Response } from 'express';
+import type { ErrorRequestHandler, Request, Response } from 'express';
 import type { ImageGenerationRequest } from 'librechat-data-provider';
 import { generateImages } from './service';
 
 export const IMAGE_GENERATION_KEY_NAME = 'aittco_shared';
 export const DEFAULT_AITTCO_API_URL = 'https://api.aittco.com';
 export const DEFAULT_IMAGE_MAX_INPUT_BYTES: number = 60 * 1024 * 1024;
+
+export const imageGenerationBodyErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  if (error?.type === 'entity.too.large' || error?.status === 413) {
+    res.status(413).json({
+      error: 'IMAGE_TOO_LARGE',
+      message: 'Image generation request is too large',
+    });
+    return;
+  }
+  next(error);
+};
 
 type GetUserKey = (params: { userId: string; name: string }) => Promise<unknown>;
 
