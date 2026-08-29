@@ -1,10 +1,10 @@
 import { Button, IconButton } from '@librechat/client';
 import { Clipboard, Download, Pencil, Trash2 } from 'lucide-react';
-import type { ImageResult } from 'librechat-data-provider';
+import type { ImageGenerationResult } from 'librechat-data-provider';
 import { triggerDownload } from '~/utils';
 import { useLocalize } from '~/hooks';
 
-const imageSource = (image: ImageResult): string =>
+const imageSource = (image: ImageGenerationResult): string =>
   image.data.startsWith('data:') || /^https?:\/\//i.test(image.data)
     ? image.data
     : `data:${image.mimeType};base64,${image.data}`;
@@ -20,9 +20,9 @@ async function copyImage(source: string, mimeType: string): Promise<void> {
 }
 
 interface ImageResultsProps {
-  images: ImageResult[];
+  images: ImageGenerationResult[];
   onDelete: (index: number) => void;
-  onContinueEditing: (image: ImageResult) => void;
+  onContinueEditing: (image: ImageGenerationResult) => void;
 }
 
 export default function ImageResults({ images, onDelete, onContinueEditing }: ImageResultsProps) {

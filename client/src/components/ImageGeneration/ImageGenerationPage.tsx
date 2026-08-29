@@ -6,9 +6,9 @@ import type {
   ImageCount,
   ImageGenerationRequest,
   ImageGenerationResponse,
+  ImageGenerationResult,
   ImageModel,
   ImageResolution,
-  ImageResult,
 } from 'librechat-data-provider';
 import ImageInput from './ImageInput';
 import ImageResults from './ImageResults';
@@ -26,10 +26,24 @@ function readFile(file: File): Promise<string> {
   });
 }
 
-function sourceForImage(image: ImageResult): string {
+function sourceForImage(image: ImageGenerationResult): string {
   return image.data.startsWith('data:') || /^https?:\/\//i.test(image.data)
     ? image.data
     : `data:${image.mimeType};base64,${image.data}`;
+}
+
+async function referenceDataForImage(image: ImageGenerationResult): Promise<string> {
+  const source = sourceForImage(image);
+  if (!/^https?:\/\//i.test(source)) return source;
+
+  const response = await fetch(source);
+  if (!response.ok) throw new Error('Unable to read generated image');
+  const blob = await response.blob();
+  return readFile(
+    new File([blob], `generated-image-${image.index + 1}.png`, {
+      type: blob.type || image.mimeType,
+    }),
+  );
 }
 
 function errorMessage(
@@ -48,7 +62,7 @@ export default function ImageGenerationPage() {
   const [resolution, setResolution] = useState<ImageResolution>('1K');
   const [count, setCount] = useState<ImageCount>(1);
   const [references, setReferences] = useState<ReferenceUpload[]>([]);
-  const [images, setImages] = useState<ImageResult[]>([]);
+  const [images, setImages] = useState<ImageGenerationResult[]>([]);
   const [error, setError] = useState<string>();
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -113,19 +127,24 @@ export default function ImageGenerationPage() {
     }
   };
 
-  const continueEditing = (image: ImageResult) => {
-    setReferences((current) =>
-      [
-        {
-          id: `generated-${image.index}-${crypto.randomUUID()}`,
-          name: `generated-image-${image.index + 1}.png`,
-          mimeType: image.mimeType,
-          data: sourceForImage(image),
-        },
-        ...current,
-      ].slice(0, MAX_REFERENCE_IMAGES),
-    );
-    setPrompt('');
+  const continueEditing = async (image: ImageGenerationResult) => {
+    try {
+      const data = await referenceDataForImage(image);
+      setReferences((current) =>
+        [
+          {
+            id: `generated-${image.index}-${crypto.randomUUID()}`,
+            name: `generated-image-${image.index + 1}.png`,
+            mimeType: image.mimeType,
+            data,
+          },
+          ...current,
+        ].slice(0, MAX_REFERENCE_IMAGES),
+      );
+      setPrompt('');
+    } catch {
+      setError(localize('com_ui_image_generation_upload_error'));
+    }
   };
 
   return (
