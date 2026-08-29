@@ -295,7 +295,7 @@ describe('ImageGenerationPage', () => {
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
     await screen.findByRole('img', { name: /generated image 1/i });
     expect(screen.getByText(/Gemini Pro Image/i)).toBeInTheDocument();
-    expect(screen.getByText(/generated:/i)).toBeInTheDocument();
+    expect(screen.getByText(/2026|\d{4}/)).toBeInTheDocument();
   });
 
   it('keeps the action bar and timestamp in separate bottom corners', async () => {
@@ -306,8 +306,16 @@ describe('ImageGenerationPage', () => {
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
     const image = await screen.findByRole('img', { name: /generated image 1/i });
     const card = image.closest('article');
-    expect(card?.querySelector('.bottom-3.left-3')).toBeInTheDocument();
-    expect(card?.querySelector('.bottom-0')).toBeInTheDocument();
+    expect(
+      Array.from(card?.querySelectorAll('div') ?? []).some((element) =>
+        element.className.includes('bottom-4') && element.className.includes('left-1/2'),
+      ),
+    ).toBe(true);
+    expect(
+      Array.from(card?.querySelectorAll('div') ?? []).some((element) =>
+        element.className.includes('bottom-1.5') && element.className.includes('right-1.5'),
+      ),
+    ).toBe(true);
   });
 
   it('opens generated images in a full-screen preview and closes it', async () => {

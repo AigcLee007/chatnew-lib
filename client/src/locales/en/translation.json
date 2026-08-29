@@ -2432,6 +2432,6 @@
   "com_ui_image_generation_add_reference": "Add reference image",
   "com_ui_image_generation_copy_prompt": "Copy prompt",
   "com_ui_image_generation_prompt_copied": "Prompt copied",
-  "com_ui_image_generation_model_label": "Model: {{0}}",
-  "com_ui_image_generation_generated_at": "Generated: {{0}}"
+  "com_ui_image_generation_model_label": "{{0}}",
+  "com_ui_image_generation_generated_at": "{{0}}"
 }

@@ -76,11 +76,11 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
             key={`${image.index}-${index}`}
             className={layout === 'waterfall' ? 'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'group relative overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/65 to-transparent px-3 pb-7 pt-3 text-right text-[11px] font-medium tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-              {localize('com_ui_image_generation_model_label', { 0: modelLabels[model] ?? model })}
+            <div className="pointer-events-none absolute right-1.5 top-1.5 z-10 text-right text-[10px] font-medium tracking-normal text-white/75 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:right-2 sm:top-2">
+              {modelLabels[model] ?? model}
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-3 pb-3 pt-10 text-right text-[11px] font-medium tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-              {localize('com_ui_image_generation_generated_at', { 0: new Date(createdAt).toLocaleString() })}
+            <div className="pointer-events-none absolute bottom-1.5 right-1.5 z-10 max-w-[38%] truncate text-right text-[10px] font-medium tracking-normal text-white/70 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:bottom-2 sm:right-2">
+              {new Date(createdAt).toLocaleString()}
             </div>
             <img
               src={source}
@@ -90,7 +90,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
               tabIndex={0}
               onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setPreviewIndex(index); }}
             />
-            <div className="absolute bottom-3 left-3 z-20 flex max-w-[58%] items-center gap-1.5 overflow-x-auto opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="absolute bottom-4 left-1/2 z-20 flex max-w-[78%] -translate-x-1/2 items-center justify-center gap-1.5 overflow-x-auto opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <IconButton
                   label={localize('com_ui_download')}
                   size="sm"
