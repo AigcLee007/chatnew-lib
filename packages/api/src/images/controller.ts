@@ -42,6 +42,7 @@ function responseError(
   message: string,
   details?: unknown,
 ): Response {
+  if (!isResponseWritable(res)) return res;
   return res.status(status).json({ error, message, ...(details ? { details } : {}) });
 }
 
@@ -113,6 +114,65 @@ function isTimeoutError(error: unknown): boolean {
   );
 }
 
+function isAbortError(error: unknown): boolean {
+  const visited = new Set<object>();
+  let current = error;
+  while (current && typeof current === 'object' && !visited.has(current)) {
+    visited.add(current);
+    const candidate = current as {
+      __CANCEL__?: unknown;
+      cause?: unknown;
+      code?: unknown;
+      message?: unknown;
+      name?: unknown;
+    };
+    if (
+      candidate.__CANCEL__ === true ||
+      candidate.code === 'ABORT_ERR' ||
+      candidate.code === 'ERR_CANCELED' ||
+      candidate.name === 'AbortError' ||
+      candidate.name === 'CanceledError' ||
+      /\b(abort|cancel)(ed|led|ing)?\b/i.test(String(candidate.message ?? ''))
+    ) {
+      return true;
+    }
+    current = candidate.cause;
+  }
+  return false;
+}
+
+function isResponseWritable(res: Response): boolean {
+  return !res.destroyed && !res.writableEnded;
+}
+
+interface AbortContext {
+  signal: AbortSignal;
+  isDisconnected: () => boolean;
+  dispose: () => void;
+}
+
+function createAbortContext(req: Request, res: Response): AbortContext {
+  const controller = new AbortController();
+  let disconnected = false;
+  const abort = () => {
+    disconnected = true;
+    controller.abort();
+  };
+  const onClose = () => {
+    if (!res.writableEnded) abort();
+  };
+  req.once('aborted', abort);
+  res.once('close', onClose);
+  return {
+    signal: controller.signal,
+    isDisconnected: () => disconnected || req.aborted || res.destroyed,
+    dispose: () => {
+      req.removeListener('aborted', abort);
+      res.removeListener('close', onClose);
+    },
+  };
+}
+
 function upstreamStatus(error: unknown): number | undefined {
   if (typeof error === 'number') return error;
   if (!error || typeof error !== 'object') return undefined;
@@ -126,98 +186,126 @@ export function createImageGenerationController(deps: ImageGenerationControllerD
   const runGeneration = deps.generateImages ?? generateImages;
 
   return async function imageGenerationController(req: Request, res: Response): Promise<Response> {
-    const typedReq = req as ImageRequest;
-    const userId = userIdFromRequest(typedReq);
-    if (!userId) return responseError(res, 401, 'IMAGE_AUTH_REQUIRED', 'Authentication required');
-
-    if (hasClientCredentials(req.body)) {
-      return responseError(
-        res,
-        400,
-        'IMAGE_INVALID_REQUEST',
-        'Client API key and base URL are not accepted',
-      );
-    }
-
-    if (bodySize(req.body) > maxInputBytes()) {
-      return responseError(res, 413, 'IMAGE_TOO_LARGE', 'Image generation request is too large');
-    }
-
-    let apiKey: string | undefined;
+    const abortContext = createAbortContext(req, res);
     try {
-      const stored = await deps.getUserKey({ userId, name: IMAGE_GENERATION_KEY_NAME });
-      if (typeof stored === 'string' && stored.trim() && stored.trim() !== 'user_provided')
-        apiKey = stored.trim();
-    } catch (error) {
-      if (!isMissingKeyError(error)) {
-        return responseError(res, 500, 'IMAGE_KEY_LOOKUP_FAILED', 'Unable to read AITTCO API key');
-      }
-    }
-    if (!apiKey) {
-      return responseError(
-        res,
-        404,
-        'IMAGE_KEY_NOT_CONFIGURED',
-        'AITTCO API key is not configured',
-      );
-    }
+      const typedReq = req as ImageRequest;
+      const userId = userIdFromRequest(typedReq);
+      if (!userId) return responseError(res, 401, 'IMAGE_AUTH_REQUIRED', 'Authentication required');
 
-    try {
-      const body = (req.body ?? {}) as ImageGenerationRequest;
-      const config = {
-        apiKey,
-        baseUrl: apiBaseUrl(),
-        ...(timeoutMs() ? { timeoutMs: timeoutMs() } : {}),
-      };
-      const result = await runGeneration(config, body);
-      if (result.successCount === 0 && result.requestedCount > 0) {
-        return responseError(res, 502, 'IMAGE_UPSTREAM_ERROR', 'AITTCO image generation failed');
-      }
-      if (result.failedCount > 0) {
-        return res.status(200).json({
-          ...result,
-          error: 'IMAGE_PARTIAL_FAILURE',
-          message: 'Some images could not be generated',
-        });
-      }
-      return res.status(200).json(result);
-    } catch (error) {
-      if (isValidationError(error)) {
+      if (hasClientCredentials(req.body)) {
         return responseError(
           res,
           400,
           'IMAGE_INVALID_REQUEST',
-          'Invalid image generation request',
-          error.errors,
+          'Client API key and base URL are not accepted',
         );
       }
-      if (isTimeoutError(error)) {
-        return responseError(res, 504, 'IMAGE_TIMEOUT', 'Image generation timed out');
-      }
-      const status = upstreamStatus(error);
-      if (status === 401) {
-        return responseError(res, 401, 'IMAGE_INVALID_API_KEY', 'AITTCO API key was rejected');
-      }
-      if (status === 403) {
-        return responseError(
-          res,
-          403,
-          'IMAGE_MODEL_OR_CONTENT_REJECTED',
-          'AITTCO rejected the model or content',
-        );
-      }
-      if (status === 413) {
+
+      if (bodySize(req.body) > maxInputBytes()) {
         return responseError(res, 413, 'IMAGE_TOO_LARGE', 'Image generation request is too large');
       }
-      if (status === 429) {
+
+      let apiKey: string | undefined;
+      try {
+        const stored = await deps.getUserKey({ userId, name: IMAGE_GENERATION_KEY_NAME });
+        if (typeof stored === 'string' && stored.trim() && stored.trim() !== 'user_provided')
+          apiKey = stored.trim();
+      } catch (error) {
+        if (abortContext.isDisconnected()) return res;
+        if (!isMissingKeyError(error)) {
+          return responseError(
+            res,
+            500,
+            'IMAGE_KEY_LOOKUP_FAILED',
+            'Unable to read AITTCO API key',
+          );
+        }
+      }
+      if (abortContext.isDisconnected()) return res;
+      if (!apiKey) {
         return responseError(
           res,
-          429,
-          'IMAGE_RATE_LIMITED',
-          'AITTCO is rate limiting image generation',
+          404,
+          'IMAGE_KEY_NOT_CONFIGURED',
+          'AITTCO API key is not configured',
         );
       }
-      return responseError(res, 502, 'IMAGE_UPSTREAM_ERROR', 'AITTCO image generation failed');
+
+      try {
+        const body = (req.body ?? {}) as ImageGenerationRequest;
+        const config = {
+          apiKey,
+          baseUrl: apiBaseUrl(),
+          signal: abortContext.signal,
+          ...(timeoutMs() ? { timeoutMs: timeoutMs() } : {}),
+        };
+        const result = await runGeneration(config, body);
+        if (abortContext.isDisconnected()) return res;
+        if (result.successCount === 0 && result.requestedCount > 0) {
+          return responseError(res, 502, 'IMAGE_UPSTREAM_ERROR', 'AITTCO image generation failed');
+        }
+        if (result.failedCount > 0) {
+          return res.status(200).json({
+            ...result,
+            error: 'IMAGE_PARTIAL_FAILURE',
+            message: 'Some images could not be generated',
+          });
+        }
+        return res.status(200).json(result);
+      } catch (error) {
+        if (abortContext.isDisconnected() || !isResponseWritable(res)) return res;
+        if (isAbortError(error)) {
+          return responseError(
+            res,
+            499,
+            'IMAGE_REQUEST_CANCELLED',
+            'Image generation request was cancelled',
+          );
+        }
+        if (isValidationError(error)) {
+          return responseError(
+            res,
+            400,
+            'IMAGE_INVALID_REQUEST',
+            'Invalid image generation request',
+            error.errors,
+          );
+        }
+        if (isTimeoutError(error)) {
+          return responseError(res, 504, 'IMAGE_TIMEOUT', 'Image generation timed out');
+        }
+        const status = upstreamStatus(error);
+        if (status === 401) {
+          return responseError(res, 401, 'IMAGE_INVALID_API_KEY', 'AITTCO API key was rejected');
+        }
+        if (status === 403) {
+          return responseError(
+            res,
+            403,
+            'IMAGE_MODEL_OR_CONTENT_REJECTED',
+            'AITTCO rejected the model or content',
+          );
+        }
+        if (status === 413) {
+          return responseError(
+            res,
+            413,
+            'IMAGE_TOO_LARGE',
+            'Image generation request is too large',
+          );
+        }
+        if (status === 429) {
+          return responseError(
+            res,
+            429,
+            'IMAGE_RATE_LIMITED',
+            'AITTCO is rate limiting image generation',
+          );
+        }
+        return responseError(res, 502, 'IMAGE_UPSTREAM_ERROR', 'AITTCO image generation failed');
+      }
+    } finally {
+      abortContext.dispose();
     }
   };
 }

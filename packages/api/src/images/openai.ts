@@ -111,7 +111,7 @@ export async function generateWithOpenAI(
         n: 1,
         size: OPENAI_IMAGE_SIZES[request.size],
       },
-      { headers, timeout: config.timeoutMs },
+      { headers, timeout: config.timeoutMs, signal: config.signal },
     );
   } else {
     const form = new FormData();
@@ -128,6 +128,7 @@ export async function generateWithOpenAI(
     response = await axios.post(`${base}/v1/images/edits`, form, {
       headers: { ...headers, ...form.getHeaders() },
       timeout: config.timeoutMs,
+      signal: config.signal,
     });
   }
   const parsed = parseImageResponse(response.data);

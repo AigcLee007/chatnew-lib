@@ -9,6 +9,7 @@ describe('image adapters', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('builds Gemini generateContent image request with inline reference parts', async () => {
+    const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({
       data: {
         responseId: 'g-1',
@@ -18,7 +19,7 @@ describe('image adapters', () => {
       },
     });
     const result = await generateWithGemini(
-      { apiKey: 'key', baseUrl: 'https://api.example.com' },
+      { apiKey: 'key', baseUrl: 'https://api.example.com', signal: abortController.signal },
       {
         model: 'gemini-3-pro-image-preview',
         prompt: 'cat',
@@ -36,25 +37,29 @@ describe('image adapters', () => {
           imageConfig: { aspectRatio: '16:9', imageSize: '2K' },
         }),
       }),
-      expect.objectContaining({ headers: expect.objectContaining({ 'x-goog-api-key': 'key' }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'x-goog-api-key': 'key' }),
+        signal: abortController.signal,
+      }),
     );
     expect(result.images[0]).toEqual({ data: 'abc', mimeType: 'image/png', index: 0 });
   });
 
   it('uses OpenAI generations without references and edits multipart with references', async () => {
+    const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-1', data: [{ b64_json: 'abc' }] } });
     await generateWithOpenAI(
-      { apiKey: 'key', baseUrl: 'https://api.example.com' },
+      { apiKey: 'key', baseUrl: 'https://api.example.com', signal: abortController.signal },
       { model: 'gpt-image-2', prompt: 'cat', size: '1:1', resolution: '1K', count: 1 },
     );
     expect(mockedAxios.post).toHaveBeenCalledWith(
       expect.stringContaining('/v1/images/generations'),
       expect.objectContaining({ model: 'gpt-image-2', n: 1, size: '1024x1024' }),
-      expect.anything(),
+      expect.objectContaining({ signal: abortController.signal }),
     );
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-2', data: [{ url: 'https://img' }] } });
     await generateWithOpenAI(
-      { apiKey: 'key', baseUrl: 'https://api.example.com' },
+      { apiKey: 'key', baseUrl: 'https://api.example.com', signal: abortController.signal },
       {
         model: 'gpt-image-2',
         prompt: 'edit',
@@ -69,6 +74,7 @@ describe('image adapters', () => {
       expect.anything(),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer key' }),
+        signal: abortController.signal,
       }),
     );
   });

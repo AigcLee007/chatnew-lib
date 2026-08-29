@@ -9,6 +9,7 @@ export interface ImageAdapterConfig {
   apiKey: string;
   baseUrl: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 interface GeminiPart {
@@ -59,6 +60,7 @@ export async function generateWithGemini(
     {
       headers: { 'x-goog-api-key': config.apiKey, 'Content-Type': 'application/json' },
       timeout: config.timeoutMs,
+      signal: config.signal,
     },
   );
   const parsed = parseGeminiResponse(response.data);

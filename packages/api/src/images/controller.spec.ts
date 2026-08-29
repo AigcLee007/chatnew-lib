@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import type { Request, Response } from 'express';
 import type { ImageGenerationRequest, ImageGenerationResponse } from 'librechat-data-provider';
 import { generateImages } from './service';
@@ -20,15 +21,17 @@ const requestBody: ImageGenerationRequest = {
 };
 
 function createResponse() {
-  const res = {
+  const res = Object.assign(new EventEmitter(), {
     status: jest.fn().mockReturnThis(),
     json: jest.fn().mockReturnThis(),
-  } as unknown as Response;
+    writableEnded: false,
+    destroyed: false,
+  }) as unknown as Response;
   return res;
 }
 
 function createRequest(body: unknown = requestBody, user: unknown = { id: 'user-1' }) {
-  return { body, user } as unknown as Request;
+  return Object.assign(new EventEmitter(), { body, user, aborted: false }) as unknown as Request;
 }
 
 const result: ImageGenerationResponse = {
@@ -53,7 +56,12 @@ describe('image generation controller', () => {
 
   it('requires an authenticated user', async () => {
     const res = createResponse();
-    await controller({ body: requestBody, user: undefined } as unknown as Request, res);
+    const req = Object.assign(new EventEmitter(), {
+      body: requestBody,
+      user: undefined,
+      aborted: false,
+    }) as unknown as Request;
+    await controller(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({
       error: 'IMAGE_AUTH_REQUIRED',
@@ -62,17 +70,69 @@ describe('image generation controller', () => {
     expect(getUserKey).not.toHaveBeenCalled();
   });
 
+  it('does not write an authentication error to an already closed response', async () => {
+    const res = createResponse();
+    Object.defineProperty(res, 'destroyed', { value: true });
+    const req = Object.assign(new EventEmitter(), {
+      body: requestBody,
+      user: undefined,
+      aborted: true,
+    }) as unknown as Request;
+
+    await controller(req, res);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
   it('loads the shared AITTCO key and uses the configured API URL', async () => {
     process.env.AITTCO_API_URL = 'https://proxy.example.test/';
     const res = createResponse();
     await controller(createRequest(), res);
     expect(getUserKey).toHaveBeenCalledWith({ userId: 'user-1', name: IMAGE_GENERATION_KEY_NAME });
     expect(mockedGenerateImages).toHaveBeenCalledWith(
-      { apiKey: 'aittco-secret', baseUrl: 'https://proxy.example.test' },
+      expect.objectContaining({ apiKey: 'aittco-secret', baseUrl: 'https://proxy.example.test' }),
       requestBody,
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(result);
+  });
+
+  it('aborts image generation and does not write after the client disconnects', async () => {
+    const req = createRequest();
+    const res = createResponse();
+    mockedGenerateImages.mockImplementationOnce(async (config) => {
+      req.emit('aborted');
+      expect(config.signal?.aborted).toBe(true);
+      return result;
+    });
+
+    await controller(req, res);
+
+    expect(mockedGenerateImages).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      requestBody,
+    );
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('maps an upstream axios cancellation to a stable cancellation response', async () => {
+    mockedGenerateImages.mockRejectedValueOnce(
+      Object.assign(new Error('request cancelled'), {
+        code: 'ERR_CANCELED',
+        name: 'CanceledError',
+      }),
+    );
+    const res = createResponse();
+
+    await controller(createRequest(), res);
+
+    expect(res.status).toHaveBeenCalledWith(499);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'IMAGE_REQUEST_CANCELLED',
+      message: 'Image generation request was cancelled',
+    });
   });
 
   it('returns a stable error when the shared key is unavailable', async () => {
