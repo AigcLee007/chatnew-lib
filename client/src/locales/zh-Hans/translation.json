@@ -2406,7 +2406,7 @@
   "com_ui_image_generation": "图片生成",
   "com_ui_image_generation_aspect_ratio": "画幅比例",
   "com_ui_image_generation_continue_editing": "继续编辑",
-  "com_ui_image_generation_count": "生成数量",
+  "com_ui_image_generation_count": "生成张数",
   "com_ui_image_generation_drag_images": "点击、拖拽或粘贴参考图片",
   "com_ui_image_generation_empty_results": "生成的图片将显示在这里",
   "com_ui_image_generation_model": "模型",
@@ -2419,9 +2419,13 @@
   "com_ui_image_generation_result": "生成图片",
   "com_ui_image_generation_results": "生成结果",
   "com_ui_image_generation_generating": "生成中...",
+  "com_ui_image_generation_generate": "生成图片",
+  "com_ui_image_generation_parallel_hint": "每张图片单独生成，可并行生成 1-4 张",
   "com_ui_image_generation_upload_error": "请添加 PNG、JPEG 或 WebP 图片",
   "com_ui_image_generation_history": "本地历史",
   "com_ui_image_generation_preview": "图片预览",
   "com_ui_image_generation_copy_image": "复制图片",
-  "com_ui_image_generation_copied": "图片已复制"
+  "com_ui_image_generation_copied": "图片已复制",
+  "com_ui_image_generation_generate": "生成图片",
+  "com_ui_image_generation_parallel_hint": "每张图片单独请求，选择 1-4 张时会并行生成。"
 }

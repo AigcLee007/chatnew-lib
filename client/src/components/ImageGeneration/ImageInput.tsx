@@ -75,18 +75,6 @@ export default function ImageInput({
       className="flex min-w-0 flex-col gap-5"
       aria-label={localize('com_ui_image_generation')}
     >
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="image-generation-prompt">{localize('com_ui_prompt')}</Label>
-        <Textarea
-          id="image-generation-prompt"
-          value={prompt}
-          maxLength={8000}
-          placeholder={localize('com_ui_image_generation_prompt_placeholder')}
-          disabled={disabled}
-          onChange={(event) => onPromptChange(event.target.value)}
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex min-w-0 flex-col gap-2 text-sm text-text-primary">
           <span>{localize('com_ui_image_generation_model')}</span>
@@ -160,9 +148,7 @@ export default function ImageInput({
         <button
           type="button"
           disabled={disabled || references.length >= 5}
-          className={cn(
-            'flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-medium px-4 text-sm text-text-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50',
-          )}
+          className={cn('flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-medium px-4 text-sm text-text-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50')}
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
@@ -188,12 +174,12 @@ export default function ImageInput({
           }}
         />
         {references.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {references.map((reference) => (
               <div
                 key={reference.id}
                 draggable={!disabled}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-border-light bg-surface-secondary"
+                className="group relative size-16 shrink-0 overflow-hidden rounded-lg border border-border-light bg-surface-secondary sm:size-20"
                 onDragStart={() => {
                   draggedReferenceId.current = reference.id;
                 }}
@@ -227,6 +213,20 @@ export default function ImageInput({
           </div>
         )}
       </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="image-generation-prompt">{localize('com_ui_prompt')}</Label>
+        <Textarea
+          id="image-generation-prompt"
+          value={prompt}
+          maxLength={8000}
+          placeholder={localize('com_ui_image_generation_prompt_placeholder')}
+          disabled={disabled}
+          onChange={(event) => onPromptChange(event.target.value)}
+        />
+      </div>
+
+      <p className="text-xs text-text-secondary">{localize('com_ui_image_generation_parallel_hint')}</p>
 
       <Button type="submit" variant="submit" disabled={disabled || prompt.trim().length === 0}>
         <ImagePlus className="size-4" aria-hidden="true" />

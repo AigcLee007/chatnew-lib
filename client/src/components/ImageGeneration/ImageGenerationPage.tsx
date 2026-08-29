@@ -278,6 +278,7 @@ export default function ImageGenerationPage() {
           </div>
           <ImageResults
             images={history.map((entry) => entry.image)}
+            layout="waterfall"
             onDelete={(index) => {
               const entry = history[index];
               if (!entry) return;

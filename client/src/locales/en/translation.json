@@ -1419,6 +1419,8 @@
   "com_ui_image_generation_result": "Generated image",
   "com_ui_image_generation_results": "Results",
   "com_ui_image_generation_generating": "Generating...",
+  "com_ui_image_generation_generate": "Generate image",
+  "com_ui_image_generation_parallel_hint": "Each image is generated separately; 1-4 requests run in parallel",
   "com_ui_image_generation_upload_error": "Add a PNG, JPEG, or WebP image",
   "com_ui_image_generation_history": "Local history",
   "com_ui_generate": "Generate",
@@ -2424,5 +2426,7 @@
   "com_model_desc_claude_sonnet": "A balanced model for writing, analysis and coding.",
   "com_ui_image_generation_preview": "Image preview",
   "com_ui_image_generation_copy_image": "Copy image",
-  "com_ui_image_generation_copied": "Image copied"
+  "com_ui_image_generation_copied": "Image copied",
+  "com_ui_image_generation_generate": "Generate image",
+  "com_ui_image_generation_parallel_hint": "Each image uses a single request; 1-4 images run in parallel."
 }

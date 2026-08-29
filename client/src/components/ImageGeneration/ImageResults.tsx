@@ -24,9 +24,10 @@ interface ImageResultsProps {
   images: ImageGenerationResult[];
   onDelete: (index: number) => void;
   onContinueEditing: (image: ImageGenerationResult) => void;
+  layout?: 'grid' | 'waterfall';
 }
 
-export default function ImageResults({ images, onDelete, onContinueEditing }: ImageResultsProps) {
+export default function ImageResults({ images, onDelete, onContinueEditing, layout = 'grid' }: ImageResultsProps) {
   const localize = useLocalize();
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -51,18 +52,18 @@ export default function ImageResults({ images, onDelete, onContinueEditing }: Im
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className={layout === 'waterfall' ? 'columns-1 gap-4 sm:columns-2 lg:columns-4' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
       {images.map((image, index) => {
         const source = imageSource(image);
         return (
           <article
             key={`${image.index}-${index}`}
-            className="overflow-hidden rounded-lg border border-border-light bg-surface-secondary"
+            className={layout === 'waterfall' ? 'mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
           >
             <img
               src={source}
               alt={`${localize('com_ui_image_generation_result')} ${index + 1}`}
-              className="aspect-square w-full cursor-zoom-in object-cover"
+              className="w-full cursor-zoom-in object-contain"
               onClick={() => setPreviewIndex(index)}
             />
             <div className="flex items-center justify-between gap-2 p-2">

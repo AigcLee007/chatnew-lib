@@ -93,6 +93,7 @@ describe('ImageGenerationPage', () => {
     expect(screen.getByRole('heading', { name: /image generation/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/prompt/i)).toBeInTheDocument();
     expect(screen.getAllByRole('option')).toHaveLength(3 + 8 + 3 + 4);
+    expect(screen.getByText(/single request/i)).toBeInTheDocument();
   });
 
   it('keeps at most five reference images', async () => {
@@ -274,6 +275,37 @@ describe('ImageGenerationPage', () => {
     expect(screen.getByRole('dialog', { name: /image preview/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /close/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('switches between images with arrow keys in the preview', async () => {
+    const user = userEvent.setup();
+    const secondImage = { ...generatedImage('d29ybGQ='), index: 1 };
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse([generatedImage(), secondImage]))));
+    renderPage();
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+    await user.click(await screen.findByRole('img', { name: /generated image 1/i }));
+    expect(screen.getByRole('dialog').querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8=');
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(screen.getByRole('dialog').querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,d29ybGQ=');
+  });
+
+  it('renders history cards in a waterfall layout with natural image ratio', async () => {
+    const user = userEvent.setup();
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    renderPage();
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+    await screen.findByRole('img', { name: /generated image 1/i });
+    const historyHeading = screen.getByRole('heading', { name: /local history/i });
+    const historySection = historyHeading.closest('section');
+    expect(historySection).not.toBeNull();
+    expect(historySection?.querySelector('.columns-1')).toBeInTheDocument();
+    const historyImages = historySection?.querySelectorAll('img') ?? [];
+    historyImages.forEach((historyImage) => {
+      expect(historyImage).not.toHaveClass('aspect-square');
+      expect(historyImage).toHaveClass('object-contain');
+    });
   });
 
   it('converts a generated image URL to a data URL before continuing to edit', async () => {
