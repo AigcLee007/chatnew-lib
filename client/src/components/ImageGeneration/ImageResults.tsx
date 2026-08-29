@@ -45,8 +45,10 @@ export default function ImageResults({ images, onDelete, onContinueEditing, layo
 
   if (images.length === 0) {
     return (
-      <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-border-light p-6 text-sm text-text-secondary">
+      <div className={layout === 'waterfall' ? 'columns-1 gap-4 sm:columns-2 lg:columns-4' : ''}>
+        <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-border-light p-6 text-sm text-text-secondary">
         {localize('com_ui_image_generation_empty_results')}
+        </div>
       </div>
     );
   }
