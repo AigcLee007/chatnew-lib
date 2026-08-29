@@ -76,10 +76,10 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
             key={`${image.index}-${index}`}
             className={layout === 'waterfall' ? 'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'group relative overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
           >
-            <div className="pointer-events-none absolute right-1.5 top-1.5 z-10 text-right text-[10px] font-medium tracking-normal text-white/75 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:right-2 sm:top-2">
+            <div className="pointer-events-none absolute right-1 top-0.5 z-10 text-right text-[10px] font-medium tracking-normal text-white/65 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:right-1.5 sm:top-1">
               {modelLabels[model] ?? model}
             </div>
-            <div className="pointer-events-none absolute bottom-1.5 right-1.5 z-10 max-w-[38%] truncate text-right text-[10px] font-medium tracking-normal text-white/70 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:bottom-2 sm:right-2">
+            <div className="pointer-events-none absolute bottom-0 right-1 z-10 max-w-[38%] truncate text-right text-[10px] font-medium tracking-normal text-white/60 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:bottom-0.5 sm:right-1.5">
               {new Date(createdAt).toLocaleString()}
             </div>
             <img
@@ -95,7 +95,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_download')}
                   size="sm"
                   shape="square"
-                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
+                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
                   title={localize('com_ui_download')}
                   onClick={() => triggerDownload(source, `generated-image-${index + 1}.png`)}
                 >
@@ -105,7 +105,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_image_generation_copy_image')}
                   size="sm"
                   shape="square"
-                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
+                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
                   title={localize('com_ui_image_generation_copy_image')}
                   onClick={() =>
                     void copyImage(source, image.mimeType).then(() => {
@@ -120,7 +120,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_image_generation_copy_prompt')}
                   size="sm"
                   shape="square"
-                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
+                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
                   title={localize('com_ui_image_generation_copy_prompt')}
                   onClick={() => {
                     const copy = navigator.clipboard?.writeText(prompt);
@@ -154,7 +154,7 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
                   label={localize('com_ui_image_generation_continue_editing')}
                   size="sm"
                   shape="square"
-                  className="rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/75"
+                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
                   title={localize('com_ui_image_generation_continue_editing')}
                   onClick={() => onContinueEditing(image)}
                 >

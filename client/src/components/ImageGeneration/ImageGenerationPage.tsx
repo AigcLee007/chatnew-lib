@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Spinner } from '@librechat/client';
+import { Spinner, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@librechat/client';
 import { getTokenHeader, IMAGE_MODELS } from 'librechat-data-provider';
 import type {
   ImageAspectRatio,
@@ -76,6 +76,7 @@ export default function ImageGenerationPage() {
   const [history, setHistory] = useState<ImageGenerationHistoryEntry[]>([]);
   const [historyOffset, setHistoryOffset] = useState(20);
   const [historyAvailable, setHistoryAvailable] = useState(true);
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -274,10 +275,24 @@ export default function ImageGenerationPage() {
             <h2 className="text-lg font-semibold text-text-primary">
               {localize('com_ui_image_generation_history')}
             </h2>
-            <button type="button" className="text-sm text-text-secondary" onClick={() => void clearHistory()}>
+            <button type="button" className="text-sm text-text-secondary" onClick={() => setIsClearDialogOpen(true)}>
               {localize('com_ui_clear')}
             </button>
           </div>
+          <AlertDialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{localize('com_ui_image_generation_clear_history_title')}</AlertDialogTitle>
+                <AlertDialogDescription>{localize('com_ui_image_generation_clear_history_description')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{localize('com_ui_cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { setIsClearDialogOpen(false); void clearHistory(); }}>
+                  {localize('com_ui_clear')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <ImageResults
             items={history.map((entry) => ({ image: entry.image, model: entry.model, prompt: entry.prompt, createdAt: entry.createdAt }))}
             layout="waterfall"

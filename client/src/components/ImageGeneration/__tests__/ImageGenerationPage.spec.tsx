@@ -45,6 +45,14 @@ jest.mock(
         React.createElement('span', { className }),
       Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) =>
         React.createElement('textarea', props),
+      AlertDialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => open ? React.createElement(React.Fragment, null, children) : null,
+      AlertDialogContent: ({ children }: { children: React.ReactNode }) => React.createElement('div', { role: 'alertdialog' }, children),
+      AlertDialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement('p', null, children),
+      AlertDialogFooter: ({ children }: { children: React.ReactNode }) => React.createElement('div', null, children),
+      AlertDialogHeader: ({ children }: { children: React.ReactNode }) => React.createElement('div', null, children),
+      AlertDialogTitle: ({ children }: { children: React.ReactNode }) => React.createElement('h2', null, children),
+      AlertDialogCancel: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.createElement('button', props, children),
+      AlertDialogAction: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.createElement('button', props, children),
     };
   },
   { virtual: true },
@@ -94,6 +102,16 @@ describe('ImageGenerationPage', () => {
     expect(screen.getByLabelText(/prompt/i)).toBeInTheDocument();
     expect(screen.getAllByRole('option')).toHaveLength(3 + 8 + 3 + 4);
     expect(screen.getByText(/single request/i)).toBeInTheDocument();
+  });
+
+  it('asks for confirmation before clearing local history', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: /^clear$/i }));
+
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/clear local history/i);
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeInTheDocument();
   });
 
   it('keeps at most five reference images', async () => {
@@ -313,7 +331,7 @@ describe('ImageGenerationPage', () => {
     ).toBe(true);
     expect(
       Array.from(card?.querySelectorAll('div') ?? []).some((element) =>
-        element.className.includes('bottom-1.5') && element.className.includes('right-1.5'),
+        element.className.includes('bottom-0') && element.className.includes('right-1'),
       ),
     ).toBe(true);
   });

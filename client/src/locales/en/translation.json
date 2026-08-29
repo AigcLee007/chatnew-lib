@@ -2433,5 +2433,7 @@
   "com_ui_image_generation_copy_prompt": "Copy prompt",
   "com_ui_image_generation_prompt_copied": "Prompt copied",
   "com_ui_image_generation_model_label": "{{0}}",
-  "com_ui_image_generation_generated_at": "{{0}}"
+  "com_ui_image_generation_generated_at": "{{0}}",
+  "com_ui_image_generation_clear_history_title": "Clear local history?",
+  "com_ui_image_generation_clear_history_description": "This will permanently remove all locally saved generated images."
 }

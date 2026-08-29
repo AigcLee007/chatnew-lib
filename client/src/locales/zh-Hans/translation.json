@@ -2432,5 +2432,7 @@
   "com_ui_image_generation_copy_prompt": "复制提示词",
   "com_ui_image_generation_prompt_copied": "提示词已复制",
   "com_ui_image_generation_model_label": "{{0}}",
-  "com_ui_image_generation_generated_at": "{{0}}"
+  "com_ui_image_generation_generated_at": "{{0}}",
+  "com_ui_image_generation_clear_history_title": "清除本地历史？",
+  "com_ui_image_generation_clear_history_description": "此操作将永久删除本地保存的全部生成图片，且无法撤销。"
 }
