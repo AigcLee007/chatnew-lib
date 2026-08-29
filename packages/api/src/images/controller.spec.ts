@@ -160,7 +160,15 @@ describe('image generation controller', () => {
   it('maps malformed JSON parser errors to a stable 400 response', () => {
     const res = createResponse();
     const next = jest.fn();
-    imageGenerationBodyErrorHandler(new SyntaxError('Unexpected token'), {} as Request, res, next);
+    imageGenerationBodyErrorHandler(
+      Object.assign(new SyntaxError('Unexpected token'), {
+        type: 'entity.parse.failed',
+        status: 400,
+      }),
+      {} as Request,
+      res,
+      next,
+    );
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: 'IMAGE_INVALID_REQUEST',

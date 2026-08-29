@@ -46,16 +46,17 @@ export async function generateImages(
     requestId,
     ...(failures.length > 0
       ? {
-          errors: failures.map((error) => ({
-            status:
+          errors: failures.map((error) => {
+            const status =
               error && typeof error === 'object' && 'response' in error
                 ? (error as { response?: { status?: number } }).response?.status
-                : undefined,
-            code:
+                : undefined;
+            const code =
               error && typeof error === 'object' && 'code' in error
                 ? String((error as { code?: unknown }).code)
-                : 'UPSTREAM_ERROR',
-          })),
+                : 'UPSTREAM_ERROR';
+            return status ? `${code}:${status}` : code;
+          }),
         }
       : {}),
   };

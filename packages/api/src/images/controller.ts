@@ -14,7 +14,7 @@ export const imageGenerationBodyErrorHandler: ErrorRequestHandler = (error, _req
     });
     return;
   }
-  if (error instanceof SyntaxError || error?.status === 400) {
+  if (error?.type === 'entity.parse.failed') {
     res.status(400).json({
       error: 'IMAGE_INVALID_REQUEST',
       message: 'Invalid image generation request',

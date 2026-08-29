@@ -23,14 +23,26 @@ describe('image generation contract', () => {
       'gemini-3.1-flash-image-preview',
       'gpt-image-2',
     ]);
-    expect(IMAGE_ASPECT_RATIOS).toEqual(['1:1', '16:9', '9:16', '4:3', '3:4', '5:4', '4:5', '21:9']);
+    expect(IMAGE_ASPECT_RATIOS).toEqual([
+      '1:1',
+      '16:9',
+      '9:16',
+      '4:3',
+      '3:4',
+      '5:4',
+      '4:5',
+      '21:9',
+    ]);
     expect(IMAGE_RESOLUTIONS).toEqual(['1K', '2K', '4K']);
     expect(MAX_IMAGE_COUNT).toBe(4);
     expect(MAX_REFERENCE_IMAGES).toBe(5);
   });
 
   it('exposes the shared request and response shapes', () => {
-    const referenceImage: ReferenceImage = { data: 'data:image/png;base64,abc', mimeType: 'image/png' };
+    const referenceImage: ReferenceImage = {
+      data: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+    };
     const request: ImageGenerationRequest = {
       model: 'gpt-image-2',
       prompt: 'A rainy futuristic city',
@@ -39,7 +51,11 @@ describe('image generation contract', () => {
       resolution: '2K',
       count: 4,
     };
-    const result: ImageResult = { data: referenceImage.data, mimeType: referenceImage.mimeType, index: 0 };
+    const result: ImageResult = {
+      data: referenceImage.data,
+      mimeType: referenceImage.mimeType,
+      index: 0,
+    };
     const response: ImageGenerationResponse = {
       images: [result],
       requestedCount: request.count,
@@ -47,9 +63,11 @@ describe('image generation contract', () => {
       failedCount: 3,
       model: request.model,
       requestId: 'request-1',
+      errors: ['ECONNABORTED'],
     };
 
     expect(response.images[0]).toEqual(result);
+    expect(response.errors).toEqual(['ECONNABORTED']);
   });
 
   it('keeps contract unions limited to the supported values', () => {

@@ -1,8 +1,4 @@
-import type {
-  IMAGE_ASPECT_RATIOS,
-  IMAGE_MODELS,
-  IMAGE_RESOLUTIONS,
-} from './constants';
+import type { IMAGE_ASPECT_RATIOS, IMAGE_MODELS, IMAGE_RESOLUTIONS } from './constants';
 
 export type ImageModel = (typeof IMAGE_MODELS)[number];
 export type ImageAspectRatio = (typeof IMAGE_ASPECT_RATIOS)[number];
@@ -36,4 +32,5 @@ export interface ImageGenerationResponse {
   failedCount: number;
   model: ImageModel;
   requestId: string;
+  errors?: string[];
 }
