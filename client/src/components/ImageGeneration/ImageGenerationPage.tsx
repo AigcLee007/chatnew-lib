@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Spinner } from '@librechat/client';
-import { IMAGE_MODELS } from 'librechat-data-provider';
+import { getTokenHeader, IMAGE_MODELS } from 'librechat-data-provider';
 import type {
   ImageAspectRatio,
   ImageCount,
@@ -126,7 +126,11 @@ export default function ImageGenerationPage() {
     try {
       const response = await fetch('/api/images/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(getTokenHeader() ? { Authorization: getTokenHeader() } : {}),
+        },
         body: JSON.stringify(request),
         signal: controller.signal,
       });
