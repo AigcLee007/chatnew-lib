@@ -27,6 +27,11 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '响应快速、延迟低，适合日常对话与内容生成。',
     group: 'GEMINI',
   },
+  'gemini-3.8-flash': {
+    name: 'Gemini 3.8 Flash',
+    description: '响应快速、延迟低，适合日常对话与内容生成。',
+    group: 'GEMINI',
+  },
   'gemini-3.1-pro-preview': {
     name: 'Gemini 3.1 Pro',
     description: '擅长复杂分析与长文档理解，适合需要深入推理的任务。',

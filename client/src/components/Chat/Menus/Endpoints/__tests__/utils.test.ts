@@ -35,6 +35,7 @@ describe('model selector utilities', () => {
       models: [
         { name: 'gemini-3.5-flash-preview' },
         { name: 'gemini-3.7-flash' },
+        { name: 'gemini-3.8-flash' },
         { name: 'custom-model' },
       ],
     };
@@ -42,6 +43,7 @@ describe('model selector utilities', () => {
     expect(entries.map((entry) => entry.model)).toEqual([
       'gemini-3.5-flash-preview',
       'gemini-3.7-flash',
+      'gemini-3.8-flash',
       'custom-model',
     ]);
     expect(entries[0]).toMatchObject({ group: 'GEMINI', name: 'Gemini 3.5 Flash' });
@@ -50,9 +52,15 @@ describe('model selector utilities', () => {
       model: 'gemini-3.7-flash',
       name: 'Gemini 3.7 Flash',
     });
+    expect(entries[2]).toMatchObject({
+      group: 'GEMINI',
+      model: 'gemini-3.8-flash',
+      name: 'Gemini 3.8 Flash',
+    });
     expect(entries[0].description).toContain('快速');
     expect(entries[1].description).toContain('快速');
-    expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(3);
+    expect(entries[2].description).toContain('快速');
+    expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(4);
   });
 
   it('provides a Chinese fallback description for unknown provider models', () => {
