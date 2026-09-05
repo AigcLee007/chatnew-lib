@@ -22,6 +22,47 @@ function jsonResponse(body: unknown, ok = true) {
 }
 
 describe('AnnouncementPopover', () => {
+  it('opens the selected announcement detail when a row is clicked', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([
+            { _id: 'a-1', title: 'First update', content: 'First body' },
+            { _id: 'a-2', title: 'Second update', content: 'Second full body' },
+          ]),
+    );
+
+    render(<AnnouncementPopover compact />);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '公告' }));
+    await user.click(await screen.findByRole('button', { name: /Second update/ }));
+
+    expect(screen.getByRole('region', { name: '公告详情' })).toHaveTextContent('Second full body');
+  });
+
+  it('switches the detail panel when another announcement row is clicked', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/announcements/read'
+        ? jsonResponse({ ok: true })
+        : jsonResponse([
+            { _id: 'a-1', title: 'First update', content: 'First body' },
+            { _id: 'a-2', title: 'Second update', content: 'Second body' },
+          ]),
+    );
+
+    render(<AnnouncementPopover compact />);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '公告' }));
+    await user.click(await screen.findByRole('button', { name: /Second update/ }));
+    await user.click(screen.getByRole('button', { name: /First update/ }));
+
+    const detail = screen.getByRole('region', { name: '公告详情' });
+    expect(detail).toHaveTextContent('First body');
+    expect(detail).not.toHaveTextContent('Second body');
+  });
+
   it('shows an unread announcement in a dialog named for its title', async () => {
     fetchMock.mockImplementation((url: string) =>
       url === '/api/announcements/read'
@@ -278,7 +319,7 @@ describe('AnnouncementPopover', () => {
       if (url === '/api/announcements/read') {
         if (loadCount > 1) {
           freshVisibleWhenReadStarts = Boolean(
-            within(screen.getByRole('menu')).queryByText('Fresh'),
+            within(screen.getByRole('menu')).queryByRole('button', { name: 'Fresh' }),
           );
         }
         return jsonResponse({ ok: true });
@@ -303,7 +344,9 @@ describe('AnnouncementPopover', () => {
     const freshDialog = await screen.findByRole('dialog', { name: 'Fresh' });
     await user.click(within(freshDialog).getByRole('button', { name: '我知道了' }));
     await user.click(screen.getByRole('button', { name: '公告' }));
-    expect(within(await screen.findByRole('menu')).getByText('Fresh')).toBeInTheDocument();
+    expect(
+      within(await screen.findByRole('menu')).getByRole('button', { name: 'Fresh' }),
+    ).toBeInTheDocument();
     expect(freshVisibleWhenReadStarts).toBe(true);
   });
 
@@ -438,7 +481,9 @@ describe('AnnouncementPopover', () => {
     const freshDialog = await screen.findByRole('dialog', { name: 'Fresh' });
     await user.click(within(freshDialog).getByRole('button', { name: '我知道了' }));
     await user.click(screen.getByRole('button', { name: '公告' }));
-    expect(within(await screen.findByRole('menu')).getByText('Fresh')).toBeInTheDocument();
+    expect(
+      within(await screen.findByRole('menu')).getByRole('button', { name: 'Fresh' }),
+    ).toBeInTheDocument();
     await waitFor(() => expect(readBodies).toContain(JSON.stringify({ announcementIds: ['a-2'] })));
   });
 
@@ -479,7 +524,9 @@ describe('AnnouncementPopover', () => {
     const freshDialog = await screen.findByRole('dialog', { name: 'Fresh' });
     await user.click(within(freshDialog).getByRole('button', { name: '我知道了' }));
     await user.click(screen.getByRole('button', { name: '公告' }));
-    expect(within(await screen.findByRole('menu')).getByText('Fresh')).toBeInTheDocument();
+    expect(
+      within(await screen.findByRole('menu')).getByRole('button', { name: 'Fresh' }),
+    ).toBeInTheDocument();
     expect(readAttempts).toBe(1);
     resolveInitialRead(jsonResponse({ ok: true }));
 

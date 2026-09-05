@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Menu from '@ariakit/react/menu';
-import { Bell, Pin } from 'lucide-react';
+import { Bell, ChevronRight, Pin, X } from 'lucide-react';
 import { DropdownMenuSeparator } from '@librechat/client';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { getTokenHeader } from 'librechat-data-provider';
@@ -25,6 +25,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   const [open, setOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailAnnouncement, setDetailAnnouncement] = useState<Announcement | null>(null);
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [error, setError] = useState('');
@@ -59,6 +60,11 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
             });
         }
         setItems(nextItems);
+        setSelectedAnnouncementId((selectedId) =>
+          nextItems.some((item: Announcement) => item._id === selectedId)
+            ? selectedId
+            : (nextItems[0]?._id ?? null),
+        );
         return true;
       })
       .catch(() => {
@@ -68,6 +74,8 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
   }, [authHeaders, canManage]);
 
   const hasUnread = items.some((item) => item.unread === true);
+  const selectedAnnouncement =
+    items.find((item) => item._id === selectedAnnouncementId) ?? items[0] ?? null;
 
   useEffect(() => {
     const unreadIds = new Set(items.filter((item) => item.unread).map((item) => item._id));
@@ -265,43 +273,107 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
       )}
       <Menu.Menu
         portal
-        className="account-settings-popover popover-ui z-[126] w-[320px] rounded-lg p-4"
+        className="account-settings-popover popover-ui z-[126] w-[min(680px,calc(100vw-2rem))] overflow-hidden rounded-xl p-0"
       >
-        <div className="flex items-center gap-2 text-sm font-medium">
+        <div className="flex items-center gap-2 border-b border-border-medium px-4 py-3 text-sm font-semibold">
           <Bell className="size-4" />
           公告
+          <span className="ml-auto text-xs font-normal text-text-secondary">
+            {items.length} 条公告
+          </span>
         </div>
-        <DropdownMenuSeparator />
-        <div className="max-h-64 space-y-3 overflow-y-auto">
-          {items.length === 0 && <p className="text-sm text-text-secondary">暂无公告</p>}
-          {items.map((item) => (
-            <article key={item._id} className="border-b border-border-medium pb-3 last:border-0">
-              <h3 className="flex items-center gap-1 text-sm font-medium">
-                {item.pinned && <Pin className="size-3" />}
-                {item.title}
-              </h3>
-              <p className="mt-1 whitespace-pre-wrap text-xs text-text-secondary">{item.content}</p>
-              {canManage && (
-                <div className="mt-2 flex gap-2 text-xs">
-                  <button
-                    type="button"
-                    className="text-accent-primary"
-                    onClick={() => update(item, { active: !item.active })}
-                  >
-                    {item.active === false ? '启用' : '停用'}
-                  </button>
-                  <button type="button" className="text-red-500" onClick={() => remove(item)}>
-                    删除
-                  </button>
-                </div>
-              )}
-            </article>
-          ))}
+        <div className="grid min-h-[360px] grid-cols-1 md:grid-cols-[250px_1fr]">
+          <div className="max-h-[min(520px,calc(100vh-10rem))] overflow-y-auto border-b border-border-medium md:border-b-0 md:border-r">
+            {items.length === 0 && <p className="p-4 text-sm text-text-secondary">暂无公告</p>}
+            {items.map((item) => (
+              <button
+                key={item._id}
+                type="button"
+                aria-label={item.title}
+                className={`group flex w-full items-center gap-2 border-b border-border-medium px-4 py-3 text-left transition-colors last:border-0 hover:bg-surface-hover ${
+                  selectedAnnouncement?._id === item._id
+                    ? 'border-l-2 border-l-accent-primary bg-surface-hover pl-[14px]'
+                    : ''
+                }`}
+                onClick={() => setSelectedAnnouncementId(item._id)}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1 text-sm font-medium text-text-primary">
+                    {item.unread && (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full bg-red-500"
+                        aria-label="未读"
+                      />
+                    )}
+                    {item.pinned && <Pin className="size-3 shrink-0 text-text-secondary" />}
+                    <span className="truncate">{item.title}</span>
+                  </span>
+                  <span className="mt-1 block text-[11px] text-text-secondary">产品公告</span>
+                  <span className="mt-1 line-clamp-2 block text-xs leading-5 text-text-secondary">
+                    {item.content}
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-text-secondary opacity-60 transition-opacity group-hover:opacity-100" />
+              </button>
+            ))}
+          </div>
+          <section
+            aria-label="公告详情"
+            className="relative max-h-[min(520px,calc(100vh-10rem))] overflow-y-auto p-5"
+          >
+            {selectedAnnouncement ? (
+              <>
+                <div className="pr-8 text-xs font-semibold text-accent-primary">公告详情</div>
+                <h2 className="mt-3 text-xl font-semibold leading-tight text-text-primary">
+                  {selectedAnnouncement.pinned && (
+                    <Pin className="mr-1 inline size-4 align-[-2px] text-text-secondary" />
+                  )}
+                  {selectedAnnouncement.title}
+                </h2>
+                <p className="mt-2 border-b border-border-medium pb-4 text-xs text-text-secondary">
+                  产品公告
+                </p>
+                <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-text-secondary">
+                  {selectedAnnouncement.content}
+                </p>
+                {canManage && (
+                  <div className="mt-6 flex gap-3 text-xs">
+                    <button
+                      type="button"
+                      className="text-accent-primary"
+                      onClick={() =>
+                        update(selectedAnnouncement, { active: !selectedAnnouncement.active })
+                      }
+                    >
+                      {selectedAnnouncement.active === false ? '启用' : '停用'}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-red-500"
+                      onClick={() => remove(selectedAnnouncement)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-text-secondary">选择一条公告查看详情</p>
+            )}
+            <button
+              type="button"
+              aria-label="关闭公告列表"
+              className="absolute right-3 top-3 rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+              onClick={() => setOpen(false)}
+            >
+              <X className="size-4" />
+            </button>
+          </section>
         </div>
         {canManage && (
           <>
             <DropdownMenuSeparator />
-            <div className="space-y-2">
+            <div className="space-y-2 p-4">
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
