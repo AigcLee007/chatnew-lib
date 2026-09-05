@@ -3,6 +3,7 @@ import {
   allowedAddressesSchema,
   bedrockModels,
   configSchema,
+  defaultModels,
   excludedKeys,
   resolveEndpointType,
   webSearchSchema,
@@ -664,6 +665,13 @@ describe('webSearchSchema', () => {
         },
       }),
     ).toThrow();
+  });
+});
+
+describe('shared default models', () => {
+  it('includes the newly supported OpenAI and Anthropic models', () => {
+    expect(defaultModels[EModelEndpoint.openAI]).toContain('gpt-6-astra');
+    expect(defaultModels[EModelEndpoint.anthropic]).toContain('claude-fable-5-1');
   });
 });
 
