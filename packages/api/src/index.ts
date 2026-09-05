@@ -70,6 +70,7 @@ export * from './endpoints';
 export * from './files';
 /* Images */
 export * from './images/controller';
+export * from './aittco/usage';
 /* Storage */
 export * from './storage';
 /* Tools */
