@@ -29,6 +29,21 @@ modelSpecs:
         model: gemini-3.8-flash
 
 endpoints:
+  all:
+    titleConvo: true
+    titleModel: gemini-3.8-flash
+    titleEndpoint: google
+    titleMethod: completion
+    titlePrompt: |
+      请根据下面提供的对话内容，生成一个简洁、准确的简体中文标题。
+      规则：
+      - 只输出标题本身，不要引号、标点、前缀或解释。
+      - 标题不超过 10 个汉字；产品名、模型名、代码标识符可保留原文。
+      - 只概括对话的核心主题，不要编造信息。
+
+      对话内容：
+      {convo}
+
   agents:
     disableBuilder: false
     allowedProviders:

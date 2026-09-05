@@ -14,4 +14,20 @@ describe('configured title model routing', () => {
       titleEndpoint: 'google',
     });
   });
+
+  it('configures all new conversation titles to use simplified Chinese', () => {
+    const configPath = path.resolve(__dirname, '../../../../librechat.yaml');
+    const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
+    const titleConfig = config.endpoints.all;
+
+    expect(titleConfig).toMatchObject({
+      titleConvo: true,
+      titleModel: 'gemini-3.8-flash',
+      titleEndpoint: 'google',
+      titleMethod: 'completion',
+    });
+    expect(titleConfig.titlePrompt).toContain('简体中文');
+    expect(titleConfig.titlePrompt).toContain('只输出标题');
+    expect(titleConfig.titlePrompt).toContain('{convo}');
+  });
 });
