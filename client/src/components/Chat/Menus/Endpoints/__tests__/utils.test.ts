@@ -93,6 +93,26 @@ describe('model selector utilities', () => {
     });
   });
 
+  it.each([
+    ['openAI', 'OpenAI', 'gpt-6-astra', 'GPT-6 Astra', 'OPENAI'],
+    ['anthropic', 'Anthropic', 'claude-fable-5-1', 'Claude Fable 5.1', 'ANTHROPIC'],
+  ])(
+    'uses a readable label for %s model %s',
+    (value, label, model, name, group) => {
+      const endpoint: Endpoint = {
+        value,
+        label,
+        hasModels: true,
+        icon: null,
+        models: [{ name: model }],
+      };
+
+      const [entry] = buildModelCatalog([endpoint], [], localizeZh);
+      expect(entry).toMatchObject({ model, name, group });
+      expect(entry.description).toBeTruthy();
+    },
+  );
+
   it('provides a Chinese fallback description for model specs without one', () => {
     const [entry] = buildModelCatalog(
       [],
