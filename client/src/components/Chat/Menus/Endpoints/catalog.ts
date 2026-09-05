@@ -57,6 +57,11 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '通用能力全面，适合推理、编程和写作。',
     group: 'OPENAI',
   },
+  'gpt-6-astra': {
+    name: 'GPT-6 Astra',
+    description: '旗舰级推理与编程能力，适合高要求的技术工作。',
+    group: 'OPENAI',
+  },
   'grok-4.6': {
     name: 'Grok 4.6',
     description: '适合分析、日常对话和通用任务处理。',
@@ -80,6 +85,11 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
   'claude-sonnet-5': {
     name: 'Claude Sonnet 5',
     description: '平衡写作、分析与编程能力，适合日常专业工作。',
+    group: 'ANTHROPIC',
+  },
+  'claude-fable-5-1': {
+    name: 'Claude Fable 5.1',
+    description: '擅长细致分析、长文本处理与复杂推理。',
     group: 'ANTHROPIC',
   },
 };

@@ -2232,6 +2232,7 @@ export const alternateName = {
 };
 
 const sharedOpenAIModels = [
+  'gpt-6-astra',
   'gpt-5.6',
   'gpt-5.6-terra',
   'gpt-5.6-luna',
@@ -2259,6 +2260,7 @@ const sharedOpenAIModels = [
 ];
 
 const sharedAnthropicModels = [
+  'claude-fable-5-1',
   'claude-fable-5',
   'claude-opus-5',
   'claude-opus-4-8',

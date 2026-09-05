@@ -1,6 +1,11 @@
 import { EModelEndpoint } from 'librechat-data-provider';
 import type { EndpointTokenConfig } from '~/types';
-import { getModelMaxTokens, getModelMaxOutputTokens } from './tokens';
+import {
+  getModelMaxTokens,
+  getModelMaxOutputTokens,
+  maxOutputTokensMap,
+  maxTokensMap,
+} from './tokens';
 
 describe('getModelMaxTokens partial-override fallback', () => {
   const partialOverride: EndpointTokenConfig = {
@@ -45,6 +50,15 @@ describe('gpt-5.6 tiers', () => {
       1050000,
     );
     expect(getModelMaxTokens('gpt-5', EModelEndpoint.openAI)).toBe(400000);
+  });
+});
+
+describe('Claude Fable 5.1 token maps', () => {
+  it('defines an explicit 1M context and 128K output entry', () => {
+    expect(maxTokensMap[EModelEndpoint.anthropic]['claude-fable-5-1']).toBe(1000000);
+    expect(maxOutputTokensMap[EModelEndpoint.anthropic]['claude-fable-5-1']).toBe(128000);
+    expect(getModelMaxTokens('claude-fable-5-1', EModelEndpoint.anthropic)).toBe(1000000);
+    expect(getModelMaxOutputTokens('claude-fable-5-1', EModelEndpoint.anthropic)).toBe(128000);
   });
 });
 
