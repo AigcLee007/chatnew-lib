@@ -2435,5 +2435,22 @@
   "com_ui_image_generation_model_label": "{{0}}",
   "com_ui_image_generation_generated_at": "{{0}}",
   "com_ui_image_generation_clear_history_title": "Clear local history?",
-  "com_ui_image_generation_clear_history_description": "This will permanently remove all locally saved generated images."
+  "com_ui_image_generation_clear_history_description": "This will permanently remove all locally saved generated images.",
+  "com_ui_aittco_quota": "Quota",
+  "com_ui_aittco_quota_title": "API Key quota",
+  "com_ui_aittco_quota_total": "Total",
+  "com_ui_aittco_quota_used": "Used",
+  "com_ui_aittco_quota_remaining": "Remaining",
+  "com_ui_aittco_quota_percentage": "Usage",
+  "com_ui_aittco_usage_details": "Usage details",
+  "com_ui_aittco_usage_title": "Usage details",
+  "com_ui_aittco_usage_time": "Time",
+  "com_ui_aittco_usage_model": "Model",
+  "com_ui_aittco_usage_input_tokens": "Input tokens",
+  "com_ui_aittco_usage_output_tokens": "Output tokens",
+  "com_ui_aittco_usage_quota": "Quota deducted",
+  "com_ui_aittco_usage_refresh": "Refresh",
+  "com_ui_aittco_usage_empty": "No usage records",
+  "com_ui_aittco_usage_limited": "Showing the latest records available from New API",
+  "com_ui_aittco_usage_error": "Usage data unavailable"
 }

@@ -1,56 +1,18 @@
 import { useState } from 'react';
 import * as Menu from '@ariakit/react/menu';
 import { BarChart3, RefreshCw } from 'lucide-react';
-import { getTokenHeader } from 'librechat-data-provider';
-
-type Quota = { total: number | null; used: number | null; remaining: number | null; percentage: number | null };
+import { Button, OGDialog, OGDialogContent, OGDialogHeader, OGDialogTitle } from '@librechat/client';
+import { useGetAittcoQuotaQuery, useGetAittcoUsageQuery } from '~/data-provider';
+import { useLocalize } from '~/hooks';
 
 export default function QuotaSummary({ compact = false }: { compact?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [quota, setQuota] = useState<Quota | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const refresh = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const tokenHeader = getTokenHeader();
-      const response = await fetch('/api/keys/aittco/quota', {
-        headers: tokenHeader ? { Authorization: tokenHeader } : undefined,
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setQuota(null);
-        setError(body?.error || body?.message || `额度查询失败（HTTP ${response.status}）`);
-      } else {
-        setQuota(body);
-      }
-    } catch (requestError) {
-      setQuota(null);
-      setError(requestError instanceof Error ? requestError.message : '额度查询失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-  return (
-    <Menu.MenuProvider open={open} setOpen={(value) => { setOpen(value); if (value && !quota) void refresh(); }} placement={compact ? 'bottom-end' : 'right-start'}>
-      {compact ? (
-        <Menu.MenuButton
-          className="flex size-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-surface-hover"
-          aria-label="额度查询"
-          title="额度查询"
-        >
-          <BarChart3 className="icon-md" aria-hidden="true" />
-        </Menu.MenuButton>
-      ) : (
-        <Menu.MenuItem className="select-item text-sm" render={<Menu.MenuButton />}>
-          <BarChart3 className="icon-md" aria-hidden="true" />额度查询
-        </Menu.MenuItem>
-      )}
-      <Menu.Menu portal className="account-settings-popover popover-ui z-[126] w-[260px] rounded-lg p-4">
-        <div className="flex items-center justify-between text-sm font-medium"><span>API Key 额度</span><button type="button" aria-label="刷新额度" onClick={refresh} disabled={loading}><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
-        {quota ? <dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><dt className="text-text-secondary">总额度</dt><dd>{quota.total ?? '-'}</dd><dt className="text-text-secondary">已使用</dt><dd>{quota.used ?? '-'}</dd><dt className="text-text-secondary">剩余</dt><dd>{quota.remaining ?? '-'}</dd><dt className="text-text-secondary">使用率</dt><dd>{quota.percentage == null ? '-' : `${quota.percentage}%`}</dd></dl> : <p className="mt-3 text-xs text-text-secondary">{error || '暂无额度数据'}</p>}
-      </Menu.Menu>
+  const localize = useLocalize(); const [open, setOpen] = useState(false); const [details, setDetails] = useState(false); const [refreshKey, setRefreshKey] = useState(0);
+  const quota = useGetAittcoQuotaQuery({ enabled: open }); const usage = useGetAittcoUsageQuery(refreshKey, { enabled: details });
+  return <>
+    <Menu.MenuProvider open={open} setOpen={setOpen} placement={compact ? 'bottom-end' : 'right-start'}>
+      <Menu.MenuButton className="flex size-9 items-center justify-center rounded-lg p-2" aria-label={localize('com_ui_aittco_quota')} title={localize('com_ui_aittco_quota')}><BarChart3 className="icon-md" /></Menu.MenuButton>
+      <Menu.Menu portal className="account-settings-popover popover-ui z-[126] w-[280px] rounded-lg p-4"><div className="flex items-center justify-between text-sm font-medium"><span>{localize('com_ui_aittco_quota_title')}</span><Button size="sm" variant="outline" onClick={() => quota.refetch()} disabled={quota.isFetching} aria-label={localize('com_ui_refresh')}><RefreshCw className="size-4" /></Button></div>{quota.data && <dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><dt>{localize('com_ui_aittco_quota_total')}</dt><dd>{quota.data.total ?? '-'}</dd><dt>{localize('com_ui_aittco_quota_used')}</dt><dd>{quota.data.used ?? '-'}</dd><dt>{localize('com_ui_aittco_quota_remaining')}</dt><dd>{quota.data.remaining ?? '-'}</dd><dt>{localize('com_ui_aittco_quota_percentage')}</dt><dd>{quota.data.percentage == null ? '-' : `${quota.data.percentage}%`}</dd></dl>}<Button className="mt-3 w-full" size="sm" onClick={() => setDetails(true)}>{localize('com_ui_aittco_usage_details')}</Button></Menu.Menu>
     </Menu.MenuProvider>
-  );
+    <OGDialog open={details} onOpenChange={setDetails}><OGDialogContent className="max-w-4xl"><OGDialogHeader><OGDialogTitle>{localize('com_ui_aittco_usage_title')}</OGDialogTitle></OGDialogHeader><div className="overflow-x-auto"><table className="min-w-[620px] text-sm"><thead><tr><th>{localize('com_ui_aittco_usage_time')}</th><th>{localize('com_ui_aittco_usage_model')}</th><th>{localize('com_ui_aittco_usage_input_tokens')}</th><th>{localize('com_ui_aittco_usage_output_tokens')}</th><th>{localize('com_ui_aittco_usage_quota')}</th></tr></thead><tbody>{usage.data?.items.map((item) => <tr key={`${item.id}-${item.createdAt}`}><td>{new Date(item.createdAt).toLocaleString()}</td><td>{item.model ?? '-'}</td><td>{item.promptTokens}</td><td>{item.completionTokens}</td><td>{item.quota ?? '-'}</td></tr>)}</tbody></table></div>{usage.data?.limited && <p className="mt-3 text-xs">{localize('com_ui_aittco_usage_limited')}</p>}<Button className="mt-4" onClick={() => setRefreshKey((key) => key + 1)} disabled={usage.isFetching}><RefreshCw className="mr-2 size-4" />{localize('com_ui_aittco_usage_refresh')}</Button></OGDialogContent></OGDialog>
+  </>;
 }

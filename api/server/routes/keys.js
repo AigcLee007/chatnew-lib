@@ -2,12 +2,19 @@ const express = require('express');
 const { updateUserKey, deleteUserKey, getUserKeyExpiry, getUserKey } = require('~/models');
 const axios = require('axios');
 const { requireJwtAuth } = require('~/server/middleware');
+const { createAittcoUsageController } = require('@librechat/api');
 
 const router = express.Router();
 
 const AITTCO_SHARED_KEY_NAME = 'aittco_shared';
 const QUOTA_CACHE_TTL_MS = 60 * 1000;
 const quotaCache = new Map();
+const aittcoUsageController = createAittcoUsageController({ getUserKey });
+function clearAittcoCaches(userId) {
+  if (userId) quotaCache.delete(userId);
+  else quotaCache.clear();
+  aittcoUsageController.clearCache(userId);
+}
 const quotaPaths = [
   '/api/key/balance',
   '/api/token/self',
@@ -144,18 +151,22 @@ router.get('/aittco/quota', requireJwtAuth, async (req, res) => {
   }
 });
 
+router.get('/aittco/usage', requireJwtAuth, aittcoUsageController.handle);
+
 router.put('/', requireJwtAuth, async (req, res) => {
   if (req.body == null || typeof req.body !== 'object') {
     return res.status(400).send({ error: 'Invalid request body.' });
   }
   const { name, value, expiresAt } = req.body;
   await updateUserKey({ userId: req.user.id, name, value, expiresAt });
+  if (name === AITTCO_SHARED_KEY_NAME) clearAittcoCaches(req.user.id);
   res.status(201).send();
 });
 
 router.delete('/:name', requireJwtAuth, async (req, res) => {
   const { name } = req.params;
   await deleteUserKey({ userId: req.user.id, name });
+  if (name === AITTCO_SHARED_KEY_NAME) clearAittcoCaches(req.user.id);
   res.status(204).send();
 });
 
@@ -167,6 +178,7 @@ router.delete('/', requireJwtAuth, async (req, res) => {
   }
 
   await deleteUserKey({ userId: req.user.id, all: true });
+  clearAittcoCaches(req.user.id);
 
   res.status(204).send();
 });

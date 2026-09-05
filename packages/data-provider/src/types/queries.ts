@@ -274,3 +274,7 @@ export type GraphTokenResponse = {
   expires_in: number;
   scope: string;
 };
+
+export type TAittcoQuotaResponse = { total: number | null; used: number | null; remaining: number | null; percentage: number | null };
+export type TAittcoUsageItem = { id: string | number | null; createdAt: string; model: string | null; quota: number | null; promptTokens: number; completionTokens: number };
+export type TAittcoUsageResponse = { source: 'newapi'; items: TAittcoUsageItem[]; limited: boolean };

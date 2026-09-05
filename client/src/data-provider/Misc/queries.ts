@@ -43,3 +43,13 @@ export const useGetSearchEnabledQuery = (
     enabled: (config?.enabled ?? true) === true && queriesEnabled,
   });
 };
+
+export const useGetAittcoQuotaQuery = (config?: UseQueryOptions<t.TAittcoQuotaResponse>) => {
+  const enabled = useRecoilValue<boolean>(store.queriesEnabled);
+  return useQuery<t.TAittcoQuotaResponse>([QueryKeys.aittcoQuota], () => dataService.getAittcoQuota(), { ...config, enabled: (config?.enabled ?? true) && enabled, refetchOnWindowFocus: false });
+};
+
+export const useGetAittcoUsageQuery = (refreshKey = 0, config?: UseQueryOptions<t.TAittcoUsageResponse>) => {
+  const enabled = useRecoilValue<boolean>(store.queriesEnabled);
+  return useQuery<t.TAittcoUsageResponse>([QueryKeys.aittcoUsage, refreshKey], () => dataService.getAittcoUsage({ refresh: refreshKey > 0 }), { ...config, enabled: (config?.enabled ?? true) && enabled, refetchOnWindowFocus: false });
+};
