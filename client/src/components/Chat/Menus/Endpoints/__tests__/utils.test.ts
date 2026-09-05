@@ -94,11 +94,25 @@ describe('model selector utilities', () => {
   });
 
   it.each([
-    ['openAI', 'OpenAI', 'gpt-6-astra', 'GPT-6 Astra', 'OPENAI'],
-    ['anthropic', 'Anthropic', 'claude-fable-5-1', 'Claude Fable 5.1', 'ANTHROPIC'],
+    [
+      'openAI',
+      'OpenAI',
+      'gpt-6-astra',
+      'GPT-6 Astra',
+      'OPENAI',
+      '旗舰级推理与编程能力，适合高要求的技术工作。',
+    ],
+    [
+      'anthropic',
+      'Anthropic',
+      'claude-fable-5-1',
+      'Claude Fable 5.1',
+      'ANTHROPIC',
+      '擅长细致分析、长文本处理与复杂推理。',
+    ],
   ])(
     'uses a readable label for %s model %s',
-    (value, label, model, name, group) => {
+    (value, label, model, name, group, expectedDescription) => {
       const endpoint: Endpoint = {
         value,
         label,
@@ -109,7 +123,7 @@ describe('model selector utilities', () => {
 
       const [entry] = buildModelCatalog([endpoint], [], localizeZh);
       expect(entry).toMatchObject({ model, name, group });
-      expect(entry.description).toBeTruthy();
+      expect(entry.description).toBe(expectedDescription);
     },
   );
 
