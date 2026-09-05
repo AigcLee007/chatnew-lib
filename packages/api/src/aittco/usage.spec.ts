@@ -18,10 +18,11 @@ const ERROR_MESSAGES = {
 } as const;
 
 type RawUsageRecord = {
-  id?: string;
-  type?: number;
-  created_at?: number;
+  id?: string | number | null;
+  type?: number | string;
+  created_at?: number | string | null;
   model_name?: string;
+  model?: string;
   quota?: number;
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -58,9 +59,16 @@ function createResponse(): MockResponse {
   return res as unknown as MockResponse;
 }
 
-function createRequest(options: { userId?: string; query?: Record<string, string> } = {}): Request {
+type RequestUser = {
+  id?: string;
+  _id?: string | { toString(): string };
+};
+
+function createRequest(
+  options: { userId?: string; query?: Record<string, string>; user?: RequestUser } = {},
+): Request {
   return Object.assign(new EventEmitter(), {
-    user: { id: options.userId ?? USER_ID },
+    user: options.user ?? { id: options.userId ?? USER_ID },
     query: options.query ?? {},
     body: {},
     aborted: false,
@@ -110,13 +118,19 @@ function createFixture(
   return { controller, get, getUserKey, now };
 }
 
-function expectUsageRequest(get: jest.Mock, callIndex: number, path: string): void {
+function expectUsageRequest(
+  get: jest.Mock,
+  callIndex: number,
+  path: string,
+  baseUrl = AITTCO_BASE_URL,
+): void {
   const [url, options] = get.mock.calls[callIndex] as [
     string,
-    { headers?: Record<string, string> } | undefined,
+    { headers?: Record<string, string>; timeout?: number } | undefined,
   ];
-  expect(url).toBe(`${AITTCO_BASE_URL}${path}`);
+  expect(url).toBe(`${baseUrl}${path}`);
   expect(options?.headers?.Authorization).toBe(`Bearer ${TEST_KEY}`);
+  expect(options?.timeout).toBe(10_000);
 }
 
 describe('AITTCO usage controller', () => {
@@ -151,24 +165,28 @@ describe('AITTCO usage controller', () => {
 
     expectUsageRequest(get, 0, USAGE_PATH);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.body).toEqual([
-      {
-        id: 'newer',
-        createdAt: new Date(1_700_003_600 * 1000).toISOString(),
-        model: 'gpt-5.2',
-        quota: 0.42,
-        promptTokens: 40,
-        completionTokens: 9,
-      },
-      {
-        id: 'older',
-        createdAt: new Date(1_700_000_000 * 1000).toISOString(),
-        model: 'gpt-4.1',
-        quota: 0.1,
-        promptTokens: 20,
-        completionTokens: 4,
-      },
-    ]);
+    expect(res.body).toEqual({
+      source: 'newapi',
+      items: [
+        {
+          id: 'newer',
+          createdAt: new Date(1_700_003_600 * 1000).toISOString(),
+          model: 'gpt-5.2',
+          quota: 0.42,
+          promptTokens: 40,
+          completionTokens: 9,
+        },
+        {
+          id: 'older',
+          createdAt: new Date(1_700_000_000 * 1000).toISOString(),
+          model: 'gpt-4.1',
+          quota: 0.1,
+          promptTokens: 20,
+          completionTokens: 4,
+        },
+      ],
+      limited: true,
+    });
   });
 
   it('normalizes missing model and quota to null and missing token counts to zero', async () => {
@@ -192,16 +210,75 @@ describe('AITTCO usage controller', () => {
 
     await controller.handle(createRequest(), res);
 
-    expect(res.body).toEqual([
-      {
-        id: 'partial',
-        createdAt: new Date(1_700_003_600 * 1000).toISOString(),
-        model: null,
-        quota: null,
-        promptTokens: 0,
-        completionTokens: 0,
+    expect(res.body).toEqual({
+      source: 'newapi',
+      items: [
+        {
+          id: 'partial',
+          createdAt: new Date(1_700_003_600 * 1000).toISOString(),
+          model: null,
+          quota: null,
+          promptTokens: 0,
+          completionTokens: 0,
+        },
+      ],
+      limited: true,
+    });
+  });
+
+  it('drops invalid rows, accepts string type 2, uses the model alias, and preserves numeric or null ids', async () => {
+    const get = jest.fn().mockResolvedValue({
+      status: 200,
+      data: {
+        success: true,
+        data: [
+          usageRecord({
+            id: 'invalid-timestamp',
+            created_at: 'not-a-unix-timestamp',
+          }),
+          null,
+          'invalid record',
+          usageRecord({
+            id: 42,
+            type: '2',
+            created_at: 1_700_003_600,
+            model_name: undefined,
+            model: 'alias-model',
+          }),
+          usageRecord({
+            id: null,
+            created_at: 1_700_000_000,
+          }),
+        ],
       },
-    ]);
+    });
+    const { controller } = createFixture({ get });
+    const res = createResponse();
+
+    await controller.handle(createRequest(), res);
+
+    expect(res.body).toEqual({
+      source: 'newapi',
+      items: [
+        {
+          id: 42,
+          createdAt: new Date(1_700_003_600 * 1000).toISOString(),
+          model: 'alias-model',
+          quota: 0.25,
+          promptTokens: 12,
+          completionTokens: 7,
+        },
+        {
+          id: null,
+          createdAt: new Date(1_700_000_000 * 1000).toISOString(),
+          model: 'gpt-5',
+          quota: 0.25,
+          promptTokens: 12,
+          completionTokens: 7,
+        },
+      ],
+      limited: true,
+    });
   });
 
   it.each([
@@ -216,16 +293,20 @@ describe('AITTCO usage controller', () => {
     await controller.handle(createRequest(), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.body).toEqual([
-      {
-        id: expect.any(String),
-        createdAt: expect.any(String),
-        model: 'gpt-5',
-        quota: 0.25,
-        promptTokens: 12,
-        completionTokens: 7,
-      },
-    ]);
+    expect(res.body).toEqual({
+      source: 'newapi',
+      items: [
+        {
+          id: expect.any(String),
+          createdAt: expect.any(String),
+          model: 'gpt-5',
+          quota: 0.25,
+          promptTokens: 12,
+          completionTokens: 7,
+        },
+      ],
+      limited: true,
+    });
   });
 
   it.each([
@@ -245,7 +326,7 @@ describe('AITTCO usage controller', () => {
     await expect(controller.handle(createRequest(), res)).resolves.toBeDefined();
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.body).toEqual([]);
+    expect(res.body).toEqual({ source: 'newapi', items: [], limited: true });
   });
 
   it('returns only the public usage fields and never serializes upstream sensitive values', async () => {
@@ -269,7 +350,15 @@ describe('AITTCO usage controller', () => {
 
     await controller.handle(createRequest(), res);
 
-    const record = (res.body as Array<Record<string, unknown>>)[0];
+    const response = res.body as {
+      source: string;
+      items: Array<Record<string, unknown>>;
+      limited: boolean;
+    };
+    expect(response).toEqual(
+      expect.objectContaining({ source: 'newapi', limited: true, items: expect.any(Array) }),
+    );
+    const record = response.items[0];
     expect(Object.keys(record).sort()).toEqual(
       ['id', 'createdAt', 'model', 'quota', 'promptTokens', 'completionTokens'].sort(),
     );
@@ -301,6 +390,56 @@ describe('AITTCO usage controller', () => {
     },
   );
 
+  it('falls back to req.user._id when req.user.id is absent', async () => {
+    const getUserKey = jest.fn().mockResolvedValue(TEST_KEY);
+    const get = jest.fn().mockResolvedValue({
+      status: 200,
+      data: { success: true, data: [usageRecord({ id: 'legacy-user-record' })] },
+    });
+    const { controller } = createFixture({ getUserKey, get });
+    const res = createResponse();
+
+    await controller.handle(
+      createRequest({ user: { _id: { toString: () => 'legacy-user' } } }),
+      res,
+    );
+
+    expect(getUserKey).toHaveBeenCalledWith({
+      userId: 'legacy-user',
+      name: AITTCO_SHARED_KEY_NAME,
+    });
+    expect(res.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'legacy-user-record' })],
+      limited: true,
+    });
+  });
+
+  it('uses the configured AITTCO_API_URL while retaining the usage path and request timeout', async () => {
+    const previousBaseUrl = process.env.AITTCO_API_URL;
+    process.env.AITTCO_API_URL = 'https://proxy.example.test/';
+    try {
+      const get = jest.fn().mockResolvedValue({
+        status: 200,
+        data: { success: true, data: [usageRecord({ id: 'configured-base' })] },
+      });
+      const { controller } = createFixture({ get });
+      const res = createResponse();
+
+      await controller.handle(createRequest(), res);
+
+      expectUsageRequest(get, 0, USAGE_PATH, 'https://proxy.example.test');
+      expect(res.body).toEqual({
+        source: 'newapi',
+        items: [expect.objectContaining({ id: 'configured-base' })],
+        limited: true,
+      });
+    } finally {
+      if (previousBaseUrl === undefined) delete process.env.AITTCO_API_URL;
+      else process.env.AITTCO_API_URL = previousBaseUrl;
+    }
+  });
+
   it.each([404, 405])(
     'falls back from the non-trailing usage path when upstream returns %s',
     async (status) => {
@@ -320,7 +459,11 @@ describe('AITTCO usage controller', () => {
       expectUsageRequest(get, 0, USAGE_PATH);
       expectUsageRequest(get, 1, USAGE_PATH_WITH_TRAILING_SLASH);
       expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.body).toEqual([expect.objectContaining({ id: 'fallback', model: 'gpt-5' })]);
+      expect(res.body).toEqual({
+        source: 'newapi',
+        items: [expect.objectContaining({ id: 'fallback', model: 'gpt-5' })],
+        limited: true,
+      });
     },
   );
 
@@ -370,6 +513,26 @@ describe('AITTCO usage controller', () => {
     },
   );
 
+  it.each([429, 500])(
+    'maps generic upstream status %s to a stable unavailable response without trailing-slash fallback',
+    async (status) => {
+      const get = jest.fn().mockRejectedValueOnce(upstreamError(status, 'raw generic error body'));
+      const { controller } = createFixture({ get });
+      const res = createResponse();
+
+      await controller.handle(createRequest(), res);
+
+      expect(get).toHaveBeenCalledTimes(1);
+      expectUsageRequest(get, 0, USAGE_PATH);
+      expect(res.status).toHaveBeenCalledWith(502);
+      expect(res.body).toEqual({
+        error: 'UPSTREAM_USAGE_UNAVAILABLE',
+        message: ERROR_MESSAGES.unavailable,
+      });
+      expect(JSON.stringify(res.body)).not.toContain('raw generic error body');
+    },
+  );
+
   it.each([
     ['a timeout', Object.assign(new Error('socket timed out'), { code: 'ECONNABORTED' })],
     ['a network failure', Object.assign(new Error('socket closed'), { code: 'ECONNRESET' })],
@@ -392,7 +555,7 @@ describe('AITTCO usage controller', () => {
     },
   );
 
-  it('caches each user within the TTL, bypasses cache for refresh=true, and clearCache invalidates one user', async () => {
+  it('caches each user for 60 seconds, supports refresh=1, and clearCache() invalidates every user', async () => {
     const get = jest
       .fn()
       .mockResolvedValueOnce({
@@ -405,42 +568,93 @@ describe('AITTCO usage controller', () => {
       })
       .mockResolvedValueOnce({
         status: 200,
+        data: { success: true, data: [usageRecord({ id: 'expired' })] },
+      })
+      .mockResolvedValueOnce({
+        status: 200,
         data: { success: true, data: [usageRecord({ id: 'refreshed' })] },
       })
       .mockResolvedValueOnce({
         status: 200,
-        data: { success: true, data: [usageRecord({ id: 'after-clear' })] },
+        data: { success: true, data: [usageRecord({ id: 'after-clear-user-1' })] },
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { success: true, data: [usageRecord({ id: 'after-clear-user-2' })] },
       });
-    const now = jest.fn().mockReturnValue(NOW);
+    let currentNow = NOW;
+    const now = jest.fn(() => currentNow);
     const { controller } = createFixture({ get, now });
 
     const firstResponse = createResponse();
     await controller.handle(createRequest({ userId: USER_ID }), firstResponse);
-    expect(firstResponse.body).toEqual([expect.objectContaining({ id: 'first' })]);
+    expect(firstResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'first' })],
+      limited: true,
+    });
 
+    currentNow = NOW + 59_999;
     const cachedResponse = createResponse();
     await controller.handle(createRequest({ userId: USER_ID }), cachedResponse);
-    expect(cachedResponse.body).toEqual([expect.objectContaining({ id: 'first' })]);
+    expect(cachedResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'first' })],
+      limited: true,
+    });
     expect(get).toHaveBeenCalledTimes(1);
 
     const secondUserResponse = createResponse();
     await controller.handle(createRequest({ userId: 'user-2' }), secondUserResponse);
-    expect(secondUserResponse.body).toEqual([expect.objectContaining({ id: 'second-user' })]);
+    expect(secondUserResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'second-user' })],
+      limited: true,
+    });
     expect(get).toHaveBeenCalledTimes(2);
 
-    const refreshedResponse = createResponse();
-    await controller.handle(
-      createRequest({ userId: USER_ID, query: { refresh: 'true' } }),
-      refreshedResponse,
-    );
-    expect(refreshedResponse.body).toEqual([expect.objectContaining({ id: 'refreshed' })]);
+    currentNow = NOW + 60_001;
+    const expiredResponse = createResponse();
+    await controller.handle(createRequest({ userId: USER_ID }), expiredResponse);
+    expect(expiredResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'expired' })],
+      limited: true,
+    });
     expect(get).toHaveBeenCalledTimes(3);
 
-    controller.clearCache(USER_ID);
-    const afterClearResponse = createResponse();
-    await controller.handle(createRequest({ userId: USER_ID }), afterClearResponse);
-    expect(afterClearResponse.body).toEqual([expect.objectContaining({ id: 'after-clear' })]);
+    currentNow = NOW + 60_002;
+    const refreshedResponse = createResponse();
+    await controller.handle(
+      createRequest({ userId: USER_ID, query: { refresh: '1' } }),
+      refreshedResponse,
+    );
+    expect(refreshedResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'refreshed' })],
+      limited: true,
+    });
     expect(get).toHaveBeenCalledTimes(4);
+
+    controller.clearCache();
+    currentNow = NOW + 60_003;
+    const afterClearUserOneResponse = createResponse();
+    await controller.handle(createRequest({ userId: USER_ID }), afterClearUserOneResponse);
+    expect(afterClearUserOneResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'after-clear-user-1' })],
+      limited: true,
+    });
+    expect(get).toHaveBeenCalledTimes(5);
+
+    const afterClearUserTwoResponse = createResponse();
+    await controller.handle(createRequest({ userId: 'user-2' }), afterClearUserTwoResponse);
+    expect(afterClearUserTwoResponse.body).toEqual({
+      source: 'newapi',
+      items: [expect.objectContaining({ id: 'after-clear-user-2' })],
+      limited: true,
+    });
+    expect(get).toHaveBeenCalledTimes(6);
     expect(now).toHaveBeenCalled();
   });
 });
