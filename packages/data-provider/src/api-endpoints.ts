@@ -45,6 +45,8 @@ export const user = () => `${BASE_URL}/api/user`;
 export const userPreferences = () => `${user()}/preferences`;
 
 export const balance = () => `${BASE_URL}/api/balance`;
+export const aittcoQuota = () => `${BASE_URL}/api/keys/aittco/quota`;
+export const aittcoUsage = (refresh = false) => `${BASE_URL}/api/keys/aittco/usage${refresh ? '?refresh=true' : ''}`;
 
 export const userPlugins = () => `${BASE_URL}/api/user/plugins`;
 
