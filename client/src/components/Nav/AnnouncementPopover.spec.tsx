@@ -28,7 +28,12 @@ describe('AnnouncementPopover', () => {
         ? jsonResponse({ ok: true })
         : jsonResponse([
             { _id: 'a-1', title: 'First update', content: 'First body' },
-            { _id: 'a-2', title: 'Second update', content: 'Second full body' },
+            {
+              _id: 'a-2',
+              title: 'Second update',
+              content: 'Second full body',
+              publishAt: '2026-09-06T08:05:00.000Z',
+            },
           ]),
     );
 
@@ -39,6 +44,8 @@ describe('AnnouncementPopover', () => {
     await user.click(await screen.findByRole('button', { name: /Second update/ }));
 
     expect(screen.getByRole('region', { name: '公告详情' })).toHaveTextContent('Second full body');
+    expect(screen.getByRole('region', { name: '公告详情' })).toHaveTextContent('2026');
+    expect(screen.getByRole('region', { name: '公告详情' })).toHaveTextContent(/\d{2}:05/);
   });
 
   it('switches the detail panel when another announcement row is clicked', async () => {
@@ -46,7 +53,12 @@ describe('AnnouncementPopover', () => {
       url === '/api/announcements/read'
         ? jsonResponse({ ok: true })
         : jsonResponse([
-            { _id: 'a-1', title: 'First update', content: 'First body' },
+            {
+              _id: 'a-1',
+              title: 'First update',
+              content: 'First body',
+              publishAt: '2026-09-06T10:30:00.000Z',
+            },
             { _id: 'a-2', title: 'Second update', content: 'Second body' },
           ]),
     );

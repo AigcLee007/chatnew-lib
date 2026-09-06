@@ -9,6 +9,8 @@ type Announcement = {
   _id: string;
   title: string;
   content: string;
+  publishAt?: string;
+  createdAt?: string;
   unread?: boolean;
   pinned?: boolean;
   active?: boolean;
@@ -16,6 +18,17 @@ type Announcement = {
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function formatAnnouncementDate(item: Announcement) {
+  const timestamp = item.publishAt || item.createdAt;
+  if (!timestamp) return '时间未知';
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '时间未知';
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export default function AnnouncementPopover({ compact = false }: { compact?: boolean }) {
   const { user } = useAuthContext();
@@ -308,7 +321,9 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
                     {item.pinned && <Pin className="size-3 shrink-0 text-text-secondary" />}
                     <span className="truncate">{item.title}</span>
                   </span>
-                  <span className="mt-1 block text-[11px] text-text-secondary">产品公告</span>
+                  <span className="mt-1 block text-[11px] text-text-secondary">
+                    {formatAnnouncementDate(item)}
+                  </span>
                   <span className="mt-1 line-clamp-2 block text-xs leading-5 text-text-secondary">
                     {item.content}
                   </span>
@@ -331,7 +346,7 @@ export default function AnnouncementPopover({ compact = false }: { compact?: boo
                   {selectedAnnouncement.title}
                 </h2>
                 <p className="mt-2 border-b border-border-medium pb-4 text-xs text-text-secondary">
-                  产品公告
+                  发布于 {formatAnnouncementDate(selectedAnnouncement)}
                 </p>
                 <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-text-secondary">
                   {selectedAnnouncement.content}
