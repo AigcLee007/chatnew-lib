@@ -39,8 +39,10 @@ resolutions `1K`, `2K`, and `4K`. The five available models are
 `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, `gpt-image-2`,
 `gpt-image-2.5-sunburst`, and `gpt-image-2.5-flare`.
 
-The GPT Image 2.5 models use the existing OpenAI-compatible image contract; no
-new endpoint or resolution wire-field is required.
+The GPT Image 2.5 models are expected to use the existing OpenAI-compatible image
+contract. Before production rollout, verify that both model IDs are accepted by
+the existing image endpoints; no new endpoint or resolution wire-field is
+introduced by this integration.
 
 Each upstream model call produces one image. Choosing 2-4 images makes the API run
 that many single-image calls in parallel and return the successful results.
