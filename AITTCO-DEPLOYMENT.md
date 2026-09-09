@@ -35,8 +35,12 @@ The BaseURL is fixed by the administrator. Users can provide API keys through th
 The standalone **Image generation** page uses the same per-user gateway key named
 `aittco_shared`. The page supports text-to-image, up to five reference images, the
 aspect ratios `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `5:4`, `4:5`, and `21:9`, and
-resolutions `1K`, `2K`, and `4K`. The three available models are
-`gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, and `gpt-image-2`.
+resolutions `1K`, `2K`, and `4K`. The five available models are
+`gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, `gpt-image-2`,
+`gpt-image-2.5-sunburst`, and `gpt-image-2.5-flare`.
+
+The GPT Image 2.5 models use the existing OpenAI-compatible image contract; no
+new endpoint or resolution wire-field is required.
 
 Each upstream model call produces one image. Choosing 2-4 images makes the API run
 that many single-image calls in parallel and return the successful results.
