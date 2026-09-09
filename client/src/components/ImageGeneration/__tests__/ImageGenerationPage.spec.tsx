@@ -350,7 +350,9 @@ describe('ImageGenerationPage', () => {
     ['gpt-image-2.5-flare', 'GPT Image 2.5 Flare'],
   ])('displays the %s result-card label', async (model, label) => {
     const user = userEvent.setup();
-    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    setFetchMock(
+      jest.fn().mockImplementation(() => createResponse({ ...generatedResponse(), model })),
+    );
     renderPage();
 
     await user.selectOptions(screen.getByRole('combobox', { name: /model/i }), model);
