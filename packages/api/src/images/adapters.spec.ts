@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { generateWithGemini } from './gemini';
 import { generateWithOpenAI, parseImageResponse } from './openai';
+import { OPENAI_IMAGE_MODELS } from './fixtures';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -8,7 +9,6 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 describe('image adapters', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  const openAIModels = ['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'] as const;
   const openAISize = '1024x1024';
 
   it('builds Gemini generateContent image request with inline reference parts', async () => {
@@ -48,7 +48,7 @@ describe('image adapters', () => {
     expect(result.images[0]).toEqual({ data: 'abc', mimeType: 'image/png', index: 0 });
   });
 
-  it.each(openAIModels)('builds a generation request for %s', async (model) => {
+  it.each(OPENAI_IMAGE_MODELS)('builds a generation request for %s', async (model) => {
     const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-1', data: [{ b64_json: 'abc' }] } });
     await generateWithOpenAI(
@@ -65,7 +65,7 @@ describe('image adapters', () => {
     );
   });
 
-  it.each(openAIModels)('builds an edit request for %s', async (model) => {
+  it.each(OPENAI_IMAGE_MODELS)('builds an edit request for %s', async (model) => {
     const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-2', data: [{ url: 'https://img' }] } });
     await generateWithOpenAI(
@@ -80,13 +80,17 @@ describe('image adapters', () => {
       },
     );
     const body = mockedAxios.post.mock.calls[0][1] as { getBuffer: () => Buffer };
-    const payload = body.getBuffer().toString();
-    expect(payload).toContain(`name="model"`);
-    expect(payload).toContain(`\r\n\r\n${model}\r\n`);
-    expect(payload).toContain('name="n"');
-    expect(payload).toContain('\r\n\r\n1\r\n');
-    expect(payload).toContain(`name="size"`);
-    expect(payload).toContain(`\r\n\r\n${openAISize}\r\n`);
+    const payload = body.getBuffer().toString('utf8');
+    expect(payload).toContain('name="prompt"');
+    expect(payload).toContain('edit');
+    expect(payload).toContain('name="model"');
+    expect(payload).toContain(model);
+    expect(payload).toMatch(/name="n"[\s\S]*?\b1\b/);
+    expect(payload).toContain('name="size"');
+    expect(payload).toContain(openAISize);
+    expect(payload).toContain('name="image"');
+    expect(payload).toContain('filename="reference-0.png"');
+    expect(payload).toContain('abc');
     expect(mockedAxios.post).toHaveBeenCalledWith(
       'https://api.example.com/v1/images/edits',
       expect.anything(),

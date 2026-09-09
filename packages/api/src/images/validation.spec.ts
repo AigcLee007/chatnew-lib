@@ -1,7 +1,8 @@
 import { validateImageGenerationRequest } from './validation';
+import { OPENAI_IMAGE_MODELS } from './fixtures';
 
 const valid = () => ({
-  model: 'gpt-image-2' as const,
+  model: OPENAI_IMAGE_MODELS[0],
   prompt: 'a cat',
   size: '1:1' as const,
   resolution: '1K' as const,
@@ -9,15 +10,12 @@ const valid = () => ({
 });
 
 describe('image generation validation', () => {
-  it.each(['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'] as const)(
-    'accepts supported OpenAI model %s',
-    (model) => {
-      expect(validateImageGenerationRequest({ ...valid(), model })).toEqual({
-        valid: true,
-        errors: [],
-      });
-    },
-  );
+  it.each(OPENAI_IMAGE_MODELS)('accepts supported OpenAI model %s', (model) => {
+    expect(validateImageGenerationRequest({ ...valid(), model })).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
 
   it('rejects unsupported values and prompt/count limits', () => {
     const result = validateImageGenerationRequest({

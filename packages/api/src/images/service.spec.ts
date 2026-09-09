@@ -1,12 +1,12 @@
 import { generateImages } from './service';
 import { generateWithGemini } from './gemini';
 import { generateWithOpenAI } from './openai';
+import { OPENAI_IMAGE_MODELS } from './fixtures';
 
 jest.mock('./gemini');
 jest.mock('./openai');
 const mockedGemini = generateWithGemini as jest.MockedFunction<typeof generateWithGemini>;
 const mockedOpenAI = generateWithOpenAI as jest.MockedFunction<typeof generateWithOpenAI>;
-const openAIModels = ['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'] as const;
 
 const request = {
   model: 'gemini-3-pro-image-preview' as const,
@@ -47,7 +47,7 @@ describe('image generation service', () => {
     expect(result.failedCount).toBe(1);
   });
 
-  it.each(openAIModels)('dispatches %s to the OpenAI adapter', async (model) => {
+  it.each(OPENAI_IMAGE_MODELS)('dispatches %s to the OpenAI adapter', async (model) => {
     mockedOpenAI.mockResolvedValue({
       images: [{ data: 'a', mimeType: 'image/png', index: 0 }],
       requestedCount: 1,
@@ -61,8 +61,8 @@ describe('image generation service', () => {
       { ...request, model },
     );
     expect(mockedOpenAI).toHaveBeenCalledTimes(3);
-    expect(mockedOpenAI.mock.calls.map(([config, one]) => one.model)).toEqual([model, model, model]);
-    expect(mockedOpenAI.mock.calls.map(([config, one]) => one.count)).toEqual([1, 1, 1]);
+    expect(mockedOpenAI.mock.calls.map(([, one]) => one.model)).toEqual([model, model, model]);
+    expect(mockedOpenAI.mock.calls.map(([, one]) => one.count)).toEqual([1, 1, 1]);
     expect(mockedGemini).not.toHaveBeenCalled();
     expect(result.successCount).toBe(3);
   });
