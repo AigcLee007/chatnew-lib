@@ -8,6 +8,9 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 describe('image adapters', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  const openAIModels = ['gpt-image-2', 'gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'] as const;
+  const openAISize = '1024x1024';
+
   it('builds Gemini generateContent image request with inline reference parts', async () => {
     const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({
@@ -45,32 +48,47 @@ describe('image adapters', () => {
     expect(result.images[0]).toEqual({ data: 'abc', mimeType: 'image/png', index: 0 });
   });
 
-  it('uses OpenAI generations without references and edits multipart with references', async () => {
+  it.each(openAIModels)('builds a generation request for %s', async (model) => {
     const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-1', data: [{ b64_json: 'abc' }] } });
     await generateWithOpenAI(
       { apiKey: 'key', baseUrl: 'https://api.example.com', signal: abortController.signal },
-      { model: 'gpt-image-2', prompt: 'cat', size: '1:1', resolution: '1K', count: 1 },
+      { model, prompt: 'cat', size: '1:1', resolution: '1K', count: 1 },
     );
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/images/generations'),
-      expect.objectContaining({ model: 'gpt-image-2', n: 1, size: '1024x1024' }),
-      expect.objectContaining({ signal: abortController.signal }),
+      'https://api.example.com/v1/images/generations',
+      expect.objectContaining({ model, n: 1, size: openAISize }),
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer key' },
+        signal: abortController.signal,
+      }),
     );
+  });
+
+  it.each(openAIModels)('builds an edit request for %s', async (model) => {
+    const abortController = new AbortController();
     mockedAxios.post.mockResolvedValue({ data: { id: 'o-2', data: [{ url: 'https://img' }] } });
     await generateWithOpenAI(
       { apiKey: 'key', baseUrl: 'https://api.example.com', signal: abortController.signal },
       {
-        model: 'gpt-image-2',
+        model,
         prompt: 'edit',
-        images: [{ data: 'abc', mimeType: 'image/png' }],
+        images: [{ data: 'YWJj', mimeType: 'image/png' }],
         size: '1:1',
         resolution: '1K',
         count: 1,
       },
     );
+    const body = mockedAxios.post.mock.calls[0][1] as { getBuffer: () => Buffer };
+    const payload = body.getBuffer().toString();
+    expect(payload).toContain(`name="model"`);
+    expect(payload).toContain(`\r\n\r\n${model}\r\n`);
+    expect(payload).toContain('name="n"');
+    expect(payload).toContain('\r\n\r\n1\r\n');
+    expect(payload).toContain(`name="size"`);
+    expect(payload).toContain(`\r\n\r\n${openAISize}\r\n`);
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/images/edits'),
+      'https://api.example.com/v1/images/edits',
       expect.anything(),
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer key' }),

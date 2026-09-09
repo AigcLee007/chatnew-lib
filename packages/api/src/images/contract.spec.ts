@@ -11,7 +11,13 @@ const contractDescribe = enabled ? describe : describe.skip;
 
 contractDescribe('AITTCO image contract', () => {
   it('exposes the configured image contract', () => {
-    expect(IMAGE_MODELS).toHaveLength(5);
+    expect(IMAGE_MODELS).toEqual([
+      'gemini-3-pro-image-preview',
+      'gemini-3.1-flash-image-preview',
+      'gpt-image-2',
+      'gpt-image-2.5-sunburst',
+      'gpt-image-2.5-flare',
+    ]);
     expect(IMAGE_ASPECT_RATIOS).toHaveLength(8);
     expect(IMAGE_RESOLUTIONS).toEqual(['1K', '2K', '4K']);
   });
