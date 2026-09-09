@@ -11,7 +11,7 @@ const contractDescribe = enabled ? describe : describe.skip;
 
 contractDescribe('AITTCO image contract', () => {
   it('exposes the configured image contract', () => {
-    expect(IMAGE_MODELS).toHaveLength(3);
+    expect(IMAGE_MODELS).toHaveLength(5);
     expect(IMAGE_ASPECT_RATIOS).toHaveLength(8);
     expect(IMAGE_RESOLUTIONS).toEqual(['1K', '2K', '4K']);
   });
