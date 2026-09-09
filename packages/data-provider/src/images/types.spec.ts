@@ -22,6 +22,8 @@ describe('image generation contract', () => {
       'gemini-3-pro-image-preview',
       'gemini-3.1-flash-image-preview',
       'gpt-image-2',
+      'gpt-image-2.5-sunburst',
+      'gpt-image-2.5-flare',
     ]);
     expect(IMAGE_ASPECT_RATIOS).toEqual([
       '1:1',
@@ -68,6 +70,28 @@ describe('image generation contract', () => {
 
     expect(response.images[0]).toEqual(result);
     expect(response.errors).toEqual(['ECONNABORTED']);
+  });
+
+  it('accepts both GPT Image 2.5 model IDs in generation requests', () => {
+    const sunburstRequest: ImageGenerationRequest = {
+      model: 'gpt-image-2.5-sunburst',
+      prompt: 'A sunburst landscape',
+      size: '1:1',
+      resolution: '1K',
+      count: 1,
+    };
+    const flareRequest: ImageGenerationRequest = {
+      model: 'gpt-image-2.5-flare',
+      prompt: 'A flare-lit landscape',
+      size: '1:1',
+      resolution: '1K',
+      count: 1,
+    };
+
+    expect([sunburstRequest.model, flareRequest.model]).toEqual([
+      'gpt-image-2.5-sunburst',
+      'gpt-image-2.5-flare',
+    ]);
   });
 
   it('keeps contract unions limited to the supported values', () => {
