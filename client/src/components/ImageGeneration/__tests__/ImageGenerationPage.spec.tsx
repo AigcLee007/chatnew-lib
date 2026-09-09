@@ -7,7 +7,8 @@ const mockTriggerDownload = jest.fn<void, [source: string, filename: string]>();
 
 jest.mock('~/utils', () => ({
   cn: (...classes: (string | undefined | false)[]) => classes.filter(Boolean).join(' '),
-  triggerDownload: (...args: Parameters<typeof mockTriggerDownload>) => mockTriggerDownload(...args),
+  triggerDownload: (...args: Parameters<typeof mockTriggerDownload>) =>
+    mockTriggerDownload(...args),
 }));
 
 jest.mock(
@@ -45,14 +46,22 @@ jest.mock(
         React.createElement('span', { className }),
       Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) =>
         React.createElement('textarea', props),
-      AlertDialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => open ? React.createElement(React.Fragment, null, children) : null,
-      AlertDialogContent: ({ children }: { children: React.ReactNode }) => React.createElement('div', { role: 'alertdialog' }, children),
-      AlertDialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement('p', null, children),
-      AlertDialogFooter: ({ children }: { children: React.ReactNode }) => React.createElement('div', null, children),
-      AlertDialogHeader: ({ children }: { children: React.ReactNode }) => React.createElement('div', null, children),
-      AlertDialogTitle: ({ children }: { children: React.ReactNode }) => React.createElement('h2', null, children),
-      AlertDialogCancel: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.createElement('button', props, children),
-      AlertDialogAction: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.createElement('button', props, children),
+      AlertDialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) =>
+        open ? React.createElement(React.Fragment, null, children) : null,
+      AlertDialogContent: ({ children }: { children: React.ReactNode }) =>
+        React.createElement('div', { role: 'alertdialog' }, children),
+      AlertDialogDescription: ({ children }: { children: React.ReactNode }) =>
+        React.createElement('p', null, children),
+      AlertDialogFooter: ({ children }: { children: React.ReactNode }) =>
+        React.createElement('div', null, children),
+      AlertDialogHeader: ({ children }: { children: React.ReactNode }) =>
+        React.createElement('div', null, children),
+      AlertDialogTitle: ({ children }: { children: React.ReactNode }) =>
+        React.createElement('h2', null, children),
+      AlertDialogCancel: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) =>
+        React.createElement('button', props, children),
+      AlertDialogAction: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) =>
+        React.createElement('button', props, children),
     };
   },
   { virtual: true },
@@ -84,6 +93,8 @@ const generatedResponse = (images = [generatedImage()], failedCount = 0) => ({
   requestId: 'request-1',
 });
 
+const newImageModels = ['gpt-image-2.5-sunburst', 'gpt-image-2.5-flare'] as const;
+
 const renderPage = () =>
   render(
     <MemoryRouter>
@@ -100,8 +111,26 @@ describe('ImageGenerationPage', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /image generation/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/prompt/i)).toBeInTheDocument();
-    expect(screen.getAllByRole('option')).toHaveLength(3 + 8 + 3 + 4);
+    expect(screen.getAllByRole('option')).toHaveLength(5 + 8 + 3 + 4);
+    expect(screen.getByRole('option', { name: 'gpt-image-2.5-sunburst' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'gpt-image-2.5-flare' })).toBeInTheDocument();
     expect(screen.getByText(/single request/i)).toBeInTheDocument();
+  });
+
+  it.each(newImageModels)('submits the selected %s model ID', async (model) => {
+    const user = userEvent.setup();
+    const fetchSpy = jest.fn().mockImplementation(() => createResponse(generatedResponse()));
+    setFetchMock(fetchSpy);
+    renderPage();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /model/i }), model);
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /generate/i }));
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith('/api/images/generate', expect.anything()),
+    );
+    expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({ model });
   });
 
   it('asks for confirmation before clearing local history', async () => {
@@ -139,9 +168,7 @@ describe('ImageGenerationPage', () => {
 
   it('submits the selected settings and renders generated images', async () => {
     const user = userEvent.setup();
-    const fetchSpy = jest.fn().mockImplementation(() =>
-      createResponse(generatedResponse()),
-    );
+    const fetchSpy = jest.fn().mockImplementation(() => createResponse(generatedResponse()));
     setFetchMock(fetchSpy);
     renderPage();
 
@@ -220,14 +247,16 @@ describe('ImageGenerationPage', () => {
   it('disables generation controls and aborts the request when cancelled', async () => {
     const user = userEvent.setup();
     let requestSignal: AbortSignal | undefined;
-    setFetchMock(jest.fn().mockImplementation((_url, options: RequestInit) => {
-      requestSignal = options.signal ?? undefined;
-      return new Promise((_resolve, reject) =>
-        requestSignal?.addEventListener('abort', () =>
-          reject(new DOMException('The operation was aborted', 'AbortError')),
-        ),
-      );
-    }));
+    setFetchMock(
+      jest.fn().mockImplementation((_url, options: RequestInit) => {
+        requestSignal = options.signal ?? undefined;
+        return new Promise((_resolve, reject) =>
+          requestSignal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted', 'AbortError')),
+          ),
+        );
+      }),
+    );
     renderPage();
 
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
@@ -253,7 +282,9 @@ describe('ImageGenerationPage', () => {
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Some images could not be generated');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Some images could not be generated',
+    );
     expect(screen.getByRole('img', { name: /generated image 1/i })).toBeInTheDocument();
   });
 
@@ -275,9 +306,7 @@ describe('ImageGenerationPage', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /copy image/i }));
-    await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith('data:image/png;base64,aGVsbG8='),
-    );
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('data:image/png;base64,aGVsbG8='));
 
     await user.click(screen.getByRole('button', { name: /continue editing/i }));
     expect(await screen.findByRole('img', { name: 'generated-image-1.png' })).toHaveAttribute(
@@ -316,6 +345,22 @@ describe('ImageGenerationPage', () => {
     expect(screen.getByText(/2026|\d{4}/)).toBeInTheDocument();
   });
 
+  it.each([
+    ['gpt-image-2.5-sunburst', 'GPT Image 2.5 Sunburst'],
+    ['gpt-image-2.5-flare', 'GPT Image 2.5 Flare'],
+  ])('displays the %s result-card label', async (model, label) => {
+    const user = userEvent.setup();
+    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
+    renderPage();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /model/i }), model);
+    await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    await screen.findByRole('img', { name: /generated image 1/i });
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
   it('keeps the action bar and timestamp in separate bottom corners', async () => {
     const user = userEvent.setup();
     setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse())));
@@ -325,13 +370,15 @@ describe('ImageGenerationPage', () => {
     const image = await screen.findByRole('img', { name: /generated image 1/i });
     const card = image.closest('article');
     expect(
-      Array.from(card?.querySelectorAll('div') ?? []).some((element) =>
-        element.className.includes('bottom-4') && element.className.includes('left-1/2'),
+      Array.from(card?.querySelectorAll('div') ?? []).some(
+        (element) =>
+          element.className.includes('bottom-4') && element.className.includes('left-1/2'),
       ),
     ).toBe(true);
     expect(
-      Array.from(card?.querySelectorAll('div') ?? []).some((element) =>
-        element.className.includes('bottom-0') && element.className.includes('right-1'),
+      Array.from(card?.querySelectorAll('div') ?? []).some(
+        (element) =>
+          element.className.includes('bottom-0') && element.className.includes('right-1'),
       ),
     ).toBe(true);
   });
@@ -352,14 +399,26 @@ describe('ImageGenerationPage', () => {
   it('switches between images with arrow keys in the preview', async () => {
     const user = userEvent.setup();
     const secondImage = { ...generatedImage('d29ybGQ='), index: 1 };
-    setFetchMock(jest.fn().mockImplementation(() => createResponse(generatedResponse([generatedImage(), secondImage]))));
+    setFetchMock(
+      jest
+        .fn()
+        .mockImplementation(() =>
+          createResponse(generatedResponse([generatedImage(), secondImage])),
+        ),
+    );
     renderPage();
     await user.type(screen.getByLabelText(/prompt/i), 'A summer garden');
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
     await user.click(await screen.findByRole('img', { name: /generated image 1/i }));
-    expect(screen.getByRole('dialog').querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8=');
+    expect(screen.getByRole('dialog').querySelector('img')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,aGVsbG8=',
+    );
     fireEvent.keyDown(window, { key: 'ArrowRight' });
-    expect(screen.getByRole('dialog').querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,d29ybGQ=');
+    expect(screen.getByRole('dialog').querySelector('img')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,d29ybGQ=',
+    );
   });
 
   it('renders history cards in a waterfall layout with natural image ratio', async () => {

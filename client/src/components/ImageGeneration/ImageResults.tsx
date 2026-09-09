@@ -14,6 +14,8 @@ const modelLabels: Record<string, string> = {
   'gemini-3-pro-image-preview': 'Gemini Pro Image',
   'gemini-3.1-flash-image-preview': 'Gemini Flash Image',
   'gpt-image-2': 'GPT Image 2',
+  'gpt-image-2.5-sunburst': 'GPT Image 2.5 Sunburst',
+  'gpt-image-2.5-flare': 'GPT Image 2.5 Flare',
 };
 
 async function copyImage(source: string, mimeType: string): Promise<void> {
@@ -40,7 +42,12 @@ export interface ImageResultItem {
   createdAt: number;
 }
 
-export default function ImageResults({ items, onDelete, onContinueEditing, layout = 'grid' }: ImageResultsProps) {
+export default function ImageResults({
+  items,
+  onDelete,
+  onContinueEditing,
+  layout = 'grid',
+}: ImageResultsProps) {
   const localize = useLocalize();
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -50,8 +57,12 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
     if (previewIndex === null) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setPreviewIndex(null);
-      if (event.key === 'ArrowRight') setPreviewIndex((index) => (index === null ? 0 : (index + 1) % items.length));
-      if (event.key === 'ArrowLeft') setPreviewIndex((index) => (index === null ? 0 : (index - 1 + items.length) % items.length));
+      if (event.key === 'ArrowRight')
+        setPreviewIndex((index) => (index === null ? 0 : (index + 1) % items.length));
+      if (event.key === 'ArrowLeft')
+        setPreviewIndex((index) =>
+          index === null ? 0 : (index - 1 + items.length) % items.length,
+        );
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -61,25 +72,35 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
     return (
       <div className={layout === 'waterfall' ? 'columns-1 gap-4 sm:columns-2 lg:columns-4' : ''}>
         <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-border-light p-6 text-sm text-text-secondary">
-        {localize('com_ui_image_generation_empty_results')}
+          {localize('com_ui_image_generation_empty_results')}
         </div>
       </div>
     );
   }
 
   return (
-    <div className={layout === 'waterfall' ? 'columns-1 gap-4 sm:columns-2 lg:columns-4' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
+    <div
+      className={
+        layout === 'waterfall'
+          ? 'columns-1 gap-4 sm:columns-2 lg:columns-4'
+          : 'grid grid-cols-1 gap-4 sm:grid-cols-2'
+      }
+    >
       {items.map(({ image, model, prompt, createdAt }, index) => {
         const source = imageSource(image);
         return (
           <article
             key={`${image.index}-${index}`}
-            className={layout === 'waterfall' ? 'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary' : 'group relative overflow-hidden rounded-lg border border-border-light bg-surface-secondary'}
+            className={
+              layout === 'waterfall'
+                ? 'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border border-border-light bg-surface-secondary'
+                : 'group relative overflow-hidden rounded-lg border border-border-light bg-surface-secondary'
+            }
           >
-            <div className="pointer-events-none absolute right-1 top-0.5 z-10 text-right text-[10px] font-medium tracking-normal text-white/65 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:right-1.5 sm:top-1">
+            <div className="pointer-events-none absolute right-1 top-0.5 z-10 text-right text-[10px] font-medium tracking-normal text-white/65 opacity-0 drop-shadow-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:right-1.5 sm:top-1">
               {modelLabels[model] ?? model}
             </div>
-            <div className="pointer-events-none absolute bottom-0 right-1 z-10 max-w-[38%] truncate text-right text-[10px] font-medium tracking-normal text-white/60 opacity-0 drop-shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:bottom-0.5 sm:right-1.5">
+            <div className="pointer-events-none absolute bottom-0 right-1 z-10 max-w-[38%] truncate text-right text-[10px] font-medium tracking-normal text-white/60 opacity-0 drop-shadow-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:bottom-0.5 sm:right-1.5">
               {new Date(createdAt).toLocaleString()}
             </div>
             <img
@@ -88,83 +109,85 @@ export default function ImageResults({ items, onDelete, onContinueEditing, layou
               className="w-full cursor-zoom-in object-contain"
               onClick={() => setPreviewIndex(index)}
               tabIndex={0}
-              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setPreviewIndex(index); }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') setPreviewIndex(index);
+              }}
             />
-            <div className="absolute bottom-4 left-1/2 z-20 flex max-w-[78%] -translate-x-1/2 items-center justify-center gap-1.5 overflow-x-auto opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                <IconButton
-                  label={localize('com_ui_download')}
-                  size="sm"
-                  shape="square"
-                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
-                  title={localize('com_ui_download')}
-                  onClick={() => triggerDownload(source, `generated-image-${index + 1}.png`)}
-                >
-                  <Download className="size-4" aria-hidden="true" />
-                </IconButton>
-                <IconButton
-                  label={localize('com_ui_image_generation_copy_image')}
-                  size="sm"
-                  shape="square"
-                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
-                  title={localize('com_ui_image_generation_copy_image')}
-                  onClick={() =>
-                    void copyImage(source, image.mimeType).then(() => {
-                      setCopiedIndex(index);
-                      window.setTimeout(() => setCopiedIndex(null), 1600);
-                    })
+            <div className="absolute bottom-4 left-1/2 z-20 flex max-w-[78%] -translate-x-1/2 items-center justify-center gap-1.5 overflow-x-auto opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+              <IconButton
+                label={localize('com_ui_download')}
+                size="sm"
+                shape="square"
+                className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
+                title={localize('com_ui_download')}
+                onClick={() => triggerDownload(source, `generated-image-${index + 1}.png`)}
+              >
+                <Download className="size-4" aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                label={localize('com_ui_image_generation_copy_image')}
+                size="sm"
+                shape="square"
+                className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
+                title={localize('com_ui_image_generation_copy_image')}
+                onClick={() =>
+                  void copyImage(source, image.mimeType).then(() => {
+                    setCopiedIndex(index);
+                    window.setTimeout(() => setCopiedIndex(null), 1600);
+                  })
+                }
+              >
+                <Clipboard className="size-4" aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                label={localize('com_ui_image_generation_copy_prompt')}
+                size="sm"
+                shape="square"
+                className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
+                title={localize('com_ui_image_generation_copy_prompt')}
+                onClick={() => {
+                  const copy = navigator.clipboard?.writeText(prompt);
+                  if (copy) {
+                    void copy.then(() => {
+                      setCopiedPromptIndex(index);
+                      window.setTimeout(() => setCopiedPromptIndex(null), 1600);
+                    });
                   }
-                >
-                  <Clipboard className="size-4" aria-hidden="true" />
-                </IconButton>
-                <IconButton
-                  label={localize('com_ui_image_generation_copy_prompt')}
-                  size="sm"
-                  shape="square"
-                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
-                  title={localize('com_ui_image_generation_copy_prompt')}
-                  onClick={() => {
-                    const copy = navigator.clipboard?.writeText(prompt);
-                    if (copy) {
-                      void copy.then(() => {
-                        setCopiedPromptIndex(index);
-                        window.setTimeout(() => setCopiedPromptIndex(null), 1600);
-                      });
-                    }
-                  }}
-                >
-                  <FileText className="size-4" aria-hidden="true" />
-                </IconButton>
-                {copiedIndex === index && (
-                  <span className="text-xs text-text-secondary" role="status">
-                    {localize('com_ui_image_generation_copied')}
-                  </span>
-                )}
-                <IconButton
-                  label={localize('com_ui_delete')}
-                  variant="destructive"
-                  size="sm"
-                  shape="square"
-                  className="rounded-full bg-red-600/90 text-white shadow-sm backdrop-blur-sm hover:bg-red-600"
-                  title={localize('com_ui_delete')}
-                  onClick={() => onDelete(index)}
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </IconButton>
-                <IconButton
-                  label={localize('com_ui_image_generation_continue_editing')}
-                  size="sm"
-                  shape="square"
-                  className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
-                  title={localize('com_ui_image_generation_continue_editing')}
-                  onClick={() => onContinueEditing(image)}
-                >
-                  <Pencil className="size-4" aria-hidden="true" />
-                </IconButton>
-                {copiedPromptIndex === index && (
-                  <span className="sr-only" role="status">
-                    {localize('com_ui_image_generation_prompt_copied')}
-                  </span>
-                )}
+                }}
+              >
+                <FileText className="size-4" aria-hidden="true" />
+              </IconButton>
+              {copiedIndex === index && (
+                <span className="text-xs text-text-secondary" role="status">
+                  {localize('com_ui_image_generation_copied')}
+                </span>
+              )}
+              <IconButton
+                label={localize('com_ui_delete')}
+                variant="destructive"
+                size="sm"
+                shape="square"
+                className="rounded-full bg-red-600/90 text-white shadow-sm backdrop-blur-sm hover:bg-red-600"
+                title={localize('com_ui_delete')}
+                onClick={() => onDelete(index)}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                label={localize('com_ui_image_generation_continue_editing')}
+                size="sm"
+                shape="square"
+                className="rounded-full bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/55"
+                title={localize('com_ui_image_generation_continue_editing')}
+                onClick={() => onContinueEditing(image)}
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+              </IconButton>
+              {copiedPromptIndex === index && (
+                <span className="sr-only" role="status">
+                  {localize('com_ui_image_generation_prompt_copied')}
+                </span>
+              )}
             </div>
           </article>
         );
