@@ -1,6 +1,13 @@
 const { Constants, ContentTypes } = require('librechat-data-provider');
 const { FakeClient, initializeFakeClient } = require('./FakeClient');
 
+const mockCheckBalance = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('@librechat/api', () => ({
+  ...jest.requireActual('@librechat/api'),
+  checkBalance: (...args) => mockCheckBalance(...args),
+}));
+
 function deferred() {
   let resolve;
   const promise = new Promise((resolvePromise) => {
@@ -535,6 +542,52 @@ describe('BaseClient', () => {
   });
 
   describe('sendMessage', () => {
+    test('passes a deterministic identity response and skips balance checks', async () => {
+      TestClient.modelOptions = { model: 'gpt-6-astra' };
+      TestClient.model = 'gpt-6-astra';
+      TestClient.options = {
+        ...TestClient.options,
+        endpoint: 'openAI',
+        endpointType: 'openAI',
+        modelDisplayLabel: 'OpenAI',
+        agent: { endpoint: 'OpenAI', provider: 'openai' },
+        req: { config: { balance: { enabled: true } } },
+      };
+      mockCheckBalance.mockClear();
+
+      await TestClient.sendMessage('你是什么模型');
+
+      expect(TestClient.sendCompletion).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          modelIdentityResponse: {
+            provider: 'OpenAI',
+            model: 'GPT-6 Astra',
+            text: '我是由 OpenAI 训练的大型语言模型 `GPT-6 Astra`。有什么我可以帮您的吗？',
+          },
+        }),
+      );
+      expect(mockCheckBalance).not.toHaveBeenCalled();
+    });
+
+    test('keeps capability questions on the normal completion path', async () => {
+      TestClient.modelOptions = { model: 'gpt-6-astra' };
+      TestClient.model = 'gpt-6-astra';
+      TestClient.options = {
+        ...TestClient.options,
+        endpoint: 'openAI',
+        endpointType: 'openAI',
+        modelDisplayLabel: 'OpenAI',
+        agent: { endpoint: 'OpenAI', provider: 'openai' },
+        req: { config: { balance: { enabled: true } } },
+      };
+
+      await TestClient.sendMessage('这个模型有什么能力');
+
+      const [, completionOptions] = TestClient.sendCompletion.mock.calls.at(-1);
+      expect(completionOptions).not.toHaveProperty('modelIdentityResponse');
+    });
+
     test('sendMessage should return a response message', async () => {
       const expectedResult = expect.objectContaining({
         sender: TestClient.sender,

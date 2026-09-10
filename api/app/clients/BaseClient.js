@@ -34,6 +34,7 @@ const {
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { logViolation } = require('~/cache');
 const TextStream = require('./TextStream');
+const { getModelIdentityResponse } = require('./modelIdentity');
 const db = require('~/models');
 
 const collectHistoricalFileRefs = (message) => {
@@ -640,6 +641,15 @@ class BaseClient {
       });
     }
 
+    const modelIdentityResponse = getModelIdentityResponse({
+      message,
+      model: this.modelOptions?.model ?? this.model,
+      modelLabel: this.modelOptions?.modelLabel ?? this.options.modelLabel,
+      modelDisplayLabel: this.options.modelDisplayLabel,
+      endpoint: this.options.agent?.endpoint ?? this.options.endpoint,
+      provider: this.options.agent?.provider,
+    });
+
     if (!isEdited && !this.skipSaveUserMessage) {
       const reqFiles = this.options.req?.body?.files;
       if (reqFiles && Array.isArray(this.options.attachments)) {
@@ -699,6 +709,7 @@ class BaseClient {
     const balanceConfig = getBalanceConfig(appConfig);
     const transactionsConfig = getTransactionsConfig(appConfig);
     if (
+      !modelIdentityResponse &&
       balanceConfig?.enabled &&
       supportsBalanceCheck[this.options.endpointType ?? this.options.endpoint]
     ) {
@@ -726,7 +737,10 @@ class BaseClient {
       );
     }
 
-    const { completion, metadata } = await this.sendCompletion(payload, opts);
+    const completionOptions = modelIdentityResponse
+      ? { ...opts, modelIdentityResponse }
+      : opts;
+    const { completion, metadata } = await this.sendCompletion(payload, completionOptions);
     if (this.abortController) {
       this.abortController.requestCompleted = true;
     }
@@ -747,7 +761,7 @@ class BaseClient {
       isEdited,
       model: this.getResponseModel(),
       sender: this.sender,
-      promptTokens,
+      promptTokens: modelIdentityResponse ? 0 : promptTokens,
       iconURL: this.options.iconURL,
       endpoint: this.options.endpoint,
       ...(this.metadata ?? {}),
@@ -783,7 +797,12 @@ class BaseClient {
       responseMessage.text = completion.join('');
     }
 
-    if (tokenCountMap && this.recordTokenUsage && this.getTokenCountForResponse) {
+    if (
+      !modelIdentityResponse &&
+      tokenCountMap &&
+      this.recordTokenUsage &&
+      this.getTokenCountForResponse
+    ) {
       let completionTokens;
 
       /**
