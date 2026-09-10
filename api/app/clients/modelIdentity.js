@@ -17,6 +17,16 @@ const IDENTITY_QUESTIONS = new Set([
   'what llm are you',
 ]);
 
+const COMBINED_IDENTITY_PATTERNS = [
+  /^你是谁(?:吗)?[，,]\s*(?:能|可以)做什么$/u,
+  /^你(?:是什么|是哪个)模型[，,]\s*(?:能|可以)做什么$/u,
+  /^who are you\s+(?:and|,)\s*what can you do$/u,
+  /^(?:what|which) model are you\s+(?:and|,)\s*what can you do$/u,
+];
+
+const CAPABILITY_RESPONSE =
+  '我可以帮助您回答问题、分析和总结内容、编写和调试代码、翻译文本，以及生成各种内容。有什么我可以帮您的吗？';
+
 function normalizeQuestion(value) {
   return String(value ?? '')
     .normalize('NFKC')
@@ -27,7 +37,15 @@ function normalizeQuestion(value) {
 }
 
 function isModelIdentityQuestion(message) {
-  return IDENTITY_QUESTIONS.has(normalizeQuestion(message));
+  const normalized = normalizeQuestion(message);
+  return (
+    IDENTITY_QUESTIONS.has(normalized) ||
+    COMBINED_IDENTITY_PATTERNS.some((pattern) => pattern.test(normalized))
+  );
+}
+
+function isCombinedIdentityQuestion(message) {
+  return COMBINED_IDENTITY_PATTERNS.some((pattern) => pattern.test(normalizeQuestion(message)));
 }
 
 function normalizeProviderName(value) {
@@ -65,7 +83,9 @@ function getModelIdentityResponse({ message, ...identityOptions } = {}) {
   if (!identity) return null;
   return {
     ...identity,
-    text: `我是由 ${identity.provider} 训练的大型语言模型 \`${identity.model}\`。有什么我可以帮您的吗？`,
+    text: `我是由 ${identity.provider} 训练的大型语言模型 \`${identity.model}\`。${
+      isCombinedIdentityQuestion(message) ? CAPABILITY_RESPONSE : '有什么我可以帮您的吗？'
+    }`,
   };
 }
 
