@@ -1391,6 +1391,8 @@ const initializeClient = async ({
     attachments: primaryConfig.requestAttachments ?? primaryConfig.attachments,
     agentContextAttachmentsByAgentId,
     endpointType: endpointOption.endpointType,
+    modelDisplayLabel: endpointConfig?.modelDisplayLabel,
+    modelLabel: endpointOption.model_parameters.modelLabel,
     resendFiles: primaryConfig.resendFiles ?? true,
     maxContextTokens: primaryConfig.maxContextTokens,
     endpoint: isEphemeralAgentId(primaryConfig.id) ? primaryConfig.endpoint : EModelEndpoint.agents,

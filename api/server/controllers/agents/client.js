@@ -106,6 +106,7 @@ const {
 const {
   Run,
   Callback,
+  GraphEvents,
   Providers,
   TitleMethod,
   formatMessage,
@@ -117,6 +118,7 @@ const {
   SteerEvents,
   ActivityLabelEvents,
   UsageEvents,
+  StepTypes,
   Permissions,
   VisionModes,
   ContentTypes,
@@ -2260,6 +2262,19 @@ class AgentClient extends BaseClient {
 
   /** @type {sendCompletion} */
   async sendCompletion(payload, opts = {}) {
+    if (opts.modelIdentityResponse) {
+      this.modelIdentityResponse = opts.modelIdentityResponse;
+      await this.emitModelIdentityResponse(opts.modelIdentityResponse);
+      if (this._resolveRun) {
+        this._resolveRun(null);
+        this._resolveRun = null;
+      }
+
+      const completion = filterMalformedContentParts(this.contentParts);
+      const metadata = this.buildResponseMetadata();
+      return metadata ? { completion, metadata } : { completion };
+    }
+
     await this.chatCompletion({
       payload,
       onProgress: opts.onProgress,
@@ -2270,6 +2285,93 @@ class AgentClient extends BaseClient {
     const completion = filterMalformedContentParts(this.contentParts);
     const metadata = this.buildResponseMetadata();
     return metadata ? { completion, metadata } : { completion };
+  }
+
+  /**
+   * Emits a deterministic model identity response through the same event
+   * handlers used by a normal assistant message.
+   *
+   * @param {{ text: string }} identityResponse
+   * @param {Record<string, unknown>} [metadata]
+   * @returns {Promise<void>}
+   */
+  async emitModelIdentityResponse(identityResponse, metadata = {}) {
+    const text = identityResponse?.text;
+    if (typeof text !== 'string') {
+      return;
+    }
+
+    const stepId = `model-identity-${this.responseMessageId}`;
+    const index = Array.isArray(this.contentParts) ? this.contentParts.length : 0;
+    const runStep = {
+      stepIndex: index,
+      id: stepId,
+      type: StepTypes.MESSAGE_CREATION,
+      index,
+      stepDetails: {
+        type: StepTypes.MESSAGE_CREATION,
+        message_creation: {
+          message_id: this.responseMessageId,
+          content_type: ContentTypes.TEXT,
+          phase: 'final_answer',
+        },
+      },
+      usage: null,
+      status: 'in_progress',
+      runId: this.responseMessageId,
+    };
+    const eventMetadata = {
+      ...metadata,
+      run_id: this.responseMessageId,
+      last_agent_id: this.options?.agent?.id,
+    };
+    const handlers = this.options?.eventHandlers ?? {};
+    const runStepHandler = handlers[GraphEvents.ON_RUN_STEP]?.handle;
+    const messageDeltaHandler = handlers[GraphEvents.ON_MESSAGE_DELTA]?.handle;
+    const runStepClosedHandler = handlers[GraphEvents.ON_RUN_STEP_CLOSED]?.handle;
+
+    if (typeof runStepHandler === 'function') {
+      await runStepHandler.call(
+        handlers[GraphEvents.ON_RUN_STEP],
+        GraphEvents.ON_RUN_STEP,
+        runStep,
+        eventMetadata,
+      );
+    }
+
+    if (typeof messageDeltaHandler === 'function') {
+      await messageDeltaHandler.call(
+        handlers[GraphEvents.ON_MESSAGE_DELTA],
+        GraphEvents.ON_MESSAGE_DELTA,
+        { id: stepId, delta: { content: [{ type: ContentTypes.TEXT, text }] } },
+        eventMetadata,
+      );
+    }
+
+    if (typeof runStepClosedHandler === 'function') {
+      await runStepClosedHandler.call(
+        handlers[GraphEvents.ON_RUN_STEP_CLOSED],
+        GraphEvents.ON_RUN_STEP_CLOSED,
+        {
+          id: stepId,
+          index,
+          type: StepTypes.MESSAGE_CREATION,
+          status: 'completed',
+          created_at: Date.now(),
+          closed_at: Date.now(),
+          runId: this.responseMessageId,
+        },
+        eventMetadata,
+      );
+    }
+
+    const hasAggregatedText = Array.isArray(this.contentParts)
+      && this.contentParts.some(
+        (part) => part?.type === ContentTypes.TEXT && part[ContentTypes.TEXT] === text,
+      );
+    if (!hasAggregatedText && Array.isArray(this.contentParts)) {
+      this.contentParts.push({ type: ContentTypes.TEXT, text });
+    }
   }
 
   /**

@@ -15,8 +15,8 @@ const mockFormatAgentMessages = jest.fn(() => ({
   boundaryTokenAdjustment: undefined,
 }));
 
-const { Providers } = require('@librechat/agents');
-const { Constants, ContentTypes, EModelEndpoint } = require('librechat-data-provider');
+const { Providers, GraphEvents, createContentAggregator } = require('@librechat/agents');
+const { Constants, ContentTypes, EModelEndpoint, StepTypes } = require('librechat-data-provider');
 const { GenerationJobManager, createStreamServices } = require('@librechat/api');
 const BaseClient = require('~/app/clients/BaseClient');
 const AgentClient = require('./client');
@@ -160,6 +160,78 @@ describe('AgentClient - subagent parent persistence', () => {
       userMessagePromise,
     );
     baseSend.mockRestore();
+  });
+});
+
+describe('AgentClient - deterministic model identity', () => {
+  const identityResponse = {
+    provider: 'OpenAI',
+    model: 'GPT-6 Astra',
+    text: '我是由 OpenAI 训练的大型语言模型 `GPT-6 Astra`。有什么我可以帮您的吗？',
+  };
+
+  test('returns the synthetic identity content without calling the upstream completion', async () => {
+    const client = Object.create(AgentClient.prototype);
+    client.contentParts = [];
+    client.responseMessageId = 'response-identity';
+    client.options = { eventHandlers: {}, agent: { id: 'agent-identity' } };
+    client.chatCompletion = jest.fn().mockResolvedValue(undefined);
+    client.buildResponseMetadata = jest.fn().mockReturnValue({ identity: true });
+
+    const result = await client.sendCompletion([], { modelIdentityResponse: identityResponse });
+
+    expect(client.chatCompletion).not.toHaveBeenCalled();
+    expect(client.buildResponseMetadata).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      completion: [{ type: ContentTypes.TEXT, text: identityResponse.text }],
+      metadata: { identity: true },
+    });
+  });
+
+  test('emits a message-creation step before the delta and aggregates the response text', async () => {
+    const { contentParts, aggregateContent, stepMap } = createContentAggregator();
+    const emitted = [];
+    const { getDefaultHandlers } = require('./callbacks');
+    const eventHandlers = getDefaultHandlers({
+      res: {
+        headersSent: true,
+        writableEnded: false,
+        write: jest.fn((chunk) => emitted.push(String(chunk))),
+      },
+      contentParts,
+      stepMap,
+      aggregateContent,
+      toolEndCallback: jest.fn(),
+      collectedUsage: [],
+    });
+    const client = Object.create(AgentClient.prototype);
+    client.contentParts = contentParts;
+    client.responseMessageId = 'response-identity';
+    client.options = {
+      eventHandlers,
+      agent: { id: 'agent-identity' },
+    };
+
+    await client.emitModelIdentityResponse(identityResponse, {
+      langgraph_node: 'agent-identity',
+    });
+
+    expect(contentParts).toEqual([{ type: ContentTypes.TEXT, text: identityResponse.text }]);
+    expect(stepMap.values().next().value).toEqual(
+      expect.objectContaining({
+        type: StepTypes.MESSAGE_CREATION,
+        stepDetails: {
+          type: StepTypes.MESSAGE_CREATION,
+          message_creation: expect.objectContaining({
+            content_type: ContentTypes.TEXT,
+            phase: 'final_answer',
+          }),
+        },
+      }),
+    );
+    expect(emitted[0]).toContain(GraphEvents.ON_RUN_STEP);
+    expect(emitted[1]).toContain(GraphEvents.ON_MESSAGE_DELTA);
+    expect(emitted[2]).toContain(GraphEvents.ON_RUN_STEP_CLOSED);
   });
 });
 
