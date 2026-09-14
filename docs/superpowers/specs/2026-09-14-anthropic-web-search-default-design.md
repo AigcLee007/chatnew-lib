@@ -2,13 +2,20 @@
 
 ## Goal
 
-Prevent Claude from invoking web search for ordinary prompts (including creative coding requests) unless the caller explicitly enables the search capability.
+Keep Claude's native web search default consistent with the other first-party model
+endpoints. Users should not need a model-parameter button to access search; an
+explicit `web_search: false` remains available for callers that want to disable it.
 
 ## Design
 
-The Anthropic endpoint initializer must not inject `web_search: true` into every request. The existing downstream configuration logic remains the single source of truth for explicit `web_search` values supplied through model parameters, endpoint `addParams`/`defaultParams`, or tool drop parameters.
+The Anthropic endpoint initializer injects `web_search: true` unless the request
+contains an explicit value. The downstream configuration logic remains the single
+source of truth for explicit `web_search` values supplied through model parameters,
+endpoint `addParams`/`defaultParams`, or tool drop parameters.
 
-This keeps native Anthropic search available when deliberately enabled while making the default request tool-free. No changes are required for Google, OpenAI-compatible, or xAI endpoints.
+This keeps native Anthropic search available by default, while preserving an
+explicit opt-out. No changes are required for Google, OpenAI-compatible, or xAI
+endpoints.
 
 ## Verification
 
