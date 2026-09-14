@@ -438,7 +438,7 @@ describe('getOpenAIModels', () => {
 
   it('returns default models when no environment configurations are provided (and fetch fails)', async () => {
     const models = await getOpenAIModels({ user: 'user456' });
-    expect(models).toContain('gpt-5.5');
+    expect(models).toContain('gpt-5.6-terra');
   });
 
   it('returns default models when OpenAI API key is user provided', async () => {
@@ -449,7 +449,7 @@ describe('getOpenAIModels', () => {
 
     expect(mockedAxios.get).not.toHaveBeenCalled();
     expect(models).not.toContain('should-not-appear');
-    expect(models).toContain('gpt-5.5');
+    expect(models).toContain('gpt-5.6-terra');
   });
 
   it('fetches models when OpenAI API key is provided through options', async () => {

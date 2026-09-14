@@ -2236,7 +2236,6 @@ const sharedOpenAIModels = [
   'gpt-5.6',
   'gpt-5.6-terra',
   'gpt-5.6-luna',
-  'gpt-5.5',
   'gpt-5.5-pro',
   'chat-latest',
   'gpt-5.4',
@@ -2263,7 +2262,6 @@ const sharedAnthropicModels = [
   'claude-fable-5-1',
   'claude-fable-5',
   'claude-opus-5',
-  'claude-opus-4-8',
   'claude-opus-4-7',
   'claude-sonnet-5',
   'claude-sonnet-4-6',
@@ -2298,7 +2296,6 @@ const sharedAnthropicModels = [
 export const bedrockModels = [
   'global.anthropic.claude-fable-5',
   'global.anthropic.claude-opus-5',
-  'global.anthropic.claude-opus-4-8',
   'global.anthropic.claude-opus-4-7',
   'global.anthropic.claude-sonnet-5',
   'global.anthropic.claude-sonnet-4-6',
@@ -2335,8 +2332,6 @@ export const defaultModels = {
   [EModelEndpoint.assistants]: [...sharedOpenAIModels, 'chatgpt-4o-latest'],
   [EModelEndpoint.agents]: sharedOpenAIModels, // TODO: Add agent models (agentsModels)
   [EModelEndpoint.google]: [
-    // Gemini 3.7 Models
-    'gemini-3.7-flash',
     // Gemini 3.6 Models
     'gemini-3.6-flash',
     // Gemini 3.5 Models

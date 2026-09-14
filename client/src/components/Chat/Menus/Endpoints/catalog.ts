@@ -28,11 +28,6 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '响应快速、延迟低，适合日常对话与内容生成。',
     group: 'GEMINI',
   },
-  'gemini-3.7-flash': {
-    name: 'Gemini 3.7 Flash',
-    description: '响应快速、延迟低，适合日常对话与内容生成。',
-    group: 'GEMINI',
-  },
   'gemini-3.8-flash': {
     name: 'Gemini 3.8 Flash',
     description: '响应快速、延迟低，适合日常对话与内容生成。',
@@ -53,11 +48,6 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '兼顾质量与效率，适合内容生产和业务分析。',
     group: 'OPENAI',
   },
-  'gpt-5.5': {
-    name: 'GPT-5.5',
-    description: '具备强大的推理、写作与编程能力，适合复杂任务。',
-    group: 'OPENAI',
-  },
   'gpt-6-astra': {
     name: 'GPT-6 Astra',
     description: '旗舰级推理与编程能力，适合高要求的技术工作。',
@@ -72,11 +62,6 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     name: 'Grok 4.5',
     description: '适合日常推理、写作与灵活的对话任务。',
     group: 'GROK',
-  },
-  'claude-opus-4-8': {
-    name: 'Claude Opus 4.8',
-    description: '擅长细致分析、长文本处理与复杂推理。',
-    group: 'ANTHROPIC',
   },
   'claude-opus-5': {
     name: 'Claude Opus 5',
