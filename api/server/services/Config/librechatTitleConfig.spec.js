@@ -3,6 +3,14 @@ const path = require('path');
 const yaml = require('js-yaml');
 
 describe('configured title model routing', () => {
+  it('does not expose gpt-5.4 on the OpenAI custom endpoint', () => {
+    const configPath = path.resolve(__dirname, '../../../../librechat.yaml');
+    const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
+    const endpoint = config.endpoints.custom.find(({ name }) => name === 'OpenAI');
+
+    expect(endpoint.models.default).not.toContain('gpt-5.4');
+  });
+
   it('routes custom OpenAI titles through Gemini 3.8 Flash on Google', () => {
     const configPath = path.resolve(__dirname, '../../../../librechat.yaml');
     const config = yaml.load(fs.readFileSync(configPath, 'utf8'));

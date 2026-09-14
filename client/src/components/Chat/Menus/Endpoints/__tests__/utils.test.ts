@@ -26,6 +26,41 @@ const disabledAgentsEndpoint: Endpoint = {
 };
 
 describe('model selector utilities', () => {
+  it('does not expose the retired gpt-5.4 model', () => {
+    const endpoint: Endpoint = {
+      value: 'openAI',
+      label: 'OpenAI',
+      hasModels: true,
+      icon: null,
+      models: [{ name: 'gpt-5.4' }, { name: 'gpt-5.4-pro' }],
+    };
+
+    expect(buildModelCatalog([endpoint], [], localizeZh).map((entry) => entry.model)).toEqual([
+      'gpt-5.4-pro',
+    ]);
+  });
+
+  it('does not expose retired model specs', () => {
+    const entries = buildModelCatalog(
+      [],
+      [
+        {
+          name: 'retired-gpt-5.4',
+          label: 'GPT-5.4',
+          preset: { model: 'gpt-5.4' },
+        },
+        {
+          name: 'gpt-5.4-pro',
+          label: 'GPT-5.4 Pro',
+          preset: { model: 'gpt-5.4-pro' },
+        },
+      ] as TModelSpec[],
+      localizeZh,
+    );
+
+    expect(entries.map((entry) => entry.spec?.preset.model)).toEqual(['gpt-5.4-pro']);
+  });
+
   it('builds grouped display rows without changing model IDs', () => {
     const endpoint: Endpoint = {
       value: 'google',

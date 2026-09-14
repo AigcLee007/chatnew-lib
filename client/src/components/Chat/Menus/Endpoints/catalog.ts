@@ -4,6 +4,12 @@ import type { TranslationKeys } from '~/hooks/useLocalize';
 
 type CatalogLocalize = (key: TranslationKeys) => string;
 
+const RETIRED_MODEL_IDS = new Set(['gpt-5.4']);
+
+function isRetiredModel(model?: string) {
+  return model != null && RETIRED_MODEL_IDS.has(model.toLowerCase());
+}
+
 export type CatalogGroup = 'GEMINI' | 'OPENAI' | 'GROK' | 'ANTHROPIC' | string;
 
 export type CatalogEntry = {
@@ -50,11 +56,6 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
   'gpt-5.5': {
     name: 'GPT-5.5',
     description: '具备强大的推理、写作与编程能力，适合复杂任务。',
-    group: 'OPENAI',
-  },
-  'gpt-5.4': {
-    name: 'GPT-5.4',
-    description: '通用能力全面，适合推理、编程和写作。',
     group: 'OPENAI',
   },
   'gpt-6-astra': {
@@ -148,7 +149,6 @@ const DESCRIPTION_TRANSLATIONS: Record<string, { zh: string }> = {
   com_model_desc_openai_sol: { zh: '旗舰级推理与编程能力，适合高要求的技术工作。' },
   com_model_desc_openai_terra: { zh: '兼顾质量与效率，适合内容生产和业务分析。' },
   com_model_desc_openai_55: { zh: '具备强大的推理、写作与编程能力，适合复杂任务。' },
-  com_model_desc_openai_54: { zh: '通用能力全面，适合推理、编程和写作。' },
   com_model_desc_grok_46: { zh: '适合分析、日常对话和通用任务处理。' },
   com_model_desc_grok_45: { zh: '适合日常推理、写作与灵活的对话任务。' },
   com_model_desc_claude_opus: { zh: '擅长细致分析、长文本处理与复杂推理。' },
@@ -188,6 +188,9 @@ export function buildModelCatalog(
       return;
     }
     endpoint.models.forEach(({ name: model }) => {
+      if (isRetiredModel(model)) {
+        return;
+      }
       const info = modelDisplayInfo(model, endpoint);
       entries.push({
         key: `model:${endpoint.value}:${model}`,
@@ -204,6 +207,9 @@ export function buildModelCatalog(
   });
 
   modelSpecs.forEach((spec) => {
+    if (isRetiredModel(spec.preset.model ?? undefined)) {
+      return;
+    }
     const endpointValue = spec.preset.endpoint ?? spec.group ?? '';
     const endpoint = endpointByValue.get(endpointValue);
     const group =
