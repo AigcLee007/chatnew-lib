@@ -26,6 +26,12 @@ import { standardCache, tokenConfigCache } from '~/cache';
 
 type SSRFSafeAgents = ReturnType<typeof createSSRFSafeAgents>;
 
+const RETIRED_MODEL_IDS = new Set(['gemini-3.7-flash', 'claude-opus-4-8']);
+
+function filterRetiredModels(models: string[]): string[] {
+  return models.filter((model) => !RETIRED_MODEL_IDS.has(model.trim().toLowerCase()));
+}
+
 export interface FetchModelsParams {
   /** User ID for API requests */
   user?: string;
@@ -492,11 +498,11 @@ export async function getAnthropicModels(
 
   // Vertex AI models from YAML config take priority
   if (opts.vertexModels && opts.vertexModels.length > 0) {
-    return opts.vertexModels;
+    return filterRetiredModels(opts.vertexModels);
   }
 
   if (process.env.ANTHROPIC_MODELS) {
-    return splitAndTrim(process.env.ANTHROPIC_MODELS);
+    return filterRetiredModels(splitAndTrim(process.env.ANTHROPIC_MODELS));
   }
 
   if (isUserProvided(process.env.ANTHROPIC_API_KEY)) {
@@ -504,10 +510,10 @@ export async function getAnthropicModels(
   }
 
   try {
-    return await fetchAnthropicModels(opts, models);
+    return filterRetiredModels(await fetchAnthropicModels(opts, models));
   } catch (error) {
     logger.error('Error fetching Anthropic models:', error);
-    return models;
+    return filterRetiredModels(models);
   }
 }
 
@@ -516,9 +522,9 @@ export async function getAnthropicModels(
  * @returns Array of model IDs
  */
 export function getGoogleModels(): string[] {
-  let models = defaultModels[EModelEndpoint.google];
+  let models = filterRetiredModels(defaultModels[EModelEndpoint.google]);
   if (process.env.GOOGLE_MODELS) {
-    models = splitAndTrim(process.env.GOOGLE_MODELS);
+    models = filterRetiredModels(splitAndTrim(process.env.GOOGLE_MODELS));
   }
   return models;
 }

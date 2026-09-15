@@ -871,6 +871,12 @@ describe('getAnthropicModels', () => {
     expect(models).toEqual(['claude-1', 'claude-2']);
   });
 
+  it('filters retired Claude models from ANTHROPIC_MODELS', async () => {
+    process.env.ANTHROPIC_MODELS = 'claude-opus-4-8, claude-opus-5';
+    const models = await getAnthropicModels();
+    expect(models).toEqual(['claude-opus-5']);
+  });
+
   it('should use Anthropic-specific headers when fetching models', async () => {
     delete process.env.ANTHROPIC_MODELS;
     process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
@@ -971,6 +977,12 @@ describe('getGoogleModels', () => {
     process.env.GOOGLE_MODELS = 'gemini-pro, bard ';
     const models = getGoogleModels();
     expect(models).toEqual(['gemini-pro', 'bard']);
+  });
+
+  it('filters retired Gemini models from GOOGLE_MODELS', () => {
+    process.env.GOOGLE_MODELS = 'gemini-3.7-flash, gemini-3.8-flash';
+    const models = getGoogleModels();
+    expect(models).toEqual(['gemini-3.8-flash']);
   });
 });
 
