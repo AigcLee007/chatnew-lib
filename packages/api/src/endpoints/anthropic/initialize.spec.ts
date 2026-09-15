@@ -48,24 +48,24 @@ function createParams(
 }
 
 describe('initializeAnthropic – custom headers', () => {
-  it('enables native web search by default, matching other first-party endpoints', async () => {
+  it('does not enable native web search unless explicitly requested', async () => {
     const { params, restore } = createParams({}, { ANTHROPIC_API_KEY: 'sk-ant-test' });
 
     try {
       const result = await initializeAnthropic(params);
-      expect(result.tools).toEqual([{ type: 'web_search_20250305', name: 'web_search' }]);
+      expect(result.tools).toEqual([]);
     } finally {
       restore();
     }
   });
 
-  it('allows an explicit false model parameter to disable native web search', async () => {
+  it('preserves explicitly enabled native web search', async () => {
     const { params, restore } = createParams({}, { ANTHROPIC_API_KEY: 'sk-ant-test' });
-    params.model_parameters = { model: 'claude-sonnet-4-5', web_search: false };
+    params.model_parameters = { model: 'claude-sonnet-4-5', web_search: true };
 
     try {
       const result = await initializeAnthropic(params);
-      expect(result.tools).toEqual([]);
+      expect(result.tools).toEqual([{ type: 'web_search_20250305', name: 'web_search' }]);
     } finally {
       restore();
     }
