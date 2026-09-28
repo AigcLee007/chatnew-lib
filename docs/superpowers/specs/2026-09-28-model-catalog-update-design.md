@@ -9,7 +9,7 @@
 - OpenAI：把 `gpt-6-luna`、`gpt-6-sol` 加入共享默认模型，并加入当前 `librechat.yaml` 的自定义 OpenAI 默认列表。
 - Anthropic：把 `claude-opus-5-5` 加入共享默认模型。
 - 前端模型目录：为三个新模型提供可读名称、中文说明和供应商分组；继续保留原始模型 ID 用于选择和请求。
-- Google：从共享默认模型中移除 `gemini-3.5-flash`，从前端目录元数据和相关目录测试中移除 `gemini-3.5-flash-preview`。
+- Google：从共享默认模型中移除 `gemini-3.5-flash`，并把 `gemini-3.5-flash-preview` 加入前端目录的 retired 过滤集合，确保它不会出现在目录列表中。
 - 测试：覆盖新模型的默认配置、目录显示和分组，以及旧模型不再出现在默认/目录列表中。
 
 不修改 token 上下文、计费映射或用户显式配置模型的运行时支持；这些映射仍可服务于已有会话或显式端点配置。
@@ -25,7 +25,7 @@
 - `gpt-6-sol` 显示为 `GPT-6 Sol`，归入 `OPENAI`，沿用旗舰级推理与编程描述。
 - `gpt-6-luna` 显示为 `GPT-6 Luna`，归入 `OPENAI`，使用兼顾速度与质量的通用描述。
 - `claude-opus-5-5` 显示为 `Claude Opus 5.5`，归入 `ANTHROPIC`，沿用 Claude Opus 的分析、长文本和复杂推理描述。
-- `gemini-3.5-flash-preview` 不再有显式目录元数据，也不再出现在对应目录测试样例中。
+- `gemini-3.5-flash-preview` 被目录构建逻辑过滤，不会出现在目录列表中，也不再保留显式目录元数据。
 
 ## 验证
 
