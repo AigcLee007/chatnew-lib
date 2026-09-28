@@ -68,8 +68,18 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '适合日常推理、写作与灵活的对话任务。',
     group: 'GROK',
   },
+  'claude-fable-5-1-high': {
+    name: 'Claude Fable 5.1 High',
+    description: '擅长细致分析、长文本处理与复杂推理。',
+    group: 'ANTHROPIC',
+  },
   'claude-opus-5-5': {
     name: 'Claude Opus 5.5',
+    description: '擅长细致分析、长文本处理与复杂推理。',
+    group: 'ANTHROPIC',
+  },
+  'claude-opus-5.5-high': {
+    name: 'Claude Opus 5.5 High',
     description: '擅长细致分析、长文本处理与复杂推理。',
     group: 'ANTHROPIC',
   },
