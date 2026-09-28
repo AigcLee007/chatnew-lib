@@ -40,6 +40,20 @@ describe('model selector utilities', () => {
     ]);
   });
 
+  it('does not expose the retired Gemini 3.5 Flash preview model', () => {
+    const endpoint: Endpoint = {
+      value: 'google',
+      label: 'Google',
+      hasModels: true,
+      icon: null,
+      models: [{ name: 'gemini-3.5-flash-preview' }, { name: 'gemini-3.8-flash' }],
+    };
+
+    expect(buildModelCatalog([endpoint], [], localizeZh).map((entry) => entry.model)).toEqual([
+      'gemini-3.8-flash',
+    ]);
+  });
+
   it('does not expose retired model specs', () => {
     const entries = buildModelCatalog(
       [],
@@ -68,34 +82,22 @@ describe('model selector utilities', () => {
       hasModels: true,
       icon: null,
       models: [
-        { name: 'gemini-3.5-flash-preview' },
-        { name: 'gemini-3.7-flash' },
         { name: 'gemini-3.8-flash' },
         { name: 'custom-model' },
       ],
     };
     const entries = buildModelCatalog([endpoint], [], localizeZh);
     expect(entries.map((entry) => entry.model)).toEqual([
-      'gemini-3.5-flash-preview',
-      'gemini-3.7-flash',
       'gemini-3.8-flash',
       'custom-model',
     ]);
-    expect(entries[0]).toMatchObject({ group: 'GEMINI', name: 'Gemini 3.5 Flash' });
-    expect(entries[1]).toMatchObject({
-      group: 'GEMINI',
-      model: 'gemini-3.7-flash',
-      name: 'Gemini 3.7 Flash',
-    });
-    expect(entries[2]).toMatchObject({
+    expect(entries[0]).toMatchObject({
       group: 'GEMINI',
       model: 'gemini-3.8-flash',
       name: 'Gemini 3.8 Flash',
     });
     expect(entries[0].description).toContain('快速');
-    expect(entries[1].description).toContain('快速');
-    expect(entries[2].description).toContain('快速');
-    expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(4);
+    expect(groupModelCatalog(entries).get('GEMINI')).toHaveLength(2);
   });
 
   it('provides a Chinese fallback description for unknown provider models', () => {
@@ -142,6 +144,30 @@ describe('model selector utilities', () => {
       'Anthropic',
       'claude-fable-5-1',
       'Claude Fable 5.1',
+      'ANTHROPIC',
+      '擅长细致分析、长文本处理与复杂推理。',
+    ],
+    [
+      'openAI',
+      'OpenAI',
+      'gpt-6-sol',
+      'GPT-6 Sol',
+      'OPENAI',
+      '旗舰级推理与编程能力，适合高要求的技术工作。',
+    ],
+    [
+      'openAI',
+      'OpenAI',
+      'gpt-6-luna',
+      'GPT-6 Luna',
+      'OPENAI',
+      '兼顾质量与效率，适合内容生产和业务分析。',
+    ],
+    [
+      'anthropic',
+      'Anthropic',
+      'claude-opus-5-5',
+      'Claude Opus 5.5',
       'ANTHROPIC',
       '擅长细致分析、长文本处理与复杂推理。',
     ],
@@ -198,7 +224,7 @@ describe('model selector utilities', () => {
       label: 'Google',
       hasModels: true,
       icon: null,
-      models: [{ name: 'gemini-3.5-flash-preview' }],
+      models: [{ name: 'gemini-3.8-flash' }],
     };
     expect(buildModelCatalog([endpoint], [], localizeEn)[0].description).toContain('low latency');
     expect(filterModelCatalog(buildModelCatalog([endpoint], [], localizeZh), '延迟')).toHaveLength(
