@@ -2232,6 +2232,8 @@ export const alternateName = {
 };
 
 const sharedOpenAIModels = [
+  'gpt-6-sol',
+  'gpt-6-luna',
   'gpt-6-astra',
   'gpt-5.6',
   'gpt-5.6-terra',
@@ -2261,6 +2263,7 @@ const sharedOpenAIModels = [
 const sharedAnthropicModels = [
   'claude-fable-5-1',
   'claude-fable-5',
+  'claude-opus-5-5',
   'claude-opus-5',
   'claude-opus-4-7',
   'claude-sonnet-5',
@@ -2335,7 +2338,6 @@ export const defaultModels = {
     // Gemini 3.6 Models
     'gemini-3.6-flash',
     // Gemini 3.5 Models
-    'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
     // Gemini 3.1 Models
     'gemini-3.1-pro-preview',
