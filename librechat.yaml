@@ -60,7 +60,7 @@ endpoints:
 
   google:
     titleConvo: true
-    titleModel: gemini-3.5-flash-preview
+    titleModel: gemini-3.8-flash
 
   anthropic:
     titleConvo: true
