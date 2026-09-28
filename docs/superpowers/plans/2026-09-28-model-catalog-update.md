@@ -17,7 +17,7 @@
 - Modify: `packages/data-provider/src/config.ts:2234-2352`
 - Modify: `librechat.yaml:70-80`
 
-- [ ] **Step 1: Write the failing configuration test**
+- [x] **Step 1: Write the failing configuration test**
 
 Extend the existing `shared default models` test in `packages/data-provider/src/config.spec.ts` so it asserts the new IDs and removal:
 
@@ -31,7 +31,7 @@ it('keeps the requested model catalog in shared defaults', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run from `D:\chat-libre\LibreChat`:
 
@@ -41,7 +41,7 @@ npm --prefix packages/data-provider run test:ci -- --runInBand src/config.spec.t
 
 Expected: FAIL because the new IDs are not in the shared arrays and Google defaults still include `gemini-3.5-flash`.
 
-- [ ] **Step 3: Implement the minimal configuration change**
+- [x] **Step 3: Implement the minimal configuration change**
 
 In `packages/data-provider/src/config.ts`:
 
@@ -51,7 +51,7 @@ In `packages/data-provider/src/config.ts`:
 
 In `librechat.yaml`, add `gpt-6-sol` and `gpt-6-luna` to the current `endpoints.custom` entry named `OpenAI`, immediately before the existing `gpt-6-astra` entry.
 
-- [ ] **Step 4: Run the configuration test to verify it passes**
+- [x] **Step 4: Run the configuration test to verify it passes**
 
 Run:
 
@@ -61,7 +61,7 @@ npm --prefix packages/data-provider run test:ci -- --runInBand src/config.spec.t
 
 Expected: PASS.
 
-- [ ] **Step 5: Validate the YAML list and commit**
+- [x] **Step 5: Validate the YAML list and commit**
 
 Run:
 
@@ -82,7 +82,7 @@ git commit -m "feat: update shared model defaults"
 - Modify: `client/src/components/Chat/Menus/Endpoints/__tests__/utils.test.ts:65-90,118-150,190-207`
 - Modify: `client/src/components/Chat/Menus/Endpoints/catalog.ts:24-75`
 
-- [ ] **Step 1: Write the failing catalog assertions**
+- [x] **Step 1: Write the failing catalog assertions**
 
 Add a retired-model test beside the existing retired `gpt-5.4` test, then add a readable-label test beside the existing Claude/OpenAI metadata test:
 
@@ -124,7 +124,7 @@ it.each([
 });
 ```
 
-- [ ] **Step 2: Run the focused client test to verify it fails**
+- [x] **Step 2: Run the focused client test to verify it fails**
 
 Run from `D:\chat-libre\LibreChat`:
 
@@ -134,7 +134,7 @@ npm --prefix client run test:ci -- --runInBand src/components/Chat/Menus/Endpoin
 
 Expected: FAIL because the retired Gemini preview model is not filtered yet and the new IDs currently use fallback names.
 
-- [ ] **Step 3: Implement the catalog metadata**
+- [x] **Step 3: Implement the catalog metadata**
 
 In `client/src/components/Chat/Menus/Endpoints/catalog.ts`:
 
@@ -145,7 +145,7 @@ In `client/src/components/Chat/Menus/Endpoints/catalog.ts`:
 
 Update the test fixtures and expected model arrays so they reflect the removed preview model and the new metadata.
 
-- [ ] **Step 4: Run the focused client test to verify it passes**
+- [x] **Step 4: Run the focused client test to verify it passes**
 
 Run:
 
@@ -155,7 +155,7 @@ npm --prefix client run test:ci -- --runInBand src/components/Chat/Menus/Endpoin
 
 Expected: PASS with all catalog grouping, localization, filtering, and fallback tests green.
 
-- [ ] **Step 5: Commit the catalog change**
+- [x] **Step 5: Commit the catalog change**
 
 ```powershell
 git add client/src/components/Chat/Menus/Endpoints/catalog.ts client/src/components/Chat/Menus/Endpoints/__tests__/utils.test.ts
@@ -167,7 +167,7 @@ git commit -m "feat: add requested models to catalog"
 **Files:**
 - No new files; verify the files changed in Tasks 1-2.
 
-- [ ] **Step 1: Run both focused test suites**
+- [x] **Step 1: Run both focused test suites**
 
 ```powershell
 npm --prefix packages/data-provider run test:ci -- --runInBand src/config.spec.ts
@@ -176,7 +176,7 @@ npm --prefix client run test:ci -- --runInBand src/components/Chat/Menus/Endpoin
 
 Expected: both commands exit 0.
 
-- [ ] **Step 2: Run client type checking**
+- [x] **Step 2: Run client type checking**
 
 ```powershell
 npm --prefix client run typecheck
@@ -184,7 +184,7 @@ npm --prefix client run typecheck
 
 Expected: TypeScript exits 0 with no diagnostics.
 
-- [ ] **Step 3: Review the final diff and status**
+- [x] **Step 3: Review the final diff and status**
 
 ```powershell
 git diff HEAD~2..HEAD --check
