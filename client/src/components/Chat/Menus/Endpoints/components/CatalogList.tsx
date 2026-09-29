@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { CheckCircle2, Pin, PinOff } from 'lucide-react';
 import { VisuallyHidden } from '@ariakit/react';
+import { TooltipAnchor } from '@librechat/client';
 import type { TModelSpec } from 'librechat-data-provider';
 import type { Endpoint } from '~/common';
 import { useFavorites, useLocalize } from '~/hooks';
@@ -85,9 +86,14 @@ function CatalogRow({
       <div className="min-w-0 flex-1 text-left">
         <div className="truncate text-sm font-medium text-text-primary">{entry.name}</div>
         {entry.description && (
-          <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-text-secondary">
-            {entry.description}
-          </div>
+          <TooltipAnchor
+            description={entry.description}
+            render={
+              <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-text-secondary">
+                {entry.description}
+              </div>
+            }
+          />
         )}
       </div>
       <button
