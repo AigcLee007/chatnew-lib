@@ -2261,14 +2261,14 @@ const sharedOpenAIModels = [
 ];
 
 const sharedAnthropicModels = [
-  'claude-fable-5-1-high',
-  'claude-fable-5-1',
-  'claude-fable-5',
   'claude-opus-5.5-high',
+  'claude-fable-5-1-high',
   'claude-opus-5-5',
+  'claude-fable-5-1',
   'claude-opus-5',
-  'claude-opus-4-7',
   'claude-sonnet-5',
+  'claude-fable-5',
+  'claude-opus-4-7',
   'claude-sonnet-4-6',
   'claude-opus-4-6',
   'claude-sonnet-4-5',

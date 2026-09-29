@@ -33,30 +33,38 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '擅长复杂分析与长文档理解，适合需要深入推理的任务。',
     group: 'GEMINI',
   },
-  'gpt-5.6-sol': {
-    name: 'GPT-5.6 Sol',
-    description: '旗舰级推理与编程能力，适合高要求的技术工作。',
-    group: 'OPENAI',
-  },
-  'gpt-5.6-terra': {
-    name: 'GPT-5.6 Terra',
-    description: '兼顾质量与效率，适合内容生产和业务分析。',
+  'gpt-6-astra': {
+    name: 'GPT-6 Astra',
+    description:
+      'GPT最新绝对旗舰，适用于科学前沿计算、复杂逆向工程/全栈架构改造、自主桌面工作流执行、深度跨领域学术研究、严苛法规业务分析，按Tokens计费。',
     group: 'OPENAI',
   },
   'gpt-6-sol': {
     name: 'GPT-6 Sol',
-    description: '旗舰级推理与编程能力，适合高要求的技术工作。',
+    description:
+      'GPT第六代主力生产力模型，适用于日常主力代码生成与重构、PR 审查、Devin/Codex 类自动化 Agent、复杂流程编排、多步骤数据分析管道，按Tokens计费。',
     group: 'OPENAI',
   },
   'gpt-6-luna': {
     name: 'GPT-6 Luna',
-    description: '兼顾质量与效率，适合内容生产和业务分析。',
+    description: '极致成本效益与高并发吞吐。特价按次：0.2/次。',
     group: 'OPENAI',
   },
-  'gpt-6-astra': {
-    name: 'GPT-6 Astra',
-    description: '旗舰级推理与编程能力，适合高要求的技术工作。',
+  'gpt-5.6-sol': {
+    name: 'GPT-5.6 Sol',
+    description: 'GPT第五代主力生产力模型，特价按次：0.3/次。',
     group: 'OPENAI',
+  },
+  'gpt-5.6-terra': {
+    name: 'GPT-5.6 Terra',
+    description: '特价按次：0.2/次。',
+    group: 'OPENAI',
+  },
+  'grok-4.7': {
+    name: 'Grok 4.7',
+    description:
+      '旗舰主力。在复杂工程重构、跨文件代码排错、数学逻辑推导与自检（Self-Verification）上表现突出，擅长长时间执行任务，按次计费：0.25/次。',
+    group: 'GROK',
   },
   'grok-4.6': {
     name: 'Grok 4.6',
@@ -68,34 +76,39 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
     description: '适合日常推理、写作与灵活的对话任务。',
     group: 'GROK',
   },
+  'claude-opus-5.5-high': {
+    name: 'Claude Opus 5.5 High',
+    description:
+      'Anthropic Opus 系列最新旗舰，面向复杂推理、软件工程与长时程智能体任务，思考模式默认开启，按Tokens计费。',
+    group: 'ANTHROPIC',
+  },
   'claude-fable-5-1-high': {
     name: 'Claude Fable 5.1 High',
-    description: '擅长细致分析、长文本处理与复杂推理。',
+    description:
+      '最强的Mythos 级模型。在更长、更复杂的任务上超越 Opus 系列，可持续自主工作的时间创 Claude 纪录，软件工程、科研与视觉表现卓越，按Tokens计费。',
     group: 'ANTHROPIC',
   },
   'claude-opus-5-5': {
     name: 'Claude Opus 5.5',
-    description: '擅长细致分析、长文本处理与复杂推理。',
-    group: 'ANTHROPIC',
-  },
-  'claude-opus-5.5-high': {
-    name: 'Claude Opus 5.5 High',
-    description: '擅长细致分析、长文本处理与复杂推理。',
-    group: 'ANTHROPIC',
-  },
-  'claude-opus-5': {
-    name: 'Claude Opus 5',
-    description: '擅长细致分析、长文本处理与复杂推理。',
-    group: 'ANTHROPIC',
-  },
-  'claude-sonnet-5': {
-    name: 'Claude Sonnet 5',
-    description: '平衡写作、分析与编程能力，适合日常专业工作。',
+    description:
+      '价低线路的claude-opus-5.5，如果报错请切换claude-opus-5.5-high，按Tokens计费。',
     group: 'ANTHROPIC',
   },
   'claude-fable-5-1': {
     name: 'Claude Fable 5.1',
-    description: '擅长细致分析、长文本处理与复杂推理。',
+    description:
+      '价低线路的claude-fable-5-1，如果报错请切换claude-fable-5-1-high，按Tokens计费。',
+    group: 'ANTHROPIC',
+  },
+  'claude-opus-5': {
+    name: 'Claude Opus 5',
+    description: 'Anthropic Opus 系列上一代旗舰，按次计费0.4/次。',
+    group: 'ANTHROPIC',
+  },
+  'claude-sonnet-5': {
+    name: 'Claude Sonnet 5',
+    description:
+      '迄今最具智能体能力的 Sonnet。能制定计划、驱动浏览器与终端等工具并自主完成多步任务，性价比高，按次计费0.28/次。',
     group: 'ANTHROPIC',
   },
 };
@@ -151,13 +164,39 @@ function localizeDescription(description: string, localize?: CatalogLocalize) {
 const DESCRIPTION_TRANSLATIONS: Record<string, { zh: string }> = {
   com_model_desc_gemini_flash: { zh: '响应快速、延迟低，适合日常对话与内容生成。' },
   com_model_desc_gemini_pro: { zh: '擅长复杂分析与长文档理解，适合需要深入推理的任务。' },
+  com_model_desc_openai_astra: {
+    zh: 'GPT最新绝对旗舰，适用于科学前沿计算、复杂逆向工程/全栈架构改造、自主桌面工作流执行、深度跨领域学术研究、严苛法规业务分析，按Tokens计费。',
+  },
+  com_model_desc_openai_6_sol: {
+    zh: 'GPT第六代主力生产力模型，适用于日常主力代码生成与重构、PR 审查、Devin/Codex 类自动化 Agent、复杂流程编排、多步骤数据分析管道，按Tokens计费。',
+  },
+  com_model_desc_openai_6_luna: { zh: '极致成本效益与高并发吞吐。特价按次：0.2/次。' },
+  com_model_desc_openai_56_sol: { zh: 'GPT第五代主力生产力模型，特价按次：0.3/次。' },
+  com_model_desc_openai_56_terra: { zh: '特价按次：0.2/次。' },
   com_model_desc_openai_sol: { zh: '旗舰级推理与编程能力，适合高要求的技术工作。' },
   com_model_desc_openai_terra: { zh: '兼顾质量与效率，适合内容生产和业务分析。' },
   com_model_desc_openai_55: { zh: '具备强大的推理、写作与编程能力，适合复杂任务。' },
+  com_model_desc_grok_47: {
+    zh: '旗舰主力。在复杂工程重构、跨文件代码排错、数学逻辑推导与自检（Self-Verification）上表现突出，擅长长时间执行任务，按次计费：0.25/次。',
+  },
   com_model_desc_grok_46: { zh: '适合分析、日常对话和通用任务处理。' },
   com_model_desc_grok_45: { zh: '适合日常推理、写作与灵活的对话任务。' },
-  com_model_desc_claude_opus: { zh: '擅长细致分析、长文本处理与复杂推理。' },
-  com_model_desc_claude_sonnet: { zh: '平衡写作、分析与编程能力，适合日常专业工作。' },
+  com_model_desc_claude_opus_55_high: {
+    zh: 'Anthropic Opus 系列最新旗舰，面向复杂推理、软件工程与长时程智能体任务，思考模式默认开启，按Tokens计费。',
+  },
+  com_model_desc_claude_fable_51_high: {
+    zh: '最强的Mythos 级模型。在更长、更复杂的任务上超越 Opus 系列，可持续自主工作的时间创 Claude 纪录，软件工程、科研与视觉表现卓越，按Tokens计费。',
+  },
+  com_model_desc_claude_opus_55: {
+    zh: '价低线路的claude-opus-5.5，如果报错请切换claude-opus-5.5-high，按Tokens计费。',
+  },
+  com_model_desc_claude_fable_51: {
+    zh: '价低线路的claude-fable-5-1，如果报错请切换claude-fable-5-1-high，按Tokens计费。',
+  },
+  com_model_desc_claude_opus_5: { zh: 'Anthropic Opus 系列上一代旗舰，按次计费0.4/次。' },
+  com_model_desc_claude_sonnet_5: {
+    zh: '迄今最具智能体能力的 Sonnet。能制定计划、驱动浏览器与终端等工具并自主完成多步任务，性价比高，按次计费0.28/次。',
+  },
 };
 
 export function modelDisplayInfo(
