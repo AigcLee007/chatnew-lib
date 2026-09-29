@@ -55,6 +55,19 @@ describe('i18next translation tests', () => {
     expect(missingKeys).toEqual([]);
   });
 
+  it('should keep context usage labels in simplified Chinese', () => {
+    expect(SimplifiedChinese.com_ui_context_unknown).toBe('上下文大小未知');
+    expect(SimplifiedChinese.com_ui_context_usage).toBe('上下文使用量');
+    expect(SimplifiedChinese.com_ui_context_usage_label).toBe(
+      '上下文窗口：已使用 {{0}} / {{1}} 个 Token（{{2}}%）',
+    );
+    expect(SimplifiedChinese.com_ui_context_usage_snapshot).toBe(
+      '上下文 {{0}} / {{1}}（{{2}}%）',
+    );
+    expect(SimplifiedChinese.com_ui_context_subagents).toBe('子智能体');
+    expect(SimplifiedChinese.com_ui_context_totals).toBe('总计');
+  });
+
   it('should fallback to English for an invalid language code', async () => {
     // When an invalid language is provided, i18next should fallback to English
     await changeLanguageSafely('invalid-code');
