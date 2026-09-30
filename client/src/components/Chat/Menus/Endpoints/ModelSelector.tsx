@@ -10,7 +10,7 @@ import { getSelectedIcon, getDisplayValue } from './utils';
 import { modelDisplayInfo } from './catalog';
 import ProviderIcon from './components/ProviderIcon';
 import { CustomMenu as Menu } from './CustomMenu';
-import CatalogList from './components/CatalogList';
+import ProviderCatalogList from './components/ProviderCatalogList';
 import { VIRTUALIZE_THRESHOLD } from './components/EndpointModelItem';
 import { useLocalize } from '~/hooks';
 import { buildModelCatalog } from './catalog';
@@ -147,7 +147,7 @@ function ModelSelectorContent() {
         finalFocus={modelTriggerRef}
         trigger={trigger}
       >
-        <CatalogList
+        <ProviderCatalogList
           endpoints={regularEndpoints}
           modelSpecs={catalogSpecs}
           hasSupplementaryResults={!!supplementarySearchResults?.length}

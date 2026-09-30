@@ -2417,6 +2417,7 @@
   "com_model_desc_gemini_flash": "Fast responses with low latency for everyday conversations.",
   "com_model_desc_gemini_pro": "Stronger reasoning for complex analysis and long documents.",
   "com_model_desc_openai_astra": "GPT's latest absolute flagship for frontier scientific computing, complex reverse engineering and full-stack architecture work, autonomous desktop workflows, deep cross-disciplinary research, and rigorous regulatory analysis. Billed by tokens.",
+  "com_model_desc_openai_61_sol": "GPT's newest flagship production agent model, approaching Astra performance for reliable everyday agent work. Billed by tokens.",
   "com_model_desc_openai_6_sol": "GPT's sixth-generation productivity workhorse for everyday code generation and refactoring, PR reviews, Devin/Codex-style automation agents, complex workflow orchestration, and multi-step data analysis pipelines. Billed by tokens.",
   "com_model_desc_openai_6_luna": "Extreme cost efficiency and high-throughput concurrency. Special per-request price: 0.2/request.",
   "com_model_desc_openai_56_sol": "GPT's fifth-generation productivity workhorse. Special per-request price: 0.3/request.",

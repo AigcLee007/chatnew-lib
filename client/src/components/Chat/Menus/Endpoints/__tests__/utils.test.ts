@@ -81,16 +81,10 @@ describe('model selector utilities', () => {
       label: 'Google',
       hasModels: true,
       icon: null,
-      models: [
-        { name: 'gemini-3.8-flash' },
-        { name: 'custom-model' },
-      ],
+      models: [{ name: 'gemini-3.8-flash' }, { name: 'custom-model' }],
     };
     const entries = buildModelCatalog([endpoint], [], localizeZh);
-    expect(entries.map((entry) => entry.model)).toEqual([
-      'gemini-3.8-flash',
-      'custom-model',
-    ]);
+    expect(entries.map((entry) => entry.model)).toEqual(['gemini-3.8-flash', 'custom-model']);
     expect(entries[0]).toMatchObject({
       group: 'GEMINI',
       model: 'gemini-3.8-flash',
@@ -137,7 +131,7 @@ describe('model selector utilities', () => {
       'gpt-6-astra',
       'GPT-6 Astra',
       'OPENAI',
-      '旗舰级推理与编程能力，适合高要求的技术工作。',
+      'GPT最新绝对旗舰，适用于科学前沿计算、复杂逆向工程/全栈架构改造、自主桌面工作流执行、深度跨领域学术研究、严苛法规业务分析，按Tokens计费。',
     ],
     [
       'anthropic',
@@ -145,7 +139,15 @@ describe('model selector utilities', () => {
       'claude-fable-5-1',
       'Claude Fable 5.1',
       'ANTHROPIC',
-      '擅长细致分析、长文本处理与复杂推理。',
+      '价低线路的claude-fable-5-1，如果报错请切换claude-fable-5-1-high，按Tokens计费。',
+    ],
+    [
+      'openAI',
+      'OpenAI',
+      'gpt-6.1-sol',
+      'GPT-6.1 Sol',
+      'OPENAI',
+      'GPT最新旗舰模型，接近 Astra 表现的生产级 Agent 默认模型，按Tokens计费。',
     ],
     [
       'openAI',
@@ -153,7 +155,7 @@ describe('model selector utilities', () => {
       'gpt-6-sol',
       'GPT-6 Sol',
       'OPENAI',
-      '旗舰级推理与编程能力，适合高要求的技术工作。',
+      'GPT第六代主力生产力模型，适用于日常主力代码生成与重构、PR 审查、Devin/Codex 类自动化 Agent、复杂流程编排、多步骤数据分析管道，按Tokens计费。',
     ],
     [
       'openAI',
@@ -161,7 +163,7 @@ describe('model selector utilities', () => {
       'gpt-6-luna',
       'GPT-6 Luna',
       'OPENAI',
-      '兼顾质量与效率，适合内容生产和业务分析。',
+      '极致成本效益与高并发吞吐。特价按次：0.2/次。',
     ],
     [
       'anthropic',
@@ -169,7 +171,7 @@ describe('model selector utilities', () => {
       'claude-opus-5-5',
       'Claude Opus 5.5',
       'ANTHROPIC',
-      '擅长细致分析、长文本处理与复杂推理。',
+      '价低线路的claude-opus-5.5，如果报错请切换claude-opus-5.5-high，按Tokens计费。',
     ],
   ])(
     'uses a readable label for %s model %s',

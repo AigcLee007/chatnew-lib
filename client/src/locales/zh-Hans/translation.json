@@ -2396,6 +2396,7 @@
   "com_model_desc_gemini_flash": "响应快速、延迟低，适合日常对话与内容生成。",
   "com_model_desc_gemini_pro": "擅长复杂分析与长文档理解，适合需要深入推理的任务。",
   "com_model_desc_openai_astra": "GPT最新绝对旗舰，适用于科学前沿计算、复杂逆向工程/全栈架构改造、自主桌面工作流执行、深度跨领域学术研究、严苛法规业务分析，按Tokens计费。",
+  "com_model_desc_openai_61_sol": "GPT最新旗舰模型，接近 Astra 表现的生产级 Agent 默认模型，按Tokens计费。",
   "com_model_desc_openai_6_sol": "GPT第六代主力生产力模型，适用于日常主力代码生成与重构、PR 审查、Devin/Codex 类自动化 Agent、复杂流程编排、多步骤数据分析管道，按Tokens计费。",
   "com_model_desc_openai_6_luna": "极致成本效益与高并发吞吐。特价按次：0.2/次。",
   "com_model_desc_openai_56_sol": "GPT第五代主力生产力模型，特价按次：0.3/次。",

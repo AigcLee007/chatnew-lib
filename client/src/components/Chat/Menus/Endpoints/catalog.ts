@@ -39,6 +39,11 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
       'GPT最新绝对旗舰，适用于科学前沿计算、复杂逆向工程/全栈架构改造、自主桌面工作流执行、深度跨领域学术研究、严苛法规业务分析，按Tokens计费。',
     group: 'OPENAI',
   },
+  'gpt-6.1-sol': {
+    name: 'GPT-6.1 Sol',
+    description: 'GPT最新旗舰模型，接近 Astra 表现的生产级 Agent 默认模型，按Tokens计费。',
+    group: 'OPENAI',
+  },
   'gpt-6-sol': {
     name: 'GPT-6 Sol',
     description:
@@ -90,14 +95,12 @@ const MODEL_INFO: Record<string, { name: string; description: string; group: Cat
   },
   'claude-opus-5-5': {
     name: 'Claude Opus 5.5',
-    description:
-      '价低线路的claude-opus-5.5，如果报错请切换claude-opus-5.5-high，按Tokens计费。',
+    description: '价低线路的claude-opus-5.5，如果报错请切换claude-opus-5.5-high，按Tokens计费。',
     group: 'ANTHROPIC',
   },
   'claude-fable-5-1': {
     name: 'Claude Fable 5.1',
-    description:
-      '价低线路的claude-fable-5-1，如果报错请切换claude-fable-5-1-high，按Tokens计费。',
+    description: '价低线路的claude-fable-5-1，如果报错请切换claude-fable-5-1-high，按Tokens计费。',
     group: 'ANTHROPIC',
   },
   'claude-opus-5': {
@@ -169,6 +172,9 @@ const DESCRIPTION_TRANSLATIONS: Record<string, { zh: string }> = {
   },
   com_model_desc_openai_6_sol: {
     zh: 'GPT第六代主力生产力模型，适用于日常主力代码生成与重构、PR 审查、Devin/Codex 类自动化 Agent、复杂流程编排、多步骤数据分析管道，按Tokens计费。',
+  },
+  com_model_desc_openai_61_sol: {
+    zh: 'GPT最新旗舰模型，接近 Astra 表现的生产级 Agent 默认模型，按Tokens计费。',
   },
   com_model_desc_openai_6_luna: { zh: '极致成本效益与高并发吞吐。特价按次：0.2/次。' },
   com_model_desc_openai_56_sol: { zh: 'GPT第五代主力生产力模型，特价按次：0.3/次。' },

@@ -11,6 +11,7 @@ import {
   buildModelCatalog,
   filterModelCatalog,
   groupModelCatalog,
+  type CatalogGroup,
   type CatalogEntry,
 } from '../catalog';
 import { CustomMenuItem as MenuItem } from '../CustomMenu';
@@ -21,6 +22,8 @@ type CatalogListProps = {
   endpoints: Endpoint[];
   modelSpecs: TModelSpec[];
   hasSupplementaryResults?: boolean;
+  group?: CatalogGroup;
+  hideGroupHeading?: boolean;
 };
 
 function CatalogRow({
@@ -126,6 +129,8 @@ export default function CatalogList({
   endpoints,
   modelSpecs,
   hasSupplementaryResults = false,
+  group,
+  hideGroupHeading = false,
 }: CatalogListProps) {
   const localize = useLocalize();
   const favorites = useFavorites();
@@ -135,7 +140,14 @@ export default function CatalogList({
     [endpoints, modelSpecs, localize],
   );
   const filtered = useMemo(() => filterModelCatalog(entries, searchValue), [entries, searchValue]);
-  const groups = useMemo(() => groupModelCatalog(filtered), [filtered]);
+  const groups = useMemo(() => {
+    const grouped = groupModelCatalog(filtered);
+    if (!group) {
+      return grouped;
+    }
+    const entries = grouped.get(group);
+    return entries ? new Map([[group, entries]]) : new Map();
+  }, [filtered, group]);
 
   if (groups.size === 0 && !hasSupplementaryResults) {
     return (
@@ -153,9 +165,11 @@ export default function CatalogList({
     <div className="space-y-2 p-1">
       {Array.from(groups.entries()).map(([group, groupEntries]) => (
         <section key={group} aria-label={group}>
-          <h2 className="px-2 py-1 text-[10px] font-semibold tracking-[0.18em] text-text-secondary">
-            {group}
-          </h2>
+          {!hideGroupHeading && (
+            <h2 className="px-2 py-1 text-[10px] font-semibold tracking-[0.18em] text-text-secondary">
+              {group}
+            </h2>
+          )}
           <div className="space-y-0.5">
             {groupEntries.map((entry) => (
               <CatalogRow key={entry.key} entry={entry} favorites={favorites} />

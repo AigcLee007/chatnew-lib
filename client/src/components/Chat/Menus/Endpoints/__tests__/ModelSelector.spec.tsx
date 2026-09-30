@@ -117,27 +117,29 @@ describe('model catalog menu', () => {
     jest.clearAllMocks();
   });
 
-  it('shows models directly with descriptions and no API-key settings', async () => {
+  it('shows provider rows first with no API-key settings', async () => {
     await openSelector();
-    expect(await screen.findByText('Gemini 3.5 Flash')).toBeVisible();
-    expect(screen.getByText('GPT-5.6 Sol')).toBeVisible();
+    expect(await screen.findByRole('option', { name: /Gemini 1/i })).toBeVisible();
+    expect(screen.getByRole('option', { name: /OpenAI 2/i })).toBeVisible();
     expect(screen.queryByRole('button', { name: /key/i })).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search 5 models...')).toBeInTheDocument();
-    expect(screen.getByText(/low latency/i)).toBeVisible();
+    expect(screen.getByPlaceholderText('Search 4 models...')).toBeInTheDocument();
   });
 
   it('filters by description, hides empty groups, and selects the original ID', async () => {
     const user = await openSelector();
-    await user.type(screen.getByRole('combobox'), 'latency');
-    const option = await screen.findByText('Gemini 3.5 Flash');
-    expect(screen.queryByText('GPT-5.6 Sol')).not.toBeInTheDocument();
+    await user.type(screen.getByRole('combobox'), 'reasoning');
+    const provider = await screen.findByRole('option', { name: /Gemini 1/i });
+    expect(screen.queryByRole('option', { name: /OpenAI 2/i })).not.toBeInTheDocument();
+    await user.click(provider);
+    const option = await screen.findByText('Gemini 3.1 Pro');
     await user.click(option);
-    expect(mockSelectModel).toHaveBeenCalledWith(mockEndpoints[0], 'gemini-3.5-flash-preview');
+    expect(mockSelectModel).toHaveBeenCalledWith(mockEndpoints[0], 'gemini-3.1-pro-preview');
     await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument());
   });
 
   it('preserves unknown models and pinning does not select a model or close the menu', async () => {
     const user = await openSelector();
+    await user.click(screen.getByRole('option', { name: /OpenAI 2/i }));
     const option = await screen.findByText('future-model');
     await user.click(
       within(option.parentElement?.parentElement as HTMLElement).getByRole('button', {
@@ -163,5 +165,19 @@ describe('model catalog menu', () => {
     await user.type(screen.getByRole('combobox'), 'assistant');
     expect(await screen.findByText('Research Assistant')).toBeVisible();
     expect(screen.queryByText('Gemini 3.5 Flash')).not.toBeInTheDocument();
+  });
+
+  it('opens a provider first and then selects a model without changing its endpoint identity', async () => {
+    const user = await openSelector();
+
+    expect(screen.getByRole('option', { name: /OpenAI 2/i })).toBeVisible();
+    expect(screen.queryByText('GPT-5.6 Sol')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('option', { name: /OpenAI 2/i }));
+    expect(await screen.findByText('GPT-5.6 Sol')).toBeVisible();
+    expect(screen.getByText(/productivity workhorse/i)).toBeVisible();
+
+    await user.click(screen.getByText('GPT-5.6 Sol'));
+    expect(mockSelectModel).toHaveBeenCalledWith(mockEndpoints[1], 'gpt-5.6-sol');
   });
 });

@@ -676,8 +676,10 @@ describe('shared default models', () => {
 
   it('keeps the requested model catalog in shared defaults', () => {
     expect(defaultModels[EModelEndpoint.openAI]).toEqual(
-      expect.arrayContaining(['gpt-6-sol', 'gpt-6-luna']),
+      expect.arrayContaining(['gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna']),
     );
+    const openAIModels = defaultModels[EModelEndpoint.openAI];
+    expect(openAIModels.indexOf('gpt-6.1-sol')).toBe(openAIModels.indexOf('gpt-6-astra') + 1);
     expect(defaultModels[EModelEndpoint.anthropic]).toContain('claude-opus-5-5');
     expect(defaultModels[EModelEndpoint.google]).not.toContain('gemini-3.5-flash');
   });
