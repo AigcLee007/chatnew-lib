@@ -62,6 +62,17 @@ describe('Claude Fable 5.1 token maps', () => {
   });
 });
 
+describe('Gemini 4 Argon', () => {
+  it.each([EModelEndpoint.google, EModelEndpoint.agents, EModelEndpoint.custom])(
+    'uses the documented context window for %s and model aliases',
+    (endpoint) => {
+      for (const model of ['gemini-4-argon', 'models/gemini-4-argon', 'google/gemini-4-argon']) {
+        expect(getModelMaxTokens(model, endpoint)).toBe(1048576);
+      }
+    },
+  );
+});
+
 describe('Gemini 3.7 Flash', () => {
   it('resolves the 1,048,576-token context window', () => {
     expect(getModelMaxTokens('gemini-3.7-flash', EModelEndpoint.google)).toBe(1048576);

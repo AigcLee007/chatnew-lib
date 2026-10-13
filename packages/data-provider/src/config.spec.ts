@@ -669,6 +669,10 @@ describe('webSearchSchema', () => {
 });
 
 describe('shared default models', () => {
+  it('exposes Gemini 4 Argon through the Google default model list', () => {
+    expect(defaultModels[EModelEndpoint.google]).toContain('gemini-4-argon');
+  });
+
   it('includes the newly supported OpenAI and Anthropic models', () => {
     expect(defaultModels[EModelEndpoint.openAI]).toContain('gpt-6-astra');
     expect(defaultModels[EModelEndpoint.anthropic]).toContain('claude-fable-5-1');
