@@ -19,6 +19,26 @@ It must print `https://github.com/AigcLee007/chatnew-lib.git`. The production Co
 the `api` and `client` services locally from `Dockerfile.multi`; it does not use the upstream
 LibreChat API image.
 
+### Existing host Nginx
+
+If host Nginx already listens on ports 80/443, configure alternate loopback
+bindings in the server's `.env` before following the production update commands:
+
+```dotenv
+LIBRECHAT_CLIENT_HTTP_BIND=127.0.0.1:18080
+LIBRECHAT_CLIENT_HTTPS_BIND=127.0.0.1:18443
+```
+
+Choose unused host ports. These bindings keep the existing host Nginx in place
+and avoid editing the tracked Compose file. Without these settings, the client
+still publishes ports 80/443. The HTTPS binding does not enable TLS by itself;
+TLS remains controlled by the Nginx configuration.
+
+The API image includes the built frontend and serves it on port 3080. Existing
+host Nginx sites proxying LibreChat to `http://127.0.0.1:3080` can keep that
+upstream. If a site uses the bundled client proxy, its HTTP upstream is
+`http://127.0.0.1:18080` with the example settings above.
+
 ## Provider routing
 
 | UI group | LibreChat endpoint | Gateway request shape |
