@@ -30,11 +30,17 @@ LibreChat API image.
 
 The BaseURL is fixed by the administrator. Users can provide API keys through the LibreChat Web UI, but cannot replace the gateway address.
 
+`gemini-4-argon-high` appears first in the Gemini group as **Gemini 4 Argon High**,
+with the Chinese note **谷歌官方 Key 线路，稳定，价格较高。** It uses the existing
+native Google route and passes the model ID unchanged to the AITTCO gateway.
+Its context limit inherits the configured Argon family limit.
+
 `gemini-4-argon` appears as **Gemini 4 Argon** in the Gemini group and uses the
 existing native Google route. Its configured context window is 1,048,576 tokens,
 as documented in the [official model reference](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon).
-When updating an existing installation, add `gemini-4-argon` to its `.env`
-`GOOGLE_MODELS` list: this environment allowlist overrides the shared defaults,
+When updating an existing installation, put `gemini-4-argon-high` first in its
+`.env` `GOOGLE_MODELS` list and retain `gemini-4-argon` after it. This environment
+allowlist overrides the shared defaults,
 and pulling code does not update an existing `.env`. Restart the API after
 changing the list, and verify that the user's AITTCO key can access the model.
 

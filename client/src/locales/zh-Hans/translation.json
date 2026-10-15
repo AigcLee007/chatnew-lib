@@ -2393,6 +2393,7 @@
   "com_insights_invalid_date_range": "请选择结束日期，且应晚于开始日期并在 {{days}} 天内。",
   "com_insights_sparkline_accessibility": "{{label}} 随时间变化",
   "com_ui_search_models_count": "搜索 {{0}} 个模型...",
+  "com_model_desc_gemini_argon_high": "谷歌官方 Key 线路，稳定，价格较高。",
   "com_model_desc_gemini_flash": "响应快速、延迟低，适合日常对话与内容生成。",
   "com_model_desc_gemini_pro": "擅长复杂分析与长文档理解，适合需要深入推理的任务。",
   "com_model_desc_openai_astra": "GPT最新绝对旗舰，适用于科学前沿计算、复杂逆向工程/全栈架构改造、自主桌面工作流执行、深度跨领域学术研究、严苛法规业务分析，按Tokens计费。",

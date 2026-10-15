@@ -23,6 +23,11 @@ export type CatalogEntry = {
 };
 
 const MODEL_INFO: Record<string, { name: string; description: string; group: CatalogGroup }> = {
+  'gemini-4-argon-high': {
+    name: 'Gemini 4 Argon High',
+    description: '谷歌官方 Key 线路，稳定，价格较高。',
+    group: 'GEMINI',
+  },
   'gemini-4-argon': {
     name: 'Gemini 4 Argon',
     description: '擅长复杂分析与长文档理解，适合需要深入推理的任务。',
@@ -170,6 +175,7 @@ function localizeDescription(description: string, localize?: CatalogLocalize) {
 }
 
 const DESCRIPTION_TRANSLATIONS: Record<string, { zh: string }> = {
+  com_model_desc_gemini_argon_high: { zh: '谷歌官方 Key 线路，稳定，价格较高。' },
   com_model_desc_gemini_flash: { zh: '响应快速、延迟低，适合日常对话与内容生成。' },
   com_model_desc_gemini_pro: { zh: '擅长复杂分析与长文档理解，适合需要深入推理的任务。' },
   com_model_desc_openai_astra: {
