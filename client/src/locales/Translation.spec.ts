@@ -68,6 +68,35 @@ describe('i18next translation tests', () => {
     expect(SimplifiedChinese.com_ui_context_totals).toBe('总计');
   });
 
+  it('should translate context compaction into simplified Chinese', () => {
+    expect(SimplifiedChinese.com_ui_context_compact).toBe('压缩上下文');
+    expect(SimplifiedChinese.com_ui_context_compacting).toBe('正在压缩上下文…');
+    expect(SimplifiedChinese.com_ui_context_compact_info).toBe(
+      '总结此对话分支，以便在更小的上下文中继续对话。',
+    );
+    expect(SimplifiedChinese.com_error_compaction_budget).toBe(
+      '系统指令占用的上下文窗口过长，无法总结此对话。',
+    );
+    expect(SimplifiedChinese.com_error_compaction_disabled).toBe('此部署已禁用上下文压缩。');
+    expect(SimplifiedChinese.com_error_compaction_failed).toBe(
+      '无法总结此对话。你的历史记录未发生变化，可以重试。',
+    );
+    expect(SimplifiedChinese.com_error_compaction_nothing).toBe('没有新的对话内容可供总结。');
+  });
+
+  it('should translate the context compaction reminder into simplified Chinese', () => {
+    expect(SimplifiedChinese.com_ui_context_compact_reminder).toBe(
+      '上下文窗口使用量已超过 80%，可以压缩上下文以便继续对话。',
+    );
+    expect(SimplifiedChinese.com_ui_context_compact_reminder_dismiss).toBe('关闭上下文压缩提醒');
+    expect(English.com_ui_context_compact_reminder).toBe(
+      'Context window is over 80%. Compact it to make room for more conversation.',
+    );
+    expect(English.com_ui_context_compact_reminder_dismiss).toBe(
+      'Dismiss context compaction reminder',
+    );
+  });
+
   it('should fallback to English for an invalid language code', async () => {
     // When an invalid language is provided, i18next should fallback to English
     await changeLanguageSafely('invalid-code');

@@ -1,6 +1,7 @@
-import { memo, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
-import { TooltipAnchor } from '@librechat/client';
+import { ScrollText, XIcon } from 'lucide-react';
+import { Button, TooltipAnchor } from '@librechat/client';
 import { Constants } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import type { CurrencyConfig } from '~/utils';
@@ -39,7 +40,20 @@ function TokenUsageIndicator({
   const popover = Ariakit.usePopoverStore({ placement: 'top' });
   const popoverOpen = Ariakit.useStoreState(popover, 'open');
   const disclosureRef = useRef<HTMLButtonElement>(null);
+  const [isReminderDismissed, setIsReminderDismissed] = useState(false);
   const conversationId = conversation?.conversationId ?? '';
+  const hasConversation =
+    conversationId !== '' &&
+    conversationId !== Constants.NEW_CONVO &&
+    conversationId !== Constants.PENDING_CONVO;
+  const previousConversationId = useRef(conversationId);
+  useEffect(() => {
+    if (previousConversationId.current !== conversationId || view.percent <= 80) {
+      setIsReminderDismissed(false);
+    }
+    previousConversationId.current = conversationId;
+  }, [conversationId, view.percent]);
+
   const canResolveLangfuseSession =
     langfuseConnectionAccess &&
     popoverOpen &&
@@ -59,6 +73,16 @@ function TokenUsageIndicator({
   }
 
   const hasMax = view.maxTokens != null && view.maxTokens > 0;
+  const showCompactionReminder =
+    hasMax &&
+    view.percent > 80 &&
+    hasConversation &&
+    compactionEnabled &&
+    supportsCompaction(conversation?.endpoint) &&
+    compaction.canCompact &&
+    !compaction.isCompacting &&
+    !isSubmitting &&
+    !isReminderDismissed;
   const ariaLabel = hasMax
     ? localize('com_ui_context_usage_label', {
         0: formatTokens(view.usedTokens),
@@ -81,6 +105,41 @@ function TokenUsageIndicator({
 
   return (
     <>
+      {showCompactionReminder && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={cn(
+            'absolute inset-x-0 bottom-full z-20 mb-2 flex items-center gap-3 rounded-md border',
+            'border-status-warning bg-surface-secondary p-2.5 text-text-primary shadow-sm',
+            'context-compaction-reminder-breathe motion-reduce:animate-none',
+          )}
+        >
+          <p className="min-w-0 flex-1 text-sm text-text-secondary">
+            {localize('com_ui_context_compact_reminder')}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={compaction.compact}
+            className="h-8 shrink-0 gap-2 px-3 text-sm"
+          >
+            <ScrollText className="size-4" aria-hidden="true" />
+            {localize('com_ui_context_compact')}
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label={localize('com_ui_context_compact_reminder_dismiss')}
+            onClick={() => setIsReminderDismissed(true)}
+            className="size-8 shrink-0"
+          >
+            <XIcon className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
       <TooltipAnchor
         description={snapshot}
         side="top"

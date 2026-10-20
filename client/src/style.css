@@ -2418,6 +2418,24 @@ html[data-input-modality='keyboard']
   animation: gradient-x 15s ease infinite;
 }
 
+/* A softer opacity range keeps this persistent reminder calmer than pulse. */
+@keyframes context-compaction-reminder-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.84;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .context-compaction-reminder-breathe {
+    animation: context-compaction-reminder-breathe 3s ease-in-out infinite;
+  }
+}
+
 .animate-pulse-slow {
   animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

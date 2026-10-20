@@ -1068,6 +1068,8 @@
   "com_ui_context_compact": "Compact context",
   "com_ui_context_compacting": "Compacting context...",
   "com_ui_context_compact_info": "Summarize this conversation branch so you can continue with a smaller context.",
+  "com_ui_context_compact_reminder": "Context window is over 80%. Compact it to make room for more conversation.",
+  "com_ui_context_compact_reminder_dismiss": "Dismiss context compaction reminder",
   "com_ui_context_usage_label": "Context window: {{0}} of {{1}} tokens used ({{2}}%)",
   "com_ui_context_usage_label_unknown": "Context usage: {{0}} tokens used",
   "com_ui_context_usage_snapshot": "Context {{0}} / {{1}} ({{2}}%)",
