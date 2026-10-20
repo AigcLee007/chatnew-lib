@@ -1653,6 +1653,7 @@ export type StartupConfigContext = 'share';
 export type TStartupConfig = {
   appTitle: string;
   socialLogins?: string[];
+  compactionEnabled?: boolean;
   langfuseFanoutEnabled?: boolean;
   langfuseConnectionAccess?: boolean;
   insightsEnabled?: boolean;
@@ -2786,6 +2787,8 @@ export enum ErrorTypes {
    * Model refused to respond (content policy violation)
    */
   REFUSAL = 'refusal',
+  COMPACTION_SKIPPED = 'compaction_skipped',
+  COMPACTION_FAILED = 'compaction_failed',
   /**
    * SSE stream 404 — job completed, expired, or was deleted before the subscriber connected
    */

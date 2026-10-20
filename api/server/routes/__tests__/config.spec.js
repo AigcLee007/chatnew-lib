@@ -119,6 +119,20 @@ afterEach(() => {
 });
 
 describe('GET /api/config', () => {
+  it.each([
+    ['summarization defaults', undefined, true],
+    ['summarization enabled', { enabled: true }, true],
+    ['summarization disabled', { enabled: false }, false],
+  ])('advertises compaction capability when %s', async (_label, summarization, expected) => {
+    mockGetAppConfig.mockResolvedValue({ ...baseAppConfig, summarization });
+    const app = createApp(mockUser);
+
+    const response = await request(app).get('/api/config');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.compactionEnabled).toBe(expected);
+  });
+
   describe('unauthenticated (no req.user)', () => {
     it('should call getAppConfig with baseOnly when no tenant context', async () => {
       mockGetAppConfig.mockResolvedValue(baseAppConfig);

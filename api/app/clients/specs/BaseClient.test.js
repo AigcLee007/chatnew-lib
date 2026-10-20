@@ -542,6 +542,103 @@ describe('BaseClient', () => {
   });
 
   describe('sendMessage', () => {
+    test('compaction summarizes from the existing leaf without creating a user message', async () => {
+      const leaf = {
+        messageId: 'leaf-response',
+        parentMessageId: 'leaf-user',
+        conversationId: 'compaction-conversation',
+        sender: 'AI Assistant',
+        text: 'Existing answer',
+        isCreatedByUser: false,
+      };
+      TestClient = initializeFakeClient(apiKey, options, [
+        { ...leaf, role: 'assistant' },
+        {
+          messageId: 'leaf-user',
+          parentMessageId: 'prior-response',
+          conversationId: 'compaction-conversation',
+          sender: 'User',
+          text: 'Existing question',
+          isCreatedByUser: true,
+        },
+      ]);
+      TestClient.saveMessageToDatabase = jest.fn().mockResolvedValue({});
+
+      const response = await TestClient.sendMessage('', {
+        isCompaction: true,
+        conversationId: 'compaction-conversation',
+        parentMessageId: 'leaf-response',
+        responseMessageId: 'compaction-summary',
+      });
+
+      expect(TestClient.buildMessages.mock.calls[0][0]).toHaveLength(2);
+      expect(TestClient.buildMessages.mock.calls[0][1]).toBe('leaf-response');
+      expect(response.parentMessageId).toBe('leaf-response');
+      expect(TestClient.saveMessageToDatabase).toHaveBeenCalledTimes(1);
+      expect(TestClient.saveMessageToDatabase.mock.calls[0][0]).toMatchObject({
+        messageId: 'compaction-summary',
+        parentMessageId: 'leaf-response',
+      });
+    });
+
+    test('compaction rejects an anchor that is not the loaded branch leaf', async () => {
+      TestClient = initializeFakeClient(apiKey, options, [
+        {
+          messageId: 'other-leaf',
+          parentMessageId: 'parent',
+          text: 'Existing',
+          isCreatedByUser: false,
+        },
+      ]);
+
+      await expect(
+        TestClient.sendMessage('', {
+          isCompaction: true,
+          conversationId: 'compaction-conversation',
+          parentMessageId: 'missing-leaf',
+        }),
+      ).rejects.toMatchObject({ code: 'COMPACTION_ANCHOR_NOT_FOUND', statusCode: 404 });
+    });
+
+    test('compaction rejects an ancestor when the persisted conversation has a later child', async () => {
+      TestClient = initializeFakeClient(apiKey, options, [
+        { messageId: 'ancestor', parentMessageId: 'user', text: 'Earlier', isCreatedByUser: false },
+        { messageId: 'later-user', parentMessageId: 'ancestor', text: 'Later', isCreatedByUser: true },
+      ]);
+
+      await expect(
+        TestClient.sendMessage('', {
+          isCompaction: true,
+          conversationId: 'compaction-conversation',
+          parentMessageId: 'ancestor',
+        }),
+      ).rejects.toMatchObject({ code: 'COMPACTION_ANCHOR_NOT_LEAF', statusCode: 409 });
+    });
+
+    test('compaction rejects a leaf that is already a finished summary', async () => {
+      TestClient = initializeFakeClient(apiKey, options, [
+        {
+          messageId: 'summary-leaf',
+          parentMessageId: 'prior',
+          isCreatedByUser: false,
+          content: [
+            {
+              type: ContentTypes.SUMMARY,
+              content: [{ type: ContentTypes.TEXT, text: 'Existing checkpoint' }],
+            },
+          ],
+        },
+      ]);
+
+      await expect(
+        TestClient.sendMessage('', {
+          isCompaction: true,
+          conversationId: 'compaction-conversation',
+          parentMessageId: 'summary-leaf',
+        }),
+      ).rejects.toMatchObject({ code: 'NOTHING_TO_COMPACT', statusCode: 409 });
+    });
+
     test('passes a deterministic identity response and skips balance checks', async () => {
       TestClient.modelOptions = { model: 'gpt-6-astra' };
       TestClient.model = 'gpt-6-astra';

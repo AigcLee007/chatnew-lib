@@ -1,7 +1,8 @@
 import type { ParentMessage } from './messages';
 import type { TFile } from './types/files';
 import type { TMessage } from './types';
-import { buildTree } from './messages';
+import { buildTree, isCompactedLeaf } from './messages';
+import { ContentTypes } from './types/runs';
 
 const msg = (messageId: string, parentMessageId: string, over: Partial<TMessage> = {}): TMessage =>
   ({
@@ -194,5 +195,33 @@ describe('buildTree', () => {
       expect(buildTree({ messages, fileMap: fileMapA })).not.toBe(treeA);
       expect(buildTree({ messages })).toBe(bare);
     });
+  });
+});
+
+describe('isCompactedLeaf', () => {
+  const summary = (overrides: Record<string, unknown> = {}) => ({
+    type: ContentTypes.SUMMARY,
+    content: [{ type: ContentTypes.TEXT, text: 'checkpoint' }],
+    ...overrides,
+  });
+
+  it('recognizes a finished summary leaf', () => {
+    expect(isCompactedLeaf({ content: [summary()] } as TMessage)).toBe(true);
+  });
+
+  it.each([
+    ['a streaming summary', summary({ summarizing: true })],
+    ['a failed summary', summary({ failed: true })],
+    ['a summary without text', summary({ content: [] })],
+  ])('does not treat %s as compacted', (_label, part) => {
+    expect(isCompactedLeaf({ content: [part] } as TMessage)).toBe(false);
+  });
+
+  it('does not treat mixed assistant content as a compacted leaf', () => {
+    expect(
+      isCompactedLeaf({
+        content: [summary(), { type: ContentTypes.TEXT, text: 'more' }],
+      } as TMessage),
+    ).toBe(false);
   });
 });

@@ -121,6 +121,7 @@ const {
   StepTypes,
   Permissions,
   VisionModes,
+  ErrorTypes,
   ContentTypes,
   ApprovalEvents,
   EModelEndpoint,
@@ -2283,8 +2284,36 @@ class AgentClient extends BaseClient {
     });
 
     const completion = filterMalformedContentParts(this.contentParts);
+    if (this.isCompactionTurn()) {
+      this.markCompactionSummary(completion);
+    }
     const metadata = this.buildResponseMetadata();
     return metadata ? { completion, metadata } : { completion };
+  }
+
+  isCompactionTurn() {
+    return this.options?.req?.body?.compact === true;
+  }
+
+  markCompactionSummary(contentParts) {
+    const summary = contentParts.find(
+      (part) =>
+        part?.type === ContentTypes.SUMMARY &&
+        part.failed !== true &&
+        Array.isArray(part.content) &&
+        part.content.some((block) => typeof block?.text === 'string' && block.text.trim()),
+    );
+    if (summary != null) {
+      summary.initiatedBy = 'user';
+      return;
+    }
+    if (contentParts.some((part) => part?.type === ContentTypes.ERROR)) {
+      return;
+    }
+    contentParts.push({
+      type: ContentTypes.ERROR,
+      [ContentTypes.ERROR]: JSON.stringify({ type: ErrorTypes.COMPACTION_FAILED }),
+    });
   }
 
   /**
@@ -2365,8 +2394,9 @@ class AgentClient extends BaseClient {
       );
     }
 
-    const hasAggregatedText = Array.isArray(this.contentParts)
-      && this.contentParts.some(
+    const hasAggregatedText =
+      Array.isArray(this.contentParts) &&
+      this.contentParts.some(
         (part) => part?.type === ContentTypes.TEXT && part[ContentTypes.TEXT] === text,
       );
     if (!hasAggregatedText && Array.isArray(this.contentParts)) {
@@ -3099,8 +3129,13 @@ class AgentClient extends BaseClient {
        * synthetic prefix. Names NOT primed this turn still reconstruct from
        * history, preserving sticky manual re-priming across turns.
        */
-      const manualSkillPrimes = this.options.agent?.manualSkillPrimes;
-      const alwaysApplySkillPrimes = this.options.agent?.alwaysApplySkillPrimes;
+      const isCompactionTurn = this.isCompactionTurn();
+      const manualSkillPrimes = isCompactionTurn
+        ? undefined
+        : this.options.agent?.manualSkillPrimes;
+      const alwaysApplySkillPrimes = isCompactionTurn
+        ? undefined
+        : this.options.agent?.alwaysApplySkillPrimes;
       const freshSkillPrimeNames = collectFreshSkillPrimeNames({
         manualSkillPrimes,
         alwaysApplySkillPrimes,
@@ -3241,7 +3276,7 @@ class AgentClient extends BaseClient {
         //   messages = addCacheControl(messages);
         // }
 
-        if (this.processMemory) {
+        if (this.processMemory && !isCompactionTurn) {
           memoryPromise = this.runMemory(memoryMessages);
         }
 
@@ -3353,6 +3388,7 @@ class AgentClient extends BaseClient {
           user: createSafeUser(this.options.req?.user),
           tenantId: this.options.req?.user?.tenantId,
           summarizationConfig: appConfig?.summarization,
+          summarizeOnly: this.isCompactionTurn(),
           appConfig,
           tokenCounter,
           /** Bills subagent child-run model calls — foreground usage joins
@@ -3505,8 +3541,13 @@ class AgentClient extends BaseClient {
         this.contentParts.push({
           type: ContentTypes.ERROR,
           [ContentTypes.ERROR]:
-            videoError ??
-            `An error occurred while processing the request${err?.message ? `: ${err.message}` : ''}`,
+            err?.name === 'ManualSummarizationSkippedError'
+              ? JSON.stringify({
+                  type: ErrorTypes.COMPACTION_SKIPPED,
+                  reason: err.reason,
+                })
+              : (videoError ??
+                `An error occurred while processing the request${err?.message ? `: ${err.message}` : ''}`),
         });
       }
     } finally {

@@ -211,4 +211,30 @@ describe('ResumableAgentController tenant context', () => {
     expect(tenantSeenBySave).toBeUndefined();
     expect(mockSaveMessage).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects compaction when summarization is disabled before creating a generation job', async () => {
+    const initializeClient = jest.fn();
+    const req = {
+      user: { id: 'user-123' },
+      body: {
+        compact: true,
+        text: '',
+        conversationId: 'conversation-123',
+        parentMessageId: 'leaf-1',
+        endpointOption: { endpoint: 'openAI' },
+      },
+      config: { summarization: { enabled: false } },
+    };
+    const res = {
+      json: jest.fn(),
+      status: jest.fn(() => res),
+    };
+
+    await AgentController(req, res, jest.fn(), initializeClient, null);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'COMPACTION_DISABLED' }));
+    expect(mockGenerationJobManager.createJob).not.toHaveBeenCalled();
+    expect(initializeClient).not.toHaveBeenCalled();
+  });
 });

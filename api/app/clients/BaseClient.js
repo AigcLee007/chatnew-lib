@@ -19,6 +19,7 @@ const {
   Constants,
   FileSources,
   Tools,
+  isCompactedLeaf,
   ContentTypes,
   excludedKeys,
   EModelEndpoint,
@@ -340,6 +341,9 @@ class BaseClient {
 
     const [overrideConvoId, overrideUserMessageId] = this.processOverideIds();
     const { isEdited, isContinued } = opts;
+    if (opts.isCompaction === true) {
+      this.skipSaveUserMessage = true;
+    }
     const user = opts.user ?? null;
     this.user = user;
     const saveOptions = this.getSaveOptions();
@@ -390,6 +394,38 @@ class BaseClient {
     };
   }
 
+  getCompactionAnchor(parentMessageId) {
+    const leaf = this.currentMessages[this.currentMessages.length - 1];
+    if (leaf == null || leaf.messageId !== parentMessageId) {
+      throw Object.assign(new Error('The message to compact up to was not found.'), {
+        statusCode: 404,
+        code: 'COMPACTION_ANCHOR_NOT_FOUND',
+      });
+    }
+    if (isCompactedLeaf(leaf)) {
+      throw Object.assign(new Error('There is no new conversation content to compact.'), {
+        statusCode: 409,
+        code: 'NOTHING_TO_COMPACT',
+      });
+    }
+    const hasChildren = (this.conversationMessages ?? []).some(
+      (message) => message.parentMessageId === parentMessageId,
+    );
+    if (hasChildren) {
+      throw Object.assign(new Error('The message to compact up to is not a branch leaf.'), {
+        statusCode: 409,
+        code: 'COMPACTION_ANCHOR_NOT_LEAF',
+      });
+    }
+    return {
+      messageId: leaf.messageId,
+      parentMessageId: leaf.parentMessageId,
+      conversationId: leaf.conversationId,
+      isCreatedByUser: leaf.isCreatedByUser === true,
+      text: '',
+    };
+  }
+
   async handleStartMethods(message, opts) {
     const {
       user,
@@ -403,14 +439,16 @@ class BaseClient {
     } = await this.setMessageOptions(opts);
     this.options.startupTelemetry?.mark('history_loaded');
 
-    const userMessage = opts.isEdited
-      ? this.currentMessages[this.currentMessages.length - 2]
-      : this.createUserMessage({
-          messageId: userMessageId,
-          parentMessageId,
-          conversationId,
-          text: message,
-        });
+    const userMessage = opts.isCompaction
+      ? this.getCompactionAnchor(parentMessageId)
+      : opts.isEdited
+        ? this.currentMessages[this.currentMessages.length - 2]
+        : this.createUserMessage({
+            messageId: userMessageId,
+            parentMessageId,
+            conversationId,
+            text: message,
+          });
 
     /**
      * Attach quoted excerpts (the "Add to chat" selections from `req.body.quotes`)
@@ -420,7 +458,7 @@ class BaseClient {
      * merged into the model-facing text later, per message, in `buildMessages`,
      * keeping the stored `text` clean while the count stays consistent.
      */
-    if (!opts.isEdited) {
+    if (!opts.isEdited && !opts.isCompaction) {
       const referencedQuotes = getReferencedQuotes(this.options.req?.body?.quotes);
       if (referencedQuotes != null) {
         userMessage.quotes = referencedQuotes;
@@ -610,7 +648,7 @@ class BaseClient {
         }
       }
       this.continued = true;
-    } else {
+    } else if (!opts.isCompaction) {
       this.currentMessages.push(userMessage);
     }
 
@@ -618,7 +656,11 @@ class BaseClient {
      * When the userMessage is pushed to currentMessages, the parentMessage is the userMessageId.
      * this only matters when buildMessages is utilizing the parentMessageId, and may vary on implementation
      */
-    const parentMessageId = isEdited ? head : userMessage.messageId;
+    const parentMessageId = opts.isCompaction
+      ? userMessage.messageId
+      : isEdited
+        ? head
+        : userMessage.messageId;
     this.parentMessageId = parentMessageId;
     let {
       prompt: payload,
@@ -632,7 +674,7 @@ class BaseClient {
     );
     this.options.startupTelemetry?.mark('messages_built');
 
-    if (tokenCountMap && tokenCountMap[userMessage.messageId]) {
+    if (tokenCountMap && tokenCountMap[userMessage.messageId] && opts.isCompaction !== true) {
       userMessage.tokenCount = tokenCountMap[userMessage.messageId];
       logger.debug('[BaseClient] userMessage', {
         messageId: userMessage.messageId,
@@ -650,7 +692,7 @@ class BaseClient {
       provider: this.options.agent?.provider,
     });
 
-    if (!isEdited && !this.skipSaveUserMessage) {
+    if (!isEdited && !opts.isCompaction && !this.skipSaveUserMessage) {
       const reqFiles = this.options.req?.body?.files;
       if (reqFiles && Array.isArray(this.options.attachments)) {
         const files = buildMessageFiles(reqFiles, this.options.attachments);
@@ -737,9 +779,7 @@ class BaseClient {
       );
     }
 
-    const completionOptions = modelIdentityResponse
-      ? { ...opts, modelIdentityResponse }
-      : opts;
+    const completionOptions = modelIdentityResponse ? { ...opts, modelIdentityResponse } : opts;
     const { completion, metadata } = await this.sendCompletion(payload, completionOptions);
     if (this.abortController) {
       this.abortController.requestCompleted = true;
@@ -843,6 +883,7 @@ class BaseClient {
     }
 
     if (
+      opts.isCompaction !== true &&
       this.contextMeta?.calibrationRatio > 0 &&
       this.contextMeta.calibrationRatio !== 1 &&
       userMessage.tokenCount > 0
@@ -905,6 +946,7 @@ class BaseClient {
     logger.debug('[BaseClient] Loading history:', { conversationId, parentMessageId });
 
     const messages = (await db.getMessages({ conversationId, user: this.user })) ?? [];
+    this.conversationMessages = messages;
 
     if (messages.length === 0) {
       return [];

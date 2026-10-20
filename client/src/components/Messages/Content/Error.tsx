@@ -1,6 +1,7 @@
 // file deepcode ignore HardcodedNonCryptoSecret: No hardcoded secrets
 import { ViolationTypes, ErrorTypes, alternateName } from 'librechat-data-provider';
 import type { LocalizeFunction } from '~/common';
+import type { TranslationKeys } from '~/hooks';
 import { formatJSON, extractJson, isJson } from '~/utils/json';
 import { useLocalize } from '~/hooks';
 import CodeBlock from './CodeBlock';
@@ -35,6 +36,17 @@ type TExpiredKey = {
 
 type TGenericError = {
   info: string;
+};
+
+type TCompactionSkipped = {
+  reason?: string;
+};
+
+const compactionSkippedKeys: Record<string, TranslationKeys> = {
+  disabled: 'com_error_compaction_disabled',
+  exhausted: 'com_error_compaction_nothing',
+  instructions_exceed_budget: 'com_error_compaction_budget',
+  nothing_to_summarize: 'com_error_compaction_nothing',
 };
 
 const errorMessages = {
@@ -79,6 +91,9 @@ const errorMessages = {
   [ErrorTypes.GOOGLE_VIDEO_UNPROCESSABLE]: 'com_error_google_video_unprocessable',
   [ErrorTypes.RESOURCE_RECOVERY_REQUIRED]: 'com_error_resource_recovery_required',
   [ErrorTypes.STREAM_EXPIRED]: 'com_error_stream_expired',
+  [ErrorTypes.COMPACTION_FAILED]: 'com_error_compaction_failed',
+  [ErrorTypes.COMPACTION_SKIPPED]: (json: TCompactionSkipped, localize: LocalizeFunction) =>
+    localize(compactionSkippedKeys[json.reason ?? ''] ?? 'com_error_compaction_failed'),
   [ViolationTypes.BAN]:
     'Your account has been temporarily banned due to violations of our service.',
   [ViolationTypes.ILLEGAL_MODEL_REQUEST]: (json: TGenericError, localize: LocalizeFunction) => {

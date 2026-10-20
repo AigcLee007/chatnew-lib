@@ -61,9 +61,11 @@ const initializeFakeClient = (apiKey, options, fakeMessages) => {
     .mockImplementation((conversationId, parentMessageId = null) => {
       if (!conversationId) {
         TestClient.currentMessages = [];
+        TestClient.conversationMessages = [];
         return Promise.resolve([]);
       }
 
+      TestClient.conversationMessages = fakeMessages;
       const orderedMessages = TestClient.constructor.getMessagesForConversation({
         messages: fakeMessages,
         parentMessageId,

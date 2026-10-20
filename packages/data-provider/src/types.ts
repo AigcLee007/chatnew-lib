@@ -129,6 +129,8 @@ export type TPayload = Partial<TMessage> &
   Partial<TEndpointOption> & {
     isContinued: boolean;
     isRegenerate?: boolean;
+    /** Internal summarize-only turn attached to the current conversation branch. */
+    compact?: boolean;
     conversationId: string | null;
     messages?: TMessages;
     isTemporary: boolean;
@@ -183,6 +185,8 @@ export type TSubmission = {
   /** Client-only full message context used to restore branch siblings after scoped regenerate. */
   regenerateMessages?: TMessage[];
   isRegenerate?: boolean;
+  /** Submits a summarize-only turn without creating a user message. */
+  compact?: boolean;
   initialResponse?: TMessage;
   conversation: Partial<TConversation>;
   endpointOption: TEndpointOption;

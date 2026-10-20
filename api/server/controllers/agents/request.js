@@ -321,6 +321,51 @@ function rejectMissingTriggerParentMessageId(res, generationProtocolVersion) {
   );
 }
 
+function getCompactionRejection(req, { conversationId, parentMessageId }) {
+  if (req.config?.summarization?.enabled === false) {
+    return { status: 400, code: 'COMPACTION_DISABLED', error: 'Context compaction is disabled.' };
+  }
+  if (!conversationId || conversationId === Constants.NEW_CONVO || req.body?.isTemporary) {
+    return {
+      status: 400,
+      code: 'INVALID_COMPACTION_REQUEST',
+      error: 'An existing conversation is required.',
+    };
+  }
+  if (
+    typeof parentMessageId !== 'string' ||
+    parentMessageId.length === 0 ||
+    parentMessageId === Constants.NO_PARENT
+  ) {
+    return {
+      status: 400,
+      code: 'INVALID_COMPACTION_REQUEST',
+      error: 'A conversation leaf is required.',
+    };
+  }
+  const { isContinued, isRegenerate, editedContent, responseMessageId } = req.body ?? {};
+  if (
+    isContinued ||
+    isRegenerate ||
+    editedContent != null ||
+    responseMessageId ||
+    req.body?.overrideConvoId != null ||
+    req.body?.overrideUserMessageId != null ||
+    req.body?.recoverySteerId != null
+  ) {
+    return {
+      status: 400,
+      code: 'INVALID_COMPACTION_REQUEST',
+      error: 'Compaction cannot be combined with edit, regenerate, or continue.',
+    };
+  }
+  return null;
+}
+
+function projectCompactionAnchor({ messageId, conversationId }) {
+  return { messageId, conversationId, text: '' };
+}
+
 /**
  * Resumable Agent Controller - Generation runs independently of HTTP connection.
  * Returns streamId immediately, client subscribes separately via SSE.
@@ -331,6 +376,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
   const {
     text,
     isRegenerate,
+    compact,
     endpointOption,
     conversationId: reqConversationId,
     isContinued = false,
@@ -342,6 +388,27 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
   const userId = req.user.id;
   const tenantId = req.user.tenantId;
+  const isCompaction = compact === true;
+  if (isCompaction) {
+    const rejection = getCompactionRejection(req, {
+      conversationId: reqConversationId,
+      parentMessageId,
+    });
+    if (rejection) {
+      startupTelemetry?.end('rejected');
+      return sendGenerationJson(
+        res,
+        rejection.status,
+        { code: rejection.code, error: rejection.error },
+        generationProtocolVersion,
+      );
+    }
+    req.body.text = '';
+    req.body.files = undefined;
+    req.body.quotes = undefined;
+    req.body.manualSkills = undefined;
+    req.body.alwaysAppliedSkills = undefined;
+  }
   const rawClientRequestId = req.body?.clientRequestId;
   if (
     rawClientRequestId != null &&
@@ -967,7 +1034,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
     const endpointIconURL = getEndpointIconURL(req, endpointOption);
     const responseModel = getAgentResponseModel(req, endpointOption);
-    const preliminaryUserMessage = getPreliminaryUserMessage(req.body, conversationId);
+    const preliminaryUserMessage = isCompaction
+      ? projectCompactionAnchor({ messageId: parentMessageId, conversationId })
+      : getPreliminaryUserMessage(req.body, conversationId);
     const preliminaryResponseMessageId = getPreliminaryResponseMessageId(req.body);
     const job = await GenerationJobManager.createJob(streamId, userId, conversationId, {
       startupTelemetry,
@@ -996,6 +1065,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         // non-persisted instead of trusting the resume request to re-send the flag.
         isTemporary: req.body?.isTemporary,
         responseMessageId: preliminaryResponseMessageId,
+        ...(isCompaction && { isRegenerate: true }),
         userMessage: preliminaryUserMessage,
       },
     });
@@ -1416,33 +1486,35 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             logger.error('[ResumableAgentController] Failed to persist start metadata', err);
           });
 
-          GenerationJobManager.emitChunk(
-            streamId,
-            {
-              created: true,
-              // Skill selections aren't on `userMessage` yet at onStart (BaseClient adds
-              // them later), so attach them from the request — this is the message
-              // `trackUserMessage` persists as the authoritative job.metadata.userMessage,
-              // and it's what the live client renders the user bubble from.
-              message: {
-                ...userMessage,
-                // Carry files so trackUserMessage (the authoritative writer) persists them on
-                // job.metadata.userMessage for a HITL resume (see the updateMetadata above).
-                ...(Array.isArray(req.body?.files) &&
-                  req.body.files.length > 0 && { files: req.body.files }),
-                ...(Array.isArray(req.body?.manualSkills) &&
-                  req.body.manualSkills.length > 0 && { manualSkills: req.body.manualSkills }),
-                ...(Array.isArray(req.body?.alwaysAppliedSkills) &&
-                  req.body.alwaysAppliedSkills.length > 0 && {
-                    alwaysAppliedSkills: req.body.alwaysAppliedSkills,
-                  }),
-              },
+          if (req.body?.compact !== true) {
+            GenerationJobManager.emitChunk(
               streamId,
-            },
-            { expectedCreatedAt: jobCreatedAt },
-          ).catch((err) => {
-            logger.error('[ResumableAgentController] Failed to queue created event', err);
-          });
+              {
+                created: true,
+                // Skill selections aren't on `userMessage` yet at onStart (BaseClient adds
+                // them later), so attach them from the request — this is the message
+                // `trackUserMessage` persists as the authoritative job.metadata.userMessage,
+                // and it's what the live client renders the user bubble from.
+                message: {
+                  ...userMessage,
+                  // Carry files so trackUserMessage (the authoritative writer) persists them on
+                  // job.metadata.userMessage for a HITL resume (see the updateMetadata above).
+                  ...(Array.isArray(req.body?.files) &&
+                    req.body.files.length > 0 && { files: req.body.files }),
+                  ...(Array.isArray(req.body?.manualSkills) &&
+                    req.body.manualSkills.length > 0 && { manualSkills: req.body.manualSkills }),
+                  ...(Array.isArray(req.body?.alwaysAppliedSkills) &&
+                    req.body.alwaysAppliedSkills.length > 0 && {
+                      alwaysAppliedSkills: req.body.alwaysAppliedSkills,
+                    }),
+                },
+                streamId,
+              },
+              { expectedCreatedAt: jobCreatedAt },
+            ).catch((err) => {
+              logger.error('[ResumableAgentController] Failed to queue created event', err);
+            });
+          }
         };
 
         const messageOptions = {
@@ -1451,6 +1523,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           getReqData,
           isContinued,
           isRegenerate,
+          isCompaction: req.body?.compact === true,
           editedContent,
           conversationId,
           parentMessageId,

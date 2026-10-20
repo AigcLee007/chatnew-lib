@@ -661,6 +661,8 @@ export type SummaryContentPart = {
   content?: Array<{ type: ContentTypes.TEXT; text: string }>;
   tokenCount?: number;
   summarizing?: boolean;
+  failed?: boolean;
+  initiatedBy?: 'user';
   summaryVersion?: number;
   model?: string;
   provider?: string;

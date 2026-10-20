@@ -351,6 +351,7 @@ export type TOptions = {
   isRegenerate?: boolean;
   isContinued?: boolean;
   isEdited?: boolean;
+  compact?: boolean;
   overrideMessages?: t.TMessage[];
   /** This value is only true when the user submits a message with "Update & rerun" for a user-created message */
   isResubmission?: boolean;

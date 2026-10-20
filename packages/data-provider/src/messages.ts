@@ -24,6 +24,27 @@ export function stripReasoningLabelMetadata(part: TMessageContentParts): TMessag
 
 export type ParentMessage = TMessage & { children: TMessage[]; depth: number };
 
+/** True when a message is a finished manual compaction with usable summary text. */
+export function isCompactedLeaf(message?: Pick<TMessage, 'content'> | null): boolean {
+  const content = message?.content;
+  if (!Array.isArray(content) || content.length === 0) {
+    return false;
+  }
+  let hasSummaryText = false;
+  for (const part of content) {
+    if (part?.type !== ContentTypes.SUMMARY) {
+      return false;
+    }
+    if (part.summarizing === true || part.failed === true) {
+      continue;
+    }
+    hasSummaryText ||= (part.content ?? []).some(
+      (block) => typeof block?.text === 'string' && block.text.trim().length > 0,
+    );
+  }
+  return hasSummaryText;
+}
+
 /**
  * Memoizes built trees per messages-array identity. The same query data feeds
  * several independent `select`s (ChatView plus the branch-tail helpers), which

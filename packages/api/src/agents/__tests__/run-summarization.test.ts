@@ -159,6 +159,7 @@ async function callAndCapture(
   opts: {
     agents?: ReturnType<typeof makeAgent>[];
     summarizationConfig?: SummarizationConfig;
+    summarizeOnly?: boolean;
     initialSummary?: { text: string; tokenCount: number };
     appConfig?: AppConfig;
     messages?: BaseMessage[];
@@ -173,6 +174,7 @@ async function callAndCapture(
     agents: agents as never,
     signal,
     summarizationConfig: opts.summarizationConfig,
+    summarizeOnly: opts.summarizeOnly,
     initialSummary: opts.initialSummary,
     appConfig: opts.appConfig,
     messages: opts.messages,
@@ -535,6 +537,20 @@ describe('initialSummary passthrough', () => {
   it('undefined when not provided', async () => {
     const agents = await callAndCapture({});
     expect(agents[0].initialSummary).toBeUndefined();
+  });
+});
+
+describe('summarizeOnly passthrough', () => {
+  it('marks the primary agent for a summarize-only run', async () => {
+    const agents = await callAndCapture({ summarizeOnly: true });
+
+    expect(agents[0].summarizeOnly).toBe(true);
+  });
+
+  it('leaves ordinary runs outside summarize-only mode', async () => {
+    const agents = await callAndCapture();
+
+    expect(agents[0].summarizeOnly).toBeUndefined();
   });
 });
 

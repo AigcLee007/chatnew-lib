@@ -4,12 +4,14 @@ import { TooltipAnchor } from '@librechat/client';
 import { Constants } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import type { CurrencyConfig } from '~/utils';
+import useCompactConversation, { supportsCompaction } from '~/hooks/Chat/useCompactConversation';
 import { useGetLangfuseSessionLinkQuery, useGetStartupConfig } from '~/data-provider';
 import { formatTokens, formatCost, cn } from '~/utils';
 import useTokenUsage from '~/hooks/Chat/useTokenUsage';
 import { useLocalize } from '~/hooks';
 import Breakdown from './Breakdown';
 import Gauge from './Gauge';
+import CompactAction from './CompactAction';
 
 interface TokenUsageProps {
   index: number;
@@ -24,13 +26,16 @@ function TokenUsageIndicator({
   showCost,
   currency,
   langfuseConnectionAccess,
+  compactionEnabled,
 }: TokenUsageProps & {
   showCost: boolean;
   currency?: CurrencyConfig;
   langfuseConnectionAccess: boolean;
+  compactionEnabled: boolean;
 }) {
   const localize = useLocalize();
   const view = useTokenUsage({ index, conversation, isSubmitting });
+  const compaction = useCompactConversation();
   const popover = Ariakit.usePopoverStore({ placement: 'top' });
   const popoverOpen = Ariakit.useStoreState(popover, 'open');
   const disclosureRef = useRef<HTMLButtonElement>(null);
@@ -120,12 +125,24 @@ function TokenUsageIndicator({
         aria-label={localize('com_ui_context_usage')}
         className="z-[200] rounded-xl border border-border-medium bg-surface-secondary p-3 shadow-lg focus:outline-none"
       >
-        <Breakdown
-          view={view}
-          showCost={showCost}
-          currency={currency}
-          langfuseSessionUrl={langfuseSession?.url ?? undefined}
-        />
+        <div className="w-72 space-y-3">
+          <Breakdown
+            view={view}
+            showCost={showCost}
+            currency={currency}
+            langfuseSessionUrl={langfuseSession?.url ?? undefined}
+          />
+          {compactionEnabled && supportsCompaction(conversation?.endpoint) && (
+            <>
+              <div className="border-t border-border-light" role="separator" />
+              <CompactAction
+                compact={compaction.compact}
+                canCompact={compaction.canCompact}
+                isCompacting={compaction.isCompacting}
+              />
+            </>
+          )}
+        </div>
       </Ariakit.Popover>
     </>
   );
@@ -146,6 +163,7 @@ const TokenUsage = memo(function TokenUsage(props: TokenUsageProps) {
       showCost={startupConfig.interface?.contextCost === true}
       currency={startupConfig.interface?.currency}
       langfuseConnectionAccess={startupConfig.langfuseConnectionAccess === true}
+      compactionEnabled={startupConfig.compactionEnabled === true}
     />
   );
 });

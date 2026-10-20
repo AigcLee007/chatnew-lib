@@ -1247,6 +1247,7 @@ export async function createRun({
   indexTokenCountMap,
   initialSessions,
   summarizationConfig,
+  summarizeOnly = false,
   initialSummary,
   calibrationRatio,
   appConfig,
@@ -1287,6 +1288,8 @@ export async function createRun({
    */
   discoveredToolNames?: string[];
   summarizationConfig?: SummarizationConfig;
+  /** Runs only the primary agent's summarize pass for manual compaction. */
+  summarizeOnly?: boolean;
   /** Cross-run summary from formatAgentMessages, forwarded to AgentContext */
   initialSummary?: { text: string; tokenCount: number };
   /** Calibration ratio from previous run's contextMeta, seeds the pruner EMA */
@@ -1612,6 +1615,9 @@ export async function createRun({
   }
   for (const agent of agents) {
     const agentInput = buildAgentInput(agent);
+    if (summarizeOnly && agent === agents[0]) {
+      agentInput.summarizeOnly = true;
+    }
     const subagentConfigs = buildSubagentConfigs(
       agent,
       agentInput,
