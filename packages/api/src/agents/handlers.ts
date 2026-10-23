@@ -3848,6 +3848,10 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
       try {
         await runOutsideTracing(async () => {
           try {
+            logger.info('[ON_TOOL_EXECUTE] batch', {
+              agentId,
+              toolNames: toolCalls.map((tc: ToolCallRequest) => tc.name),
+            });
             const requestedToolNames = [
               ...new Set(toolCalls.map((tc: ToolCallRequest) => tc.name)),
             ];

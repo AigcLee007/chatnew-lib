@@ -1551,6 +1551,24 @@ export async function createRun({
     );
 
     const reasoningKey = getReasoningKey(provider, llmConfig, agent.endpoint, agent.reasoningKey);
+    /**
+     * Alias diagnostics. `Tool "Write" not found.` (with quotes) is thrown by the
+     * SDK's own ToolNode lookup, which is only reached when the event-driven
+     * dispatcher is inactive — i.e. `toolDefinitions` is empty. That makes the
+     * whole tool set worth logging once per agent build: it tells us whether the
+     * agent exposed any tools at all, which no alias can substitute for.
+     */
+    if (!isSubagent) {
+      logger.info('[agent-tool-diag]', {
+        agentId: agent.id,
+        provider,
+        model: agent.model,
+        toolInstanceCount: tools?.length ?? 0,
+        toolDefinitionCount: toolDefinitions.length,
+        toolDefinitionNames: toolDefinitions.map((def) => def.name),
+        registrySize: toolRegistry?.size ?? null,
+      });
+    }
     const agentInput: AgentInputs = {
       provider,
       reasoningKey,
