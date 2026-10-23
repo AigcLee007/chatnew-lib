@@ -40,6 +40,7 @@ export * from './codeFilesSession';
 export * from './run';
 export * from './testHook';
 export * from './tools';
+export * from './aliases';
 export * from './validation';
 export * from './added';
 export * from './load';

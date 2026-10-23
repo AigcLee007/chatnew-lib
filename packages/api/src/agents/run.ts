@@ -60,6 +60,7 @@ import { isSteeringSupported, isSteerPreemptSupported } from '~/agents/steering/
 import { getLLMConfig as getAnthropicLLMConfig } from '~/endpoints/anthropic/llm';
 import { resolveStreamLimits, resolveSubagentMaxTurns } from '~/agents/config';
 import { CREATE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME } from '~/agents/tools';
+import { CLAUDE_ALIAS_TOOL_NAMES } from '~/agents/aliases';
 import { buildAgentInitialToolSessions } from '~/agents/codeFilesSession';
 import { getProviderConfig } from '~/endpoints/config/providers';
 import { extractDefaultParams } from '~/endpoints/openai/llm';
@@ -1823,6 +1824,13 @@ export async function createRun({
         Constants.EXECUTE_CODE,
         Constants.BASH_TOOL,
         ASK_USER_QUESTION_TOOL_NAME,
+        /**
+         * Claude-spelled aliases (`Write`/`Edit`/`Bash`/`Read`) resolve onto the
+         * tools above at execution time, so they inherit the same hazard: eager
+         * execution would speculatively write or exec with partial args, and
+         * `Read` would be read before the runtime alias exists in the tool map.
+         */
+        ...CLAUDE_ALIAS_TOOL_NAMES,
         /**
          * Background-capable tools: eager execution could launch the detached
          * task with speculative/partial args before the final tool call, and a

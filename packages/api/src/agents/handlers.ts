@@ -40,6 +40,7 @@ import {
   HOST_FILE_AUTHORING_ARTIFACT_KEY,
   isCodeSessionToolName,
 } from './tools';
+import { getClaudeAliasRuntimeName, resolveToolCallAliases } from './aliases';
 import {
   hasIntentArg,
   stripIntentArg,
@@ -3847,12 +3848,38 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
       try {
         await runOutsideTracing(async () => {
           try {
-            const toolNames = [...new Set(toolCalls.map((tc: ToolCallRequest) => tc.name))];
+            const requestedToolNames = [
+              ...new Set(toolCalls.map((tc: ToolCallRequest) => tc.name)),
+            ];
+            /**
+             * A call emitted in Claude's namespace (`Write`, `Edit`, ...) has no
+             * runtime tool under that name, so it must be requested by its
+             * runtime name or `loadTools` binds nothing and the call fails with
+             * `Tool "Write" not found.`. Aliases are only added, never replace a
+             * requested name, so an MCP tool genuinely named `Write` still wins.
+             */
+            const aliasToolNames = requestedToolNames
+              .map(getClaudeAliasRuntimeName)
+              .filter((name): name is string => name != null);
+            const toolNames = [...new Set([...requestedToolNames, ...aliasToolNames])];
             const { loadedTools, configurable: toolConfigurable } = await loadTools(
               toolNames,
               agentId,
             );
             const toolMap = new Map(loadedTools.map((t) => [t.name, t]));
+            /**
+             * Rewrite Claude-spelled calls onto the runtime tools that actually
+             * loaded. Done here rather than before `loadTools` because the guard
+             * needs the real tool set: a `Write` call on an agent without file
+             * authoring must keep its own name so the lookup below reports the
+             * truthful "tool not available" instead of a misleading rename.
+             * Ids, steps and session context are preserved, so completion events
+             * still key on the original call.
+             */
+            const resolvedToolCalls = resolveToolCallAliases(
+              toolCalls,
+              new Set(toolMap.keys()),
+            );
             const sourceConfigurable = configurable as Record<string, unknown> | undefined;
             const loadedConfigurable = toolConfigurable as Record<string, unknown> | undefined;
             const mergedConfigurable = mergeToolConfigurables(
@@ -4087,7 +4114,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
             };
 
             const results: ToolExecuteResult[] = await Promise.all(
-              toolCalls.map(async (tc: ToolCallRequest) => {
+              resolvedToolCalls.map(async (tc: ToolCallRequest) => {
                 if (backgroundControlEnabled && tc.name === CHECK_BACKGROUND_TASK_NAME) {
                   const pollContent = await runCheckBackgroundTask({
                     userId: backgroundUserId,
