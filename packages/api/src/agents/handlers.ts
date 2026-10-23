@@ -3867,25 +3867,34 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               agentId,
             );
             const toolMap = new Map(loadedTools.map((t) => [t.name, t]));
-            /**
-             * Rewrite Claude-spelled calls onto the runtime tools that actually
-             * loaded. Done here rather than before `loadTools` because the guard
-             * needs the real tool set: a `Write` call on an agent without file
-             * authoring must keep its own name so the lookup below reports the
-             * truthful "tool not available" instead of a misleading rename.
-             * Ids, steps and session context are preserved, so completion events
-             * still key on the original call.
-             */
-            const resolvedToolCalls = resolveToolCallAliases(
-              toolCalls,
-              new Set(toolMap.keys()),
-            );
             const sourceConfigurable = configurable as Record<string, unknown> | undefined;
             const loadedConfigurable = toolConfigurable as Record<string, unknown> | undefined;
             const mergedConfigurable = mergeToolConfigurables(
               sourceConfigurable,
               loadedConfigurable,
             );
+            /**
+             * Rewrite Claude-spelled calls onto the runtime tools available to
+             * this agent. The available set cannot be `toolMap` alone: the host
+             * handles `create_file`/`edit_file`/`read_file`/`skill` through
+             * dedicated branches and never returns them from `loadTools`, so a
+             * toolMap-only guard would treat every file alias as unavailable and
+             * leave `Write` to fail upstream. Those names come from the
+             * per-agent capability set instead.
+             *
+             * Kept guarded rather than unconditional so an agent without file
+             * authoring still reports the truthful "tool not available" instead
+             * of a rename onto a tool it never had.
+             */
+            const availableToolNames = new Set<string>(toolMap.keys());
+            for (const name of getFileAuthoringToolNames(mergedConfigurable) ?? []) {
+              availableToolNames.add(name);
+            }
+            /** `read_file` is dispatched by the host branch at
+             *  `tc.name === Constants.READ_FILE` regardless of `loadTools`, so it
+             *  is executable whenever that branch is reachable. */
+            availableToolNames.add(Constants.READ_FILE);
+            const resolvedToolCalls = resolveToolCallAliases(toolCalls, availableToolNames);
             const codeExecutionContext = getCodeExecutionContext(mergedConfigurable);
             const runtimeSessionHint = codeExecutionContext?.runtimeSessionHint;
             const sandboxConversationId =
