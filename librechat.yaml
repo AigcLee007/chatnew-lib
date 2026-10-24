@@ -51,7 +51,6 @@ endpoints:
       - anthropic
       - xAI
     capabilities:
-      - execute_code
       - file_search
       - artifacts
       - skills

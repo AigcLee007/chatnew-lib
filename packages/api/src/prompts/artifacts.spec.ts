@@ -52,15 +52,26 @@ describe('generateArtifactsPrompt tool preference', () => {
   });
 });
 
-describe('deployment defaultPinnedTools', () => {
+describe('deployment code execution config', () => {
+  const configPath = path.resolve(__dirname, '../../../../librechat.yaml');
+  const config = load(fs.readFileSync(configPath, 'utf8')) as {
+    interface?: { defaultPinnedTools?: string[] };
+    endpoints?: { agents?: { capabilities?: string[] } };
+  };
+
   it('does not pin execute_code by default', () => {
-    const configPath = path.resolve(__dirname, '../../../../librechat.yaml');
-    const config = load(fs.readFileSync(configPath, 'utf8')) as {
-      interface?: { defaultPinnedTools?: string[] };
-    };
     const pinned = config.interface?.defaultPinnedTools ?? [];
 
     expect(pinned).not.toContain('execute_code');
     expect(pinned).toEqual(expect.arrayContaining(['artifacts', 'file_search', 'skills']));
+  });
+
+  it('disables the execute_code capability while no code sandbox is deployed', () => {
+    const capabilities = config.endpoints?.agents?.capabilities ?? [];
+
+    expect(capabilities).not.toContain('execute_code');
+    expect(capabilities).toEqual(
+      expect.arrayContaining(['file_search', 'artifacts', 'skills', 'tools']),
+    );
   });
 });
