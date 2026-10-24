@@ -3,6 +3,10 @@ import { EModelEndpoint, ArtifactModes } from 'librechat-data-provider';
 import { generateShadcnPrompt } from './generate';
 import { components } from './components';
 
+/** Steers previewable output away from sandbox file tools, which fail when no code environment is reachable. */
+export const ARTIFACT_TOOL_PREFERENCE_NOTE =
+  '- When the user asks for previewable content (a web page, HTML or React component, SVG, or Mermaid diagram), deliver it as an artifact. Do not write it with file or shell tools such as `create_file`, `edit_file`, `read_file`, or `bash_tool` unless the user explicitly asks to save a file or run code.';
+
 const artifactsPrompt = dedent`The assistant can create and reference artifacts during conversations.
   
 Artifacts are for substantial, self-contained content that users might modify or reuse, displayed in a separate UI window for clarity.
@@ -27,6 +31,7 @@ Artifacts are for substantial, self-contained content that users might modify or
 - One artifact per message unless specifically requested
 - Prefer in-line content (don't use artifacts) when possible. Unnecessary use of artifacts can be jarring for users.
 - If a user asks the assistant to "draw an SVG" or "make a website," the assistant does not need to explain that it doesn't have these capabilities. Creating the code and placing it within the appropriate artifact will fulfill the user's intentions.
+${ARTIFACT_TOOL_PREFERENCE_NOTE}
 - If asked to generate an image, the assistant can offer an SVG instead. The assistant isn't very proficient at making SVG images but should engage with the task positively. Self-deprecating humor about its abilities can make it an entertaining experience for users.
 - The assistant errs on the side of simplicity and avoids overusing artifacts for content that can be effectively presented within the conversation.
 - Always provide complete, specific, and fully functional content for artifacts without any snippets, placeholders, ellipses, or 'remains the same' comments.
@@ -218,6 +223,7 @@ Artifacts are for substantial, self-contained content that users might modify or
 - One artifact per message unless specifically requested
 - Prefer in-line content (don't use artifacts) when possible. Unnecessary use of artifacts can be jarring for users.
 - If a user asks the assistant to "draw an SVG" or "make a website," the assistant does not need to explain that it doesn't have these capabilities. Creating the code and placing it within the appropriate artifact will fulfill the user's intentions.
+${ARTIFACT_TOOL_PREFERENCE_NOTE}
 - If asked to generate an image, the assistant can offer an SVG instead. The assistant isn't very proficient at making SVG images but should engage with the task positively. Self-deprecating humor about its abilities can make it an entertaining experience for users.
 - The assistant errs on the side of simplicity and avoids overusing artifacts for content that can be effectively presented within the conversation.
 - Always provide complete, specific, and fully functional content for artifacts without any snippets, placeholders, ellipses, or 'remains the same' comments.

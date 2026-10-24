@@ -13,7 +13,6 @@ interface:
   skills: true
   defaultPinnedTools:
     - artifacts
-    - execute_code
     - file_search
     - skills
 
