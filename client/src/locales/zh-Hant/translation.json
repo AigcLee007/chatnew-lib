@@ -903,6 +903,8 @@
   "com_ui_authentication": "驗證",
   "com_ui_authentication_type": "驗證類型",
   "com_ui_auto": "自動",
+  "com_ui_reasoning_level": "思考等級",
+  "com_ui_reasoning_next_message": "僅套用於下一則訊息",
   "com_ui_available_options": "可用選項",
   "com_ui_avatar": "大頭照",
   "com_ui_azure": "Azure",

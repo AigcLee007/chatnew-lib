@@ -3,6 +3,7 @@ import type { EndpointTokenConfig } from '~/types';
 import {
   getModelMaxTokens,
   getModelMaxOutputTokens,
+  findMatchingPattern,
   maxOutputTokensMap,
   maxTokensMap,
 } from './tokens';
@@ -158,6 +159,38 @@ describe('newer windows for existing families', () => {
   it('keeps command-a-plus off the wider command-a window', () => {
     expect(getModelMaxTokens('command-a', EModelEndpoint.openAI)).toBe(255500);
     expect(getModelMaxTokens('command-a-plus-05-2026', EModelEndpoint.openAI)).toBe(127500);
+  });
+
+  it.each([
+    ['gpt-6-astra', 1050000],
+    ['gpt-6-sol', 1050000],
+    ['gpt-6-luna', 1050000],
+    ['gpt-6.1-sol', 1050000],
+    ['gpt-6.1-sol-2026-10-01', 1050000],
+    ['openai/gpt-6.1-sol', 1050000],
+    ['gemini-3.8-flash', 1048576],
+    ['claude-haiku-5-5', 1000000],
+    ['claude-haiku-5.5', 1000000],
+    ['claude-sonnet-5-5', 1000000],
+    ['claude-sonnet-5.5', 1000000],
+    ['claude-opus-5-5', 1000000],
+    ['claude-opus-5.5', 1000000],
+    ['claude-mythos-5-1', 1000000],
+    ['grok-4.7', 500000],
+    ['grok-4-7', 500000],
+  ])('resolves upstream model context %s to %i tokens', (model, expected) => {
+    expect(getModelMaxTokens(model, EModelEndpoint.openAI)).toBe(expected);
+  });
+
+  it('prefers explicit GPT release overrides and otherwise inherits the family', () => {
+    expect(
+      getModelMaxTokens('gpt-6.1-sol', EModelEndpoint.openAI, {
+        'gpt-6.1-sol': { context: 400000, prompt: 1, completion: 1 },
+      }),
+    ).toBe(400000);
+    expect(findMatchingPattern('gpt-6.1-sol', { 'gpt-6-sol': 1050000 })).toBe('gpt-6-sol');
+    expect(findMatchingPattern('gpt-7.1-nova', { 'gpt-7-nova': 1 })).toBe('gpt-7-nova');
+    expect(findMatchingPattern('gpt-7.1-nova', { 'gpt-6-sol': 1 })).toBeNull();
   });
 });
 

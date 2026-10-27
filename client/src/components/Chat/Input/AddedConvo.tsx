@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { X } from 'lucide-react';
+import { Button, TooltipAnchor } from '@librechat/client';
 import { isAgentsEndpoint } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import type { SetterOrUpdater } from 'recoil';
@@ -21,8 +23,7 @@ export default function AddedConvo({
     // Priority: agent name > modelDisplayLabel > modelLabel > model
     if (isAgentsEndpoint(addedConvo?.endpoint)) {
       const agent = addedConvo?.agent_id ? agentsMap?.[addedConvo.agent_id] : undefined;
-      /** Never fall into the model-label chain for agents — it would reveal the
-       *  underlying model an agent author may intend to keep private. */
+      /** Keep agent model details private by using its display name only. */
       return `+ ${agent?.name || localize('com_ui_agent')}`;
     }
 
@@ -53,29 +54,21 @@ export default function AddedConvo({
       <span className="text-token-text-secondary line-clamp-3 flex-1 py-0.5 font-semibold">
         {title}
       </span>
-      <button
-        className="text-token-text-secondary flex-shrink-0"
-        type="button"
-        aria-label="Close added conversation"
-        onClick={() => setAddedConvo(null)}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          fill="none"
-          viewBox="0 0 24 24"
-          className="icon-lg"
-          aria-hidden="true"
-        >
-          <path
-            fill="currentColor"
-            fillRule="evenodd"
-            d="M7.293 7.293a1 1 0 0 1 1.414 0L12 10.586l3.293-3.293a1 1 0 1 1 1.414 1.414L13.414 12l3.293 3.293a1 1 0 0 1-1.414 1.414L12 13.414l-3.293 3.293a1 1 0 0 1-1.414-1.414L10.586 12 7.293 8.707a1 1 0 0 1 0-1.414"
-            clipRule="evenodd"
-          ></path>
-        </svg>
-      </button>
+      <TooltipAnchor
+        description={localize('com_ui_close')}
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            type="button"
+            aria-label={localize('com_ui_close')}
+            onClick={() => setAddedConvo(null)}
+            className="size-8 shrink-0 rounded-md text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        }
+      />
     </div>
   );
 }

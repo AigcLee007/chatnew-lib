@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { QueryKeys, FileSources, EModelEndpoint } from 'librechat-data-provider';
 import type { TFile, TFileUpload, TConversation } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
-import { ChatContext, ChatFormProvider } from '~/Providers';
+import { ChatContext, AddedChatContext, ChatFormProvider } from '~/Providers';
 import { AuthContextProvider } from '~/hooks/AuthContext';
 import ChatForm from '../ChatForm';
 import store from '~/store';
@@ -66,7 +66,8 @@ class StubImage {
 
 let commits = 0;
 
-function Harness() {
+function Harness({ initialAddedConvo }: { initialAddedConvo: TConversation | null }) {
+  const [addedConvo, setAddedConvo] = useState(initialAddedConvo);
   const [files, setFiles] = useRecoilState(store.filesByIndex(0));
   const [isSubmitting] = useRecoilState(store.isSubmittingFamily(0));
   const [, setFilesLoading] = useState(false);
@@ -109,15 +110,23 @@ function Harness() {
   return (
     <ChatFormProvider {...methods}>
       <ChatContext.Provider value={chatHelpers}>
-        <Profiler id="composer" onRender={() => (commits += 1)}>
-          <ChatForm index={0} />
-        </Profiler>
+        <AddedChatContext.Provider
+          value={{
+            conversation: addedConvo,
+            setConversation: setAddedConvo,
+            generateConversation: () => undefined,
+          }}
+        >
+          <Profiler id="composer" onRender={() => (commits += 1)}>
+            <ChatForm index={0} />
+          </Profiler>
+        </AddedChatContext.Provider>
       </ChatContext.Provider>
     </ChatFormProvider>
   );
 }
 
-function renderComposer() {
+function renderComposer(initialAddedConvo: TConversation | null = null) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -131,7 +140,7 @@ function renderComposer() {
         <Router>
           <AuthContextProvider authConfig={{ loginRedirect: '', test: true }}>
             <DndProvider backend={HTML5Backend}>
-              <Harness />
+              <Harness initialAddedConvo={initialAddedConvo} />
             </DndProvider>
           </AuthContextProvider>
         </Router>
@@ -146,6 +155,25 @@ const attach = (container: HTMLElement, file: File) =>
 const image = () => new File(['image-bytes'], 'cat.png', { type: 'image/png' });
 
 describe('ChatForm attachments', () => {
+  test('reserves room for expand beside comparison close and keeps both actions usable', async () => {
+    renderComposer({ ...conversation, model: 'comparison-model' });
+    const textarea = await screen.findByTestId('text-input');
+    await userEvent.type(textarea, 'Keep comparison draft');
+    const comparison = screen.getByText('+ comparison-model');
+    const header = comparison.parentElement?.parentElement;
+    expect(header).toHaveClass('me-12');
+    expect(header).not.toHaveClass('absolute');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand editor' }));
+    expect(screen.getByRole('dialog', { name: 'Expand editor' })).toContainElement(comparison);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByText('+ comparison-model')).not.toBeInTheDocument();
+    expect(textarea).toHaveValue('Keep comparison draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Exit expanded editor' }));
+    expect(screen.queryByRole('dialog', { name: 'Expand editor' })).not.toBeInTheDocument();
+    expect(textarea).toHaveValue('Keep comparison draft');
+  });
+
   test('exposes formatting through the plus menu and preserves the draft when expanding', async () => {
     renderComposer();
     const textarea = await screen.findByTestId('text-input');
@@ -174,6 +202,16 @@ describe('ChatForm attachments', () => {
       model.compareDocumentPosition(sendButton()) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(model).toHaveAttribute('type', 'button');
+  });
+
+  test('keeps speech input next to the plus menu', async () => {
+    renderComposer();
+    await screen.findByTestId('text-input');
+    const plus = screen.getByRole('button', { name: 'Add attachments and tools' });
+    const microphone = screen.getByRole('button', { name: 'Use microphone' });
+    expect(plus.closest('[data-composer-controls]')).toBe(
+      microphone.closest('[data-composer-controls]'),
+    );
   });
 
   beforeEach(() => {

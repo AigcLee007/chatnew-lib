@@ -64,6 +64,7 @@ export default function ReasoningControl({
         >
           <SelectTrigger
             aria-label={label}
+            title={label}
             aria-describedby={descriptionId}
             className={cn(
               'h-8 w-auto min-w-24 gap-2 text-xs',
@@ -89,6 +90,7 @@ export default function ReasoningControl({
         <>
           <Input
             aria-label={label}
+            title={label}
             aria-describedby={descriptionId}
             className="h-8 w-24 rounded-md border border-border-medium bg-surface-chat px-2 text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-heavy"
             type="number"

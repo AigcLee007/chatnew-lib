@@ -948,7 +948,10 @@ const ChatForm = memo(function ChatForm({
                     isRTL ? 'flex-row-reverse' : 'flex-row',
                   )}
                 >
-                  <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
+                  <div
+                    className={`${isRTL ? 'mr-2' : 'ml-2'} flex items-center gap-1`}
+                    data-composer-controls
+                  >
                     <AttachFileChat
                       conversation={conversation}
                       disableInputs={disableInputs || answerMode.composerLocked}
@@ -971,6 +974,14 @@ const ChatForm = memo(function ChatForm({
                         return showTools ? <ToolsDropdown renderMenu={menu} /> : menu([]);
                       }}
                     />
+                    {SpeechToText && (
+                      <AudioRecorder
+                        methods={methods}
+                        ask={submitWithReasoning}
+                        disabled={disableInputs || isNotAppendable}
+                        isSubmitting={isSubmitting}
+                      />
+                    )}
                   </div>
                   <div className="order-last w-full px-2 pt-1 empty:hidden">
                     <BadgeRow
@@ -1023,14 +1034,6 @@ const ChatForm = memo(function ChatForm({
                       />
                     )}
                   </div>
-                  {SpeechToText && (
-                    <AudioRecorder
-                      methods={methods}
-                      ask={submitWithReasoning}
-                      disabled={disableInputs || isNotAppendable}
-                      isSubmitting={isSubmitting}
-                    />
-                  )}
                   {steering.duringRunActive &&
                     steering.canControlGeneration &&
                     (textValue?.trim() ?? '') !== '' && (

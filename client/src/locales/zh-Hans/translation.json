@@ -948,6 +948,8 @@
   "com_ui_authentication": "认证",
   "com_ui_authentication_type": "认证类型",
   "com_ui_auto": "自动",
+  "com_ui_reasoning_level": "思考等级",
+  "com_ui_reasoning_next_message": "仅应用于下一条消息",
   "com_ui_available_options": "可用选项",
   "com_ui_avatar": "头像",
   "com_ui_avatar_drop_image": "将图片拖到此处作为头像",

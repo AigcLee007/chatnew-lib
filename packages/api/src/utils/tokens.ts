@@ -1,5 +1,5 @@
 import z from 'zod';
-import { EModelEndpoint } from 'librechat-data-provider';
+import { EModelEndpoint, supportsContext1m } from 'librechat-data-provider';
 import type { EndpointTokenConfig, TokenConfig } from '~/types';
 
 /**
@@ -64,6 +64,9 @@ const openAIModels = {
   'gpt-5.6': 1050000,
   'gpt-5.6-terra': 1050000,
   'gpt-5.6-luna': 1050000,
+  'gpt-6-astra': 1050000,
+  'gpt-6-sol': 1050000,
+  'gpt-6-luna': 1050000,
   'chat-latest': 400000,
   'gpt-5-mini': 400000,
   'gpt-5-nano': 400000,
@@ -143,6 +146,7 @@ const googleModels = {
   'gemini-3.5-flash-lite': 1048576,
   'gemini-3.6-flash': 1048576,
   'gemini-3.7-flash': 1048576,
+  'gemini-3.8-flash': 1048576,
   'gemini-4-argon': 1048576,
 };
 
@@ -165,6 +169,8 @@ const anthropicModels = {
   'claude-3.7-sonnet': 200000,
   'claude-4': 200000,
   'claude-haiku-4-5': 200000,
+  'claude-haiku-5-5': 1000000,
+  'claude-haiku-5.5': 1000000,
   'claude-opus-4': 200000,
   'claude-opus-4-5': 200000,
   'claude-sonnet-4': 200000,
@@ -178,20 +184,22 @@ const anthropicModels = {
   'claude-sonnet-4-9': 1000000,
   'claude-sonnet-4.9': 1000000,
   'claude-sonnet-5': 1000000,
+  'claude-sonnet-5-5': 1000000,
+  'claude-sonnet-5.5': 1000000,
   'claude-opus-4-6': 1000000,
   'claude-opus-4-7': 1000000,
   'claude-opus-4-8': 1000000,
   'claude-opus-5': 1000000,
+  'claude-opus-5-5': 1000000,
+  'claude-opus-5.5': 1000000,
   'claude-fable-5-1': 1000000,
+  'claude-mythos-5-1': 1000000,
   'claude-fable-5': 1000000,
   'claude-mythos-5': 1000000,
 };
 
 const ANTHROPIC_SONNET_4_6_PLUS_CONTEXT = 1000000;
 const ANTHROPIC_SONNET_4_6_PLUS_OUTPUT = 128000;
-const ANTHROPIC_SONNET_4_6_PLUS_PATTERN =
-  /(?:claude-sonnet[-.]?4[-.]?(?:[6-9]|\d{2})|claude[-.]?4[-.]?(?:[6-9]|\d{2})[-.]?sonnet)(?=$|[^0-9])/;
-
 function usesAnthropicContextMap(endpoint: EModelEndpoint): boolean {
   return (
     endpoint === EModelEndpoint.anthropic ||
@@ -206,7 +214,7 @@ function getAnthropicSonnet46PlusContext(
   modelName: string,
   endpoint: EModelEndpoint,
 ): number | undefined {
-  if (!usesAnthropicContextMap(endpoint) || !ANTHROPIC_SONNET_4_6_PLUS_PATTERN.test(modelName)) {
+  if (!usesAnthropicContextMap(endpoint) || !supportsContext1m(modelName)) {
     return undefined;
   }
   return ANTHROPIC_SONNET_4_6_PLUS_CONTEXT;
@@ -216,7 +224,7 @@ function getAnthropicSonnet46PlusOutput(
   modelName: string,
   endpoint: EModelEndpoint,
 ): number | undefined {
-  if (endpoint !== EModelEndpoint.anthropic || !ANTHROPIC_SONNET_4_6_PLUS_PATTERN.test(modelName)) {
+  if (endpoint !== EModelEndpoint.anthropic || !supportsContext1m(modelName)) {
     return undefined;
   }
   return ANTHROPIC_SONNET_4_6_PLUS_OUTPUT;
@@ -447,6 +455,8 @@ const xAIModels = {
   'grok-4-5': 500000,
   'grok-4.6': 500000,
   'grok-4-6': 500000,
+  'grok-4.7': 500000,
+  'grok-4-7': 500000,
 };
 
 const aggregateModels = {
@@ -606,6 +616,24 @@ function findLongestKey(lowerModelName: string, tokensMap: ModelKeyedMap): strin
  * OpenRouter is keyed by `org/model`, so those must still beat a bare `model`.
  */
 export function findMatchingPattern(modelName: string, tokensMap: ModelKeyedMap): string | null {
+  const direct = findVendorAwarePattern(modelName, tokensMap);
+  if (direct != null) {
+    return direct;
+  }
+  const family = gptPointReleaseFamily(modelName);
+  return family == null ? null : findVendorAwarePattern(family, tokensMap);
+}
+
+const GPT_POINT_RELEASE = /(^|[^a-z0-9])(gpt-\d+)\.\d+(?=-)/i;
+
+function gptPointReleaseFamily(model: string): string | undefined {
+  if (!GPT_POINT_RELEASE.test(model)) {
+    return undefined;
+  }
+  return model.replace(GPT_POINT_RELEASE, '$1$2');
+}
+
+function findVendorAwarePattern(modelName: string, tokensMap: ModelKeyedMap): string | null {
   const lowerModelName = modelName.toLowerCase();
   const slashIndex = lowerModelName.lastIndexOf('/');
   if (slashIndex === -1) {
