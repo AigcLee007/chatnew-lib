@@ -161,6 +161,80 @@ describe('buildEndpointOption - defaultParamsEndpoint parsing', () => {
     expect(parsedResult.temperature).toBe(0.7);
   });
 
+  it('applies a supported one-message override to the server-built model parameters', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      openAI: { type: EModelEndpoint.openAI },
+    });
+    const req = createReq(
+      {
+        endpoint: EModelEndpoint.openAI,
+        model: 'o3-mini',
+        reasoningOverride: { key: 'reasoning_effort', value: 'high' },
+      },
+      { modelSpecs: null },
+    );
+    req.baseUrl = '/api/agents/chat';
+    const next = jest.fn();
+
+    await buildEndpointOption(req, createRes(), next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.body.endpointOption.model_parameters).toEqual({ reasoning_effort: 'high' });
+  });
+
+  it('rejects unsupported reasoning overrides before provider dispatch', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      openAI: { type: EModelEndpoint.openAI },
+    });
+    const req = createReq(
+      {
+        endpoint: EModelEndpoint.openAI,
+        model: 'gpt-4.1',
+        reasoningOverride: { key: 'reasoning_effort', value: 'high' },
+      },
+      { modelSpecs: null },
+    );
+    req.baseUrl = '/api/agents/chat';
+    const res = createRes();
+    const next = jest.fn();
+
+    await buildEndpointOption(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'unsupported_reasoning_override' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('validates saved Agent overrides against the loaded Agent provider and model', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      openAI: { type: EModelEndpoint.openAI },
+    });
+    mockAgentBuildOptions.mockReturnValueOnce({
+      endpoint: EModelEndpoint.agents,
+      model_parameters: {},
+      agent: Promise.resolve({
+        provider: EModelEndpoint.openAI,
+        model: 'o3-mini',
+        model_parameters: { model: 'o3-mini' },
+      }),
+    });
+    const req = createReq(
+      {
+        endpoint: EModelEndpoint.agents,
+        agent_id: 'saved-agent',
+        reasoningOverride: { key: 'reasoning_effort', value: 'high' },
+      },
+      { modelSpecs: null },
+    );
+    req.baseUrl = '/api/agents/chat';
+    const next = jest.fn();
+
+    await buildEndpointOption(req, createRes(), next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.body.endpointOption.model_parameters).toEqual({ reasoning_effort: 'high' });
+  });
+
   it('should pass defaultParamsEndpoint when re-parsing enforced model spec', async () => {
     mockGetEndpointsConfig.mockResolvedValue({
       AnthropicClaude: {

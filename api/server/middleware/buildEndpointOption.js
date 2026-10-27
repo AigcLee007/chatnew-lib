@@ -4,11 +4,13 @@ const {
   findModelSpecByName,
   isModelSpecEndpointMatch,
   resolveModelSpecPromptPrefixVariables,
+  validateReasoningOverride,
 } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const {
   EndpointURLs,
   EModelEndpoint,
+  isAssistantsEndpoint,
   isAgentsEndpoint,
   parseCompactConvo,
   getDefaultParamsEndpoint,
@@ -18,6 +20,7 @@ const assistants = require('~/server/services/Endpoints/assistants');
 const { getEndpointsConfig } = require('~/server/services/Config');
 const agents = require('~/server/services/Endpoints/agents');
 const { updateFilesUsage } = require('~/models');
+const { getReasoningCapability } = require('~/server/services/Endpoints/reasoning');
 
 const buildFunction = {
   [EModelEndpoint.agents]: agents.buildOptions,
@@ -57,6 +60,7 @@ async function buildEndpointOption(req, res, next) {
 
   const appConfig = req.config;
   let appliedModelSpecPrivateFields = new Set();
+  let resolvedModelSpec;
   if (appConfig.modelSpecs?.list?.length && appConfig.modelSpecs?.enforce) {
     /** @type {{ list: TModelSpec[] }}*/
     const { list } = appConfig.modelSpecs;
@@ -77,6 +81,7 @@ async function buildEndpointOption(req, res, next) {
     if (!currentModelSpec) {
       return handleError(res, { text: 'Invalid model spec' });
     }
+    resolvedModelSpec = currentModelSpec;
 
     if (!isModelSpecEndpointMatch(currentModelSpec, endpoint)) {
       return handleError(res, { text: 'Model spec mismatch' });
@@ -100,6 +105,7 @@ async function buildEndpointOption(req, res, next) {
   } else if (parsedBody.spec && appConfig.modelSpecs?.list) {
     const modelSpec = findModelSpecByName(appConfig.modelSpecs, parsedBody.spec);
     if (modelSpec) {
+      resolvedModelSpec = modelSpec;
       if (!isModelSpecEndpointMatch(modelSpec, endpoint)) {
         return handleError(res, { text: 'Model spec mismatch' });
       }
@@ -136,7 +142,57 @@ async function buildEndpointOption(req, res, next) {
 
     // TODO: use object params
     req.body = req.body || {}; // Express 5: ensure req.body exists
-    req.body.endpointOption = await builder(endpoint, parsedBody, endpointType);
+    const endpointOption = await builder(endpoint, parsedBody, endpointType);
+
+    if (req.body.reasoningOverride != null) {
+      if (isAssistantsEndpoint(endpoint)) {
+        return res.status(400).json({ error: 'unsupported_reasoning_override' });
+      }
+
+      const loadedAgent = await endpointOption.agent;
+      const providerName = loadedAgent?.provider ?? endpoint;
+      const model =
+        loadedAgent?.model_parameters?.model ?? loadedAgent?.model ?? parsedBody.model ?? '';
+      const providerConfig = endpointsConfig?.[providerName] ?? {};
+      const providerType = providerConfig.type ?? providerName;
+      const customParams = providerConfig.customParams ?? {};
+      const catalogCapability = await getReasoningCapability({
+        endpointsConfig,
+        configuredEndpoints: appConfig.endpoints?.custom,
+        endpoint: providerName,
+        model,
+      });
+      const blockedParameters =
+        appConfig.modelSpecs?.enforce === true && resolvedModelSpec
+          ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'].filter(
+              (key) => resolvedModelSpec.preset?.[key] != null,
+            )
+          : [];
+      const validation = validateReasoningOverride({
+        endpoint: providerType,
+        model,
+        provider: providerConfig.provider,
+        defaultParamsEndpoint:
+          customParams.defaultParamsEndpoint ??
+          getDefaultParamsEndpoint(endpointsConfig, providerName),
+        parameterDefinitions: customParams.paramDefinitions,
+        reasoningFormat: customParams.reasoningFormat,
+        dropParams: providerConfig.dropParams,
+        blockedParameters,
+        catalogCapability,
+        override: req.body.reasoningOverride,
+      });
+      if (!validation.valid) {
+        return res.status(400).json({ error: 'unsupported_reasoning_override' });
+      }
+
+      endpointOption.model_parameters = {
+        ...(endpointOption.model_parameters ?? {}),
+        [validation.override.key]: validation.override.value,
+      };
+    }
+
+    req.body.endpointOption = endpointOption;
 
     if (req.body.files && !isAgents) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files, undefined, {

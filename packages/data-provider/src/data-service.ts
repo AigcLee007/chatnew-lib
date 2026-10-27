@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios';
 import type { TInsightsAccessResponse, TInsightsParams, TInsightsResponse } from './types/insights';
+import type { ReasoningCatalogCapability } from './reasoning';
 import type { TFileConfig } from './file-config';
 import type * as t from './types';
 import * as permissions from './accessPermissions';
@@ -197,8 +198,14 @@ export function updateUserPreferences(
 export function getUserBalance(): Promise<t.TBalanceResponse> {
   return request.get(endpoints.balance());
 }
-export function getAittcoQuota(): Promise<q.TAittcoQuotaResponse> { return request.get(endpoints.aittcoQuota()); }
-export function getAittcoUsage(params: { refresh?: boolean } = {}): Promise<q.TAittcoUsageResponse> { return request.get(endpoints.aittcoUsage(params.refresh === true)); }
+export function getAittcoQuota(): Promise<q.TAittcoQuotaResponse> {
+  return request.get(endpoints.aittcoQuota());
+}
+export function getAittcoUsage(
+  params: { refresh?: boolean } = {},
+): Promise<q.TAittcoUsageResponse> {
+  return request.get(endpoints.aittcoUsage(params.refresh === true));
+}
 
 export const updateTokenCount = (text: string) => {
   return request.post(endpoints.tokenizer(), { arg: text });
@@ -304,6 +311,12 @@ export const getStartupConfig = (
 export const getAIEndpoints = (): Promise<t.TEndpointsConfig> => {
   return request.get(endpoints.aiEndpoints());
 };
+
+export const getReasoningCapability = (
+  endpoint: string,
+  model: string,
+): Promise<ReasoningCatalogCapability | null> =>
+  request.get(endpoints.reasoningCapability(endpoint, model));
 
 export const getTokenConfig = (): Promise<t.TTokenConfigMap> => {
   return request.get(endpoints.tokenConfig());

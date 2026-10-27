@@ -10,8 +10,33 @@ import {
   eReasoningEffortSchema,
   eReasoningModeSchema,
   eReasoningContextSchema,
+  reasoningOverrideSchema,
   subagentThreadLineageSchema,
 } from './schemas';
+
+describe('reasoningOverrideSchema', () => {
+  it('accepts known reasoning keys with a finite string or numeric override', () => {
+    expect(reasoningOverrideSchema.parse({ key: 'reasoning_effort', value: 'high' })).toEqual({
+      key: 'reasoning_effort',
+      value: 'high',
+    });
+    expect(reasoningOverrideSchema.parse({ key: 'thinkingBudget', value: 4096 })).toEqual({
+      key: 'thinkingBudget',
+      value: 4096,
+    });
+  });
+
+  it('rejects unknown keys, empty values, non-finite numbers, and extra fields', () => {
+    expect(reasoningOverrideSchema.safeParse({ key: 'temperature', value: 0 }).success).toBe(false);
+    expect(reasoningOverrideSchema.safeParse({ key: 'effort', value: '' }).success).toBe(false);
+    expect(
+      reasoningOverrideSchema.safeParse({ key: 'thinkingBudget', value: Infinity }).success,
+    ).toBe(false);
+    expect(
+      reasoningOverrideSchema.safeParse({ key: 'effort', value: 'high', trusted: true }).success,
+    ).toBe(false);
+  });
+});
 
 describe('anthropicSettings', () => {
   describe('maxOutputTokens.reset()', () => {

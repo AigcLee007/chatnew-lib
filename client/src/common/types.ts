@@ -336,6 +336,7 @@ export type TGenButtonProps = {
 
 export type TAskProps = {
   text: string;
+  reasoningOverride?: t.TReasoningOverride;
   overrideConvoId?: string;
   overrideUserMessageId?: string;
   parentMessageId?: string | null;
@@ -345,6 +346,7 @@ export type TAskProps = {
 };
 
 export type TOptions = {
+  reasoningOverride?: t.TReasoningOverride;
   editedMessageId?: string | null;
   editedContent?: t.TEditedContent;
   editedText?: string | null;

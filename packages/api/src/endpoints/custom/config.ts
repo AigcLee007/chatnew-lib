@@ -36,6 +36,7 @@ export function loadCustomEndpointsConfig(
         modelDisplayLabel,
         customParams,
         provider,
+        dropParams,
       } = endpoint;
       const name = normalizeEndpointName(configName);
 
@@ -61,6 +62,8 @@ export function loadCustomEndpointsConfig(
         userProvide: isUserProvided(resolvedApiKey) || userProvideURL,
         userProvideURL,
         customParams: resolvedCustomParams,
+        dropParams,
+        provider,
         modelDisplayLabel,
         iconURL,
       };

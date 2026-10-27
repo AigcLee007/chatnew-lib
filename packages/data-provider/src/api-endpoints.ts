@@ -46,7 +46,8 @@ export const userPreferences = () => `${user()}/preferences`;
 
 export const balance = () => `${BASE_URL}/api/balance`;
 export const aittcoQuota = () => `${BASE_URL}/api/keys/aittco/quota`;
-export const aittcoUsage = (refresh = false) => `${BASE_URL}/api/keys/aittco/usage${refresh ? '?refresh=true' : ''}`;
+export const aittcoUsage = (refresh = false) =>
+  `${BASE_URL}/api/keys/aittco/usage${refresh ? '?refresh=true' : ''}`;
 
 export const userPlugins = () => `${BASE_URL}/api/user/plugins`;
 
@@ -158,6 +159,9 @@ export const presets = () => `${BASE_URL}/api/presets`;
 export const deletePreset = () => `${BASE_URL}/api/presets/delete`;
 
 export const aiEndpoints = () => `${BASE_URL}/api/endpoints`;
+
+export const reasoningCapability = (endpoint: string, model: string) =>
+  `${BASE_URL}/api/endpoints/reasoning?endpoint=${encodeURIComponent(endpoint)}&model=${encodeURIComponent(model)}`;
 
 export const tokenConfig = () => `${BASE_URL}/api/endpoints/token-config`;
 

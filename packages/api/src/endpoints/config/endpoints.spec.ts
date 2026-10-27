@@ -79,6 +79,34 @@ describe('createEndpointsConfigService', () => {
       expect(result?.myCustom).toBeDefined();
     });
 
+    it('exposes reasoning declarations and dropped parameters for enabled endpoints', async () => {
+      const deps = createMockDeps({
+        getAppConfig: jest.fn().mockResolvedValue(
+          appConfig({
+            endpoints: {
+              openAI: {
+                dropParams: ['reasoning_effort'],
+                customParams: {
+                  reasoningFormat: 'reasoning_effort',
+                  paramDefinitions: [{ key: 'reasoning_effort', type: 'enum', options: ['low'] }],
+                },
+              },
+            },
+          }),
+        ),
+      });
+      const { getEndpointsConfig } = createEndpointsConfigService(deps);
+
+      await expect(getEndpointsConfig(fakeReq())).resolves.toEqual(
+        expect.objectContaining({
+          openAI: expect.objectContaining({
+            dropParams: ['reasoning_effort'],
+            customParams: expect.objectContaining({ reasoningFormat: 'reasoning_effort' }),
+          }),
+        }),
+      );
+    });
+
     it('adds azureOpenAI when configured', async () => {
       const deps = createMockDeps({
         getAppConfig: jest.fn().mockResolvedValue(

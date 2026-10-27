@@ -2,8 +2,23 @@ import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
-import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
-import type { TChatProject, TMessage, TConversation } from 'librechat-data-provider';
+import {
+  Constants,
+  EModelEndpoint,
+  getSettingsKeys,
+  isAssistantsEndpoint,
+  isAgentsEndpoint,
+  paramSettings,
+  resolveEndpointType,
+  resolveReasoningSetting,
+} from 'librechat-data-provider';
+import type {
+  SettingDefinition,
+  TChatProject,
+  TMessage,
+  TConversation,
+  TReasoningOverride,
+} from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter, ConvoGenerator } from '~/common';
 import type { QueuedMessageContext } from '~/hooks/Chat/useSteering';
 import {
@@ -21,7 +36,15 @@ import {
   useChatFormContext,
   useAddedChatContext,
   useAssistantsMapContext,
+  useAgentsMapContext,
 } from '~/Providers';
+import {
+  useGetAgentByIdQuery,
+  useGetEndpointsQuery,
+  useGetReasoningCapabilityQuery,
+  useGetStartupConfig,
+} from '~/data-provider';
+import ReasoningControl, { getScopedReasoningOverride } from './ReasoningControl';
 import { cn, getModelSpec, hasIncompleteFiles, removeFocusRings } from '~/utils';
 import PendingManualSkillsChips from './PendingManualSkillsChips';
 import useAskAnswerMode from '~/hooks/Input/useAskAnswerMode';
@@ -29,7 +52,6 @@ import AskUserQuestionPopover from './AskUserQuestionPopover';
 import InterruptSteerButton from './InterruptSteerButton';
 import DuringRunSendButton from './DuringRunSendButton';
 import ProjectLandingChip from '../ProjectLandingChip';
-import { useGetStartupConfig } from '~/data-provider';
 import { mainTextareaId, BadgeItem } from '~/common';
 import PendingSteerChips from './PendingSteerChips';
 import PendingQuoteChips from './PendingQuoteChips';
@@ -113,6 +135,8 @@ const ChatForm = memo(function ChatForm({
     setConversation: setAddedConvo,
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
+  const agentsMap = useAgentsMapContext();
+  const { data: endpointsConfig = {} } = useGetEndpointsQuery();
   const { data: startupConfig } = useGetStartupConfig();
 
   const endpoint = useMemo(
@@ -123,6 +147,108 @@ const ChatForm = memo(function ChatForm({
     () => getModelSpec({ specName: conversation?.spec, startupConfig }),
     [conversation?.spec, startupConfig],
   );
+  const selectedAgentId = conversation?.agent_id ?? modelSpec?.preset.agent_id ?? undefined;
+  const cachedAgent = agentsMap?.[selectedAgentId ?? ''];
+  const { data: fetchedAgent } = useGetAgentByIdQuery(selectedAgentId, {
+    enabled: isAgentsEndpoint(conversation?.endpoint) && !cachedAgent?.model_parameters,
+  });
+  const activeAgent = cachedAgent ?? fetchedAgent;
+  const reasoningEndpointName =
+    activeAgent?.endpoint ?? activeAgent?.provider ?? conversation?.endpoint ?? '';
+  const reasoningModel =
+    activeAgent?.model_parameters?.model ?? activeAgent?.model ?? conversation?.model ?? '';
+  const endpointConfiguration = endpointsConfig[reasoningEndpointName];
+  const reasoningEndpointType = resolveEndpointType(
+    endpointsConfig,
+    reasoningEndpointName,
+    activeAgent?.provider,
+  );
+  const reasoningCustomParams = endpointConfiguration?.customParams ?? {};
+  const isOpenRouterEndpoint =
+    reasoningCustomParams.defaultParamsEndpoint?.toLowerCase() === 'openrouter' ||
+    reasoningEndpointName.toLowerCase() === 'openrouter';
+  const { data: reasoningCatalogCapability } = useGetReasoningCapabilityQuery(
+    reasoningEndpointName,
+    reasoningModel,
+    isOpenRouterEndpoint,
+  );
+  const reasoningSettingsEndpoint =
+    reasoningCustomParams.defaultParamsEndpoint ??
+    (isOpenRouterEndpoint ? 'openrouter' : (reasoningEndpointType ?? reasoningEndpointName));
+  const reasoningSettings = useMemo((): SettingDefinition[] => {
+    const [combinedKey, endpointKey] = getSettingsKeys(reasoningSettingsEndpoint, reasoningModel);
+    const baseSettings = paramSettings[combinedKey] ?? paramSettings[endpointKey] ?? [];
+    const overrides = new Map(
+      (reasoningCustomParams.paramDefinitions ?? []).map((definition) => [
+        definition.key,
+        definition,
+      ]),
+    );
+    return baseSettings.map(
+      (definition) =>
+        (overrides.get(definition.key) as SettingDefinition | undefined) ?? definition,
+    );
+  }, [reasoningCustomParams.paramDefinitions, reasoningModel, reasoningSettingsEndpoint]);
+  const blockedReasoningParameters = useMemo(
+    () =>
+      startupConfig?.modelSpecs?.enforce === true && modelSpec
+        ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'].filter(
+            (key) => modelSpec.preset[key as keyof typeof modelSpec.preset] != null,
+          )
+        : [],
+    [startupConfig?.modelSpecs?.enforce, modelSpec],
+  );
+  const reasoningSetting = useMemo(
+    () =>
+      resolveReasoningSetting({
+        endpoint: reasoningEndpointType ?? reasoningEndpointName,
+        model: reasoningModel,
+        provider:
+          endpointConfiguration?.provider ??
+          activeAgent?.provider ??
+          (reasoningEndpointType === EModelEndpoint.custom
+            ? reasoningCustomParams.defaultParamsEndpoint
+            : undefined),
+        settings: reasoningSettings,
+        parameterDefinitions: reasoningCustomParams.paramDefinitions as
+          | SettingDefinition[]
+          | undefined,
+        reasoningFormat: reasoningCustomParams.reasoningFormat,
+        dropParams: endpointConfiguration?.dropParams,
+        blockedParameters: blockedReasoningParameters,
+        catalogCapability: reasoningCatalogCapability ?? undefined,
+      }),
+    [
+      activeAgent?.provider,
+      endpointConfiguration?.provider,
+      blockedReasoningParameters,
+      endpointConfiguration?.dropParams,
+      reasoningCustomParams.paramDefinitions,
+      reasoningCustomParams.defaultParamsEndpoint,
+      reasoningCustomParams.reasoningFormat,
+      reasoningModel,
+      reasoningSettings,
+      reasoningEndpointName,
+      reasoningEndpointType,
+      reasoningCatalogCapability,
+    ],
+  );
+  const reasoningTargetKey = [
+    index,
+    conversation?.endpoint,
+    reasoningEndpointName,
+    reasoningModel,
+    selectedAgentId,
+    conversation?.spec,
+  ].join(':');
+  const [scopedReasoningOverride, setScopedReasoningOverride] = useState<{
+    targetKey: string;
+    override: TReasoningOverride;
+  }>();
+  useEffect(() => {
+    setScopedReasoningOverride(undefined);
+  }, [reasoningTargetKey]);
+  const reasoningOverride = getScopedReasoningOverride(scopedReasoningOverride, reasoningTargetKey);
   const hideBadgeRow = modelSpec?.hideBadgeRow === true;
   const filesLoading = useMemo(() => hasIncompleteFiles(files), [files]);
   const conversationId = useMemo(
@@ -198,6 +324,16 @@ const ChatForm = memo(function ChatForm({
   });
 
   const { submitMessage, submitPrompt } = useSubmitMessage();
+  const submitWithReasoning = useCallback(
+    (data?: Parameters<typeof submitMessage>[0]) => {
+      const result = submitMessage(data ? { ...data, reasoningOverride } : undefined);
+      if (result !== false && reasoningOverride) {
+        setScopedReasoningOverride(undefined);
+      }
+      return result;
+    },
+    [reasoningOverride, submitMessage],
+  );
 
   /** Queued/steered sends carry their FULL submission context: explicit
    *  (possibly empty) overrides stop `ask` from vacuuming quotes or skill
@@ -502,7 +638,7 @@ const ChatForm = memo(function ChatForm({
           }
           return;
         }
-        return submitMessage(data);
+        return submitWithReasoning(data);
       })}
       className={cn(
         'mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2',
@@ -681,12 +817,25 @@ const ChatForm = memo(function ChatForm({
                     Array.isArray(conversation?.messages) && conversation.messages.length >= 1
                   }
                 />
+                {reasoningSetting && !isAssistantsEndpoint(endpoint) && (
+                  <ReasoningControl
+                    setting={reasoningSetting}
+                    value={reasoningOverride}
+                    autoAllowed={reasoningCatalogCapability?.required !== true}
+                    descriptionId={`reasoning-override-description-${index}`}
+                    onChange={(override) =>
+                      setScopedReasoningOverride(
+                        override ? { targetKey: reasoningTargetKey, override } : undefined,
+                      )
+                    }
+                  />
+                )}
                 <div className="mx-auto flex" />
                 <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
                 {SpeechToText && (
                   <AudioRecorder
                     methods={methods}
-                    ask={submitMessage}
+                    ask={submitWithReasoning}
                     disabled={disableInputs || isNotAppendable}
                     isSubmitting={isSubmitting}
                   />

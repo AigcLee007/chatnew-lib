@@ -7,6 +7,12 @@ const tokenConfigController = require('~/server/controllers/TokenConfigControlle
 const router = express.Router();
 /** Auth required for role/tenant-scoped endpoint config resolution. */
 router.get('/', requireJwtAuth, endpointController);
+router.get(
+  '/reasoning',
+  requireJwtAuth,
+  configMiddleware,
+  endpointController.getReasoningCapability,
+);
 router.get('/token-config', requireJwtAuth, configMiddleware, tokenConfigController);
 
 module.exports = router;

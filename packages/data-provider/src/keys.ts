@@ -18,6 +18,7 @@ export enum QueryKeys {
   aittcoQuota = 'aittcoQuota',
   aittcoUsage = 'aittcoUsage',
   endpoints = 'endpoints',
+  reasoningCapability = 'reasoningCapability',
   tokenConfig = 'tokenConfig',
   presets = 'presets',
   searchResults = 'searchResults',

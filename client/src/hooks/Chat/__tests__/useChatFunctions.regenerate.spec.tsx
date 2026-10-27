@@ -292,6 +292,25 @@ describe('useChatFunctions regenerate', () => {
     ).toEqual(['user-1', 'assistant-1_']);
     expect(messages.at(-1)?.messageId).toBe('assistant-1_');
   });
+
+  it('reuses the original reasoning override when regenerating the same user message', () => {
+    const original = {
+      ...userMessage('user-1'),
+      reasoningOverride: { key: 'reasoning_effort', value: 'high' },
+    } as TMessage;
+    const { result, setSubmission } = renderAsk([
+      original,
+      assistantMessage('assistant-1', 'user-1'),
+    ]);
+
+    act(() => {
+      result.current.regenerate({ messageId: 'assistant-1', parentMessageId: 'user-1' });
+    });
+
+    expect(setSubmission).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reasoningOverride: original.reasoningOverride }),
+    );
+  });
 });
 
 describe('useChatFunctions ask attachments', () => {

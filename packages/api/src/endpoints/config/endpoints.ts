@@ -42,6 +42,24 @@ export function createEndpointsConfigService(deps: EndpointsConfigDeps): {
       ...customEndpointsConfig,
     };
 
+    for (const [endpoint, endpointOptions] of Object.entries(appConfig.endpoints ?? {})) {
+      if (
+        endpoint === EModelEndpoint.custom ||
+        !endpointOptions ||
+        Array.isArray(endpointOptions)
+      ) {
+        continue;
+      }
+      const resolvedEndpoint = mergedConfig[endpoint];
+      if (resolvedEndpoint) {
+        mergedConfig[endpoint] = {
+          ...resolvedEndpoint,
+          dropParams: endpointOptions.dropParams,
+          customParams: endpointOptions.customParams,
+        };
+      }
+    }
+
     if (appConfig.endpoints?.[EModelEndpoint.azureOpenAI]) {
       mergedConfig[EModelEndpoint.azureOpenAI] = { userProvide: false };
     }

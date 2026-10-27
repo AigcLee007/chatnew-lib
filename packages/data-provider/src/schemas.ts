@@ -319,6 +319,14 @@ export const eThinkingLevelSchema = z.nativeEnum(ThinkingLevel);
 export const eReasoningModeSchema = z.nativeEnum(ReasoningMode);
 export const eReasoningContextSchema = z.nativeEnum(ReasoningContext);
 
+export const reasoningOverrideSchema = z
+  .object({
+    key: z.enum(['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget']),
+    value: z.union([z.string().min(1), z.number().finite()]),
+  })
+  .strict();
+export type TReasoningOverride = z.infer<typeof reasoningOverrideSchema>;
+
 export const defaultAssistantFormValues = {
   assistant: '',
   id: '',
@@ -866,6 +874,7 @@ export const tMessageSchema = z.object({
    * request time and counted in the user message token count.
    */
   quotes: z.array(z.string()).optional(),
+  reasoningOverride: reasoningOverrideSchema.optional(),
 });
 
 /**

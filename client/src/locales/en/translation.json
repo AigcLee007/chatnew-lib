@@ -355,6 +355,8 @@
   "com_endpoint_prompt_prefix_placeholder": "Set custom instructions or context. Ignored if empty.",
   "com_endpoint_reasoning_context": "Reasoning Context",
   "com_endpoint_reasoning_effort": "Reasoning Effort",
+  "com_ui_reasoning_level": "Reasoning level",
+  "com_ui_reasoning_next_message": "Applies to the next message only",
   "com_endpoint_reasoning_mode": "Reasoning Mode",
   "com_endpoint_reasoning_summary": "Reasoning Summary",
   "com_endpoint_save_as_preset": "Save As Preset",

@@ -193,6 +193,7 @@ const messageSchema: Schema<IMessage> = new Schema(
      * count), so they are not duplicated into the stored `text`.
      */
     quotes: { type: [String], default: undefined },
+    reasoningOverride: { type: Schema.Types.Mixed, default: undefined },
     /*
     attachments: {
       type: [

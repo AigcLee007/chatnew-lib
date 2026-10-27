@@ -24,6 +24,23 @@ export const useGetEndpointsQuery = <TData = t.TEndpointsConfig>(
   );
 };
 
+export const useGetReasoningCapabilityQuery = (
+  endpoint: string,
+  model: string,
+  enabled: boolean,
+) => {
+  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  return useQuery<t.ReasoningCatalogCapability | null>(
+    [QueryKeys.reasoningCapability, endpoint, model],
+    () => dataService.getReasoningCapability(endpoint, model),
+    {
+      staleTime: 5 * 60_000,
+      retry: false,
+      enabled: queriesEnabled && enabled && endpoint.length > 0 && model.length > 0,
+    },
+  );
+};
+
 export const useTokenConfigQuery = (
   config?: UseQueryOptions<t.TTokenConfigMap>,
 ): QueryObserverResult<t.TTokenConfigMap> => {

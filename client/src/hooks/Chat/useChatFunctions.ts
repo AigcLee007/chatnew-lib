@@ -273,6 +273,7 @@ export default function useChatFunctions({
       parentMessageId = null,
       conversationId = null,
       messageId = null,
+      reasoningOverride: messageReasoningOverride,
     },
     {
       editedContent = null,
@@ -291,8 +292,10 @@ export default function useChatFunctions({
       overrideRecoverySteerId,
       overrideExpectedPredecessorCreatedAt,
       overrideQueuedMessageOrigin,
+      reasoningOverride,
     } = {},
   ) => {
+    const submittedReasoningOverride = reasoningOverride ?? messageReasoningOverride;
     text = text.trim();
     /**
      * Attached files make an otherwise empty draft submittable, e.g. replying
@@ -539,6 +542,7 @@ export default function useChatFunctions({
        * also merges these into the model-facing user text at request time.
        */
       quotes: quotes.length > 0 ? quotes : undefined,
+      reasoningOverride: submittedReasoningOverride,
     };
 
     const submissionFiles = compact ? undefined : (overrideFiles ?? targetParentMessage?.files);
@@ -609,6 +613,7 @@ export default function useChatFunctions({
        * server-backed `responseMessage` replacement takes over.
        */
       manualSkills: manualSkills.length > 0 ? manualSkills : undefined,
+      reasoningOverride: submittedReasoningOverride,
     };
 
     if (isAssistantsEndpoint(endpoint)) {
@@ -708,6 +713,7 @@ export default function useChatFunctions({
       recoverySteerId: overrideRecoverySteerId,
       expectedPredecessorCreatedAt: overrideExpectedPredecessorCreatedAt,
       queuedMessageOrigin: overrideQueuedMessageOrigin,
+      reasoningOverride: submittedReasoningOverride,
     };
 
     if (regenerateShaped) {

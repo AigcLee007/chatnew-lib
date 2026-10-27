@@ -59,6 +59,7 @@ export { default as createPayload } from './createPayload';
 /* feedback */
 export * from './feedback';
 export * from './parameterSettings';
+export * from './reasoning';
 export * from './agentToolOptions';
 /* code-execution sandbox */
 export * from './codeEnvRef';

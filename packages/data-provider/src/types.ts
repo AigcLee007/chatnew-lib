@@ -9,6 +9,7 @@ import type {
   TBanner,
   ReasoningResponseKey,
   ReasoningParameterFormat,
+  TReasoningOverride,
 } from './schemas';
 import type { Agent, EToolResources, StatefulCodeEnvironment } from './types/assistants';
 import type { RefillIntervalUnit } from './balance';
@@ -128,6 +129,7 @@ export type TEphemeralAgent = {
 export type TPayload = Partial<TMessage> &
   Partial<TEndpointOption> & {
     isContinued: boolean;
+    reasoningOverride?: TReasoningOverride;
     isRegenerate?: boolean;
     /** Internal summarize-only turn attached to the current conversation branch. */
     compact?: boolean;
@@ -228,6 +230,7 @@ export type TSubmission = {
   /** Client-only carry-through for a receipt-bound queued recovery. */
   recoverySteerId?: string;
   expectedPredecessorCreatedAt?: number;
+  reasoningOverride?: TReasoningOverride;
   /** Opaque client-only queue restoration metadata; intentionally omitted by
    * `createPayload`. */
   queuedMessageOrigin?: unknown;
@@ -530,6 +533,8 @@ export type TSearchResults = {
 export type TConfig = {
   order: number;
   type?: EModelEndpoint;
+  provider?: string;
+  dropParams?: string[];
   azure?: boolean;
   availableTools?: [];
   availableRegions?: string[];

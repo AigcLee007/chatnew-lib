@@ -10,12 +10,17 @@ import {
   SettingDefinition,
   tConvoUpdateSchema,
   applyModelAwareDefaults,
+  filterReasoningSettings,
 } from 'librechat-data-provider';
-import type { TPreset } from 'librechat-data-provider';
+import type { SettingDefinition as TSettingDefinition, TPreset } from 'librechat-data-provider';
+import {
+  useGetEndpointsQuery,
+  useGetReasoningCapabilityQuery,
+  useGetStartupConfig,
+} from '~/data-provider';
 import { useChatContext, useLiveAnnouncer } from '~/Providers';
 import { SaveAsPresetDialog } from '~/components/Endpoints';
 import { useSetIndexOptions, useLocalize } from '~/hooks';
-import { useGetEndpointsQuery } from '~/data-provider';
 import { componentMapping } from './components';
 import { logger, cn } from '~/utils';
 
@@ -31,6 +36,7 @@ export default function Parameters() {
   const [resetCount, setResetCount] = useState(0);
 
   const { data: endpointsConfig = {} } = useGetEndpointsQuery();
+  const { data: startupConfig } = useGetStartupConfig();
   const provider = conversation?.endpoint ?? '';
   const model = conversation?.model ?? '';
 
@@ -42,9 +48,17 @@ export default function Parameters() {
     () => getEndpointField(endpointsConfig, conversation?.endpoint, 'type'),
     [conversation?.endpoint, endpointsConfig],
   );
+  const customParams = endpointsConfig[provider]?.customParams ?? {};
+  const isOpenRouterEndpoint =
+    customParams.defaultParamsEndpoint?.toLowerCase() === 'openrouter' ||
+    provider.toLowerCase() === 'openrouter';
+  const { data: reasoningCatalogCapability } = useGetReasoningCapabilityQuery(
+    provider,
+    model,
+    isOpenRouterEndpoint,
+  );
 
   const parameters = useMemo((): SettingDefinition[] => {
-    const customParams = endpointsConfig[provider]?.customParams ?? {};
     const [combinedKey, endpointKey] = getSettingsKeys(endpointType ?? provider, model);
     const overriddenEndpointKey = customParams.defaultParamsEndpoint ?? endpointKey;
     const defaultParams = paramSettings[combinedKey] ?? paramSettings[overriddenEndpointKey] ?? [];
@@ -55,10 +69,41 @@ export default function Parameters() {
       overriddenEndpointKey,
       model,
     );
-    return modelAwareParams.map(
+    const resolvedParams = modelAwareParams.map(
       (param) => (overriddenParamsMap[param.key] as SettingDefinition) ?? param,
     );
-  }, [endpointType, endpointsConfig, model, provider]);
+    const modelSpec = startupConfig?.modelSpecs?.list?.find(
+      (spec) => spec.name === conversation?.spec,
+    );
+    const blockedParameters =
+      startupConfig?.modelSpecs?.enforce === true && modelSpec
+        ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'].filter(
+            (key) => modelSpec.preset[key as keyof typeof modelSpec.preset] != null,
+          )
+        : [];
+    return filterReasoningSettings(resolvedParams as TSettingDefinition[], {
+      endpoint: endpointType ?? provider,
+      model,
+      provider:
+        endpointsConfig[provider]?.provider ??
+        (endpointType === 'custom' ? customParams.defaultParamsEndpoint : undefined),
+      parameterDefinitions: overriddenParams as TSettingDefinition[],
+      reasoningFormat: customParams.reasoningFormat,
+      dropParams: endpointsConfig[provider]?.dropParams,
+      blockedParameters,
+      catalogCapability: reasoningCatalogCapability ?? undefined,
+    });
+  }, [
+    conversation?.spec,
+    customParams.defaultParamsEndpoint,
+    customParams.reasoningFormat,
+    endpointType,
+    endpointsConfig,
+    model,
+    provider,
+    reasoningCatalogCapability,
+    startupConfig,
+  ]);
 
   useEffect(() => {
     if (!parameters) {
@@ -99,6 +144,22 @@ export default function Parameters() {
         }
 
         if (excludedKeys.has(key)) {
+          return;
+        }
+
+        if (
+          [
+            'reasoning_effort',
+            'reasoning_summary',
+            'reasoning_mode',
+            'reasoning_context',
+            'effort',
+            'thinking',
+            'thinkingBudget',
+            'thinkingLevel',
+            'thinkingDisplay',
+          ].includes(key)
+        ) {
           return;
         }
 

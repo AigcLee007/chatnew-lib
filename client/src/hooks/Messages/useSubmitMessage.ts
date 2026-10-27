@@ -21,6 +21,7 @@ export default function useSubmitMessage() {
   const submitMessage = useCallback(
     (data?: {
       text: string;
+      reasoningOverride?: import('librechat-data-provider').TReasoningOverride;
       overrideFiles?: TMessage['files'];
       overrideQuotes?: string[];
       overrideManualSkills?: string[];
@@ -50,6 +51,7 @@ export default function useSubmitMessage() {
         },
         {
           addedConvo: addedConvo ?? undefined,
+          reasoningOverride: data.reasoningOverride,
           // Queued during-run messages carry their own consumed attachments,
           // quote chips, and manual skill picks (undefined = drain composer).
           overrideFiles: data.overrideFiles,
