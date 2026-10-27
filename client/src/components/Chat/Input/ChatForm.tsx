@@ -1,8 +1,17 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
-import { Button, TextareaAutosize, TooltipAnchor } from '@librechat/client';
+import type { Editor } from '@tiptap/core';
+import {
+  Button,
+  TextareaAutosize,
+  TooltipAnchor,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@librechat/client';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import { useRecoilState, useRecoilValue, useRecoilCallback, useSetRecoilState } from 'recoil';
+import { useRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
 import {
   Constants,
   isParamEndpoint,
@@ -64,7 +73,7 @@ import ComposerFormatting from './ComposerFormatting';
 import ComposerMenu from './ComposerMenu';
 import ToolsDropdown from './ToolsDropdown';
 import ToolDialogs from './ToolDialogs';
-import useSidebarToggle from '~/hooks/Nav/useSidebarToggle';
+import Parameters from '~/components/SidePanel/Parameters/Panel';
 import useSteering from '~/hooks/Chat/useSteering';
 import FileFormChat from './Files/FileFormChat';
 import InFlightSteers from './InFlightSteers';
@@ -114,14 +123,14 @@ const ChatForm = memo(function ChatForm({
   const formRef = useRef<HTMLFormElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const composerEditorRef = useRef<Editor | null>(null);
   useFocusChatEffect(textAreaRef);
   const localize = useLocalize();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFormatting, setShowFormatting] = useState(false);
-  const { setSidebarOpen } = useSidebarToggle();
-  const setActivePanel = useSetRecoilState(store.activePanel);
+  const [parametersOpen, setParametersOpen] = useState(false);
 
   useEffect(() => {
     if (!isExpanded) {
@@ -312,8 +321,12 @@ const ChatForm = memo(function ChatForm({
     if (window.matchMedia?.('(pointer: coarse)').matches) {
       return;
     }
+    if (showFormatting) {
+      composerEditorRef.current?.commands.focus();
+      return;
+    }
     textAreaRef.current?.focus();
-  }, []);
+  }, [showFormatting]);
 
   const handleFocusOrClick = useCallback(() => {
     if (isCollapsed) {
@@ -660,8 +673,45 @@ const ChatForm = memo(function ChatForm({
     !requiresKey;
   const openParameters = () => {
     setIsExpanded(false);
-    setSidebarOpen(true, () => setActivePanel('parameters'));
+    setParametersOpen(true);
   };
+
+  const handleComposerEditorReady = useCallback((editor: Editor | null) => {
+    composerEditorRef.current = editor;
+  }, []);
+
+  const handleRichEditorKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Enter' && event.shiftKey) {
+        return;
+      }
+      const currentTarget = { value: methods.getValues('text') ?? '' };
+      const bridgedEvent = new Proxy(event, {
+        get(target, property) {
+          if (property === 'currentTarget') {
+            return currentTarget;
+          }
+          if (property === 'nativeEvent') {
+            return target;
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      }) as unknown as React.KeyboardEvent<HTMLTextAreaElement>;
+      if (answerMode.handleComposerKeyDown(bridgedEvent)) {
+        return;
+      }
+      handleKeyDown(bridgedEvent);
+    },
+    [answerMode, handleKeyDown, methods],
+  );
+
+  let textAreaHeight: number | undefined;
+  if (showFormatting) {
+    textAreaHeight = 1;
+  } else if (!isExpanded) {
+    textAreaHeight = 44;
+  }
 
   return (
     <BadgeRowProvider
@@ -669,6 +719,14 @@ const ChatForm = memo(function ChatForm({
       specName={conversation?.spec}
       isSubmitting={isSubmitting}
     >
+      <Dialog open={parametersOpen && canOpenParameters} onOpenChange={setParametersOpen}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{localize('com_ui_composer_parameters')}</DialogTitle>
+          </DialogHeader>
+          <Parameters />
+        </DialogContent>
+      </Dialog>
       <form
         ref={formRef}
         role={isExpanded ? 'dialog' : undefined}
@@ -829,8 +887,21 @@ const ChatForm = memo(function ChatForm({
                 </div>
                 {showFormatting && (
                   <ComposerFormatting
+                    text={textValue ?? ''}
+                    onEditorReady={handleComposerEditorReady}
                     textAreaRef={textAreaRef}
                     disabled={disableInputs || isNotAppendable || answerMode.composerLocked}
+                    onKeyDown={handleRichEditorKeyDown}
+                    onKeyUp={
+                      handleKeyUp as unknown as (event: React.KeyboardEvent<HTMLDivElement>) => void
+                    }
+                    onPaste={
+                      handlePaste as unknown as (
+                        event: React.ClipboardEvent<HTMLDivElement>,
+                      ) => void
+                    }
+                    onFocus={handleTextareaFocus}
+                    onBlur={handleTextareaBlur}
                     onChange={(text) =>
                       methods.setValue('text', text, { shouldDirty: true, shouldValidate: true })
                     }
@@ -904,15 +975,30 @@ const ChatForm = memo(function ChatForm({
                         onCompositionStart={handleCompositionStart}
                         onCompositionEnd={handleCompositionEnd}
                         id={mainTextareaId}
-                        tabIndex={0}
+                        tabIndex={showFormatting ? -1 : 0}
                         data-testid="text-input"
                         rows={1}
                         maxRows={isExpanded ? 100 : 15}
-                        onFocus={handleTextareaFocus}
+                        onFocus={() => {
+                          if (showFormatting) {
+                            composerEditorRef.current?.commands.focus();
+                          }
+                          handleTextareaFocus();
+                        }}
                         onBlur={handleTextareaBlur}
                         aria-label={localize('com_ui_message_input')}
+                        aria-hidden={showFormatting}
                         onClick={handleFocusOrClick}
-                        style={{ height: isExpanded ? undefined : 44, overflowY: 'auto' }}
+                        style={{
+                          height: textAreaHeight,
+                          overflowY: 'auto',
+                          position: showFormatting ? 'absolute' : undefined,
+                          left: showFormatting ? '-10000px' : undefined,
+                          width: showFormatting ? 1 : undefined,
+                          padding: showFormatting ? 0 : undefined,
+                          opacity: showFormatting ? 0 : undefined,
+                          pointerEvents: showFormatting ? 'none' : undefined,
+                        }}
                         className={cn(
                           baseClasses,
                           removeFocusRings,

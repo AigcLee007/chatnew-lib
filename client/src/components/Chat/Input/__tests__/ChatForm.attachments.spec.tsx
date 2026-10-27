@@ -6,7 +6,7 @@ import { RecoilRoot, useRecoilState } from 'recoil';
 import userEvent from '@testing-library/user-event';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { QueryKeys, FileSources, EModelEndpoint } from 'librechat-data-provider';
 import type { TFile, TFileUpload, TConversation } from 'librechat-data-provider';
@@ -148,7 +148,9 @@ function renderComposer(initialAddedConvo: TConversation | null = null, paramete
   });
   queryClient.setQueryData([QueryKeys.fileConfig], {});
   queryClient.setQueryData<TFile[]>([QueryKeys.files], []);
-  queryClient.setQueryData([QueryKeys.endpoints], { [EModelEndpoint.openAI]: { order: 0 } });
+  queryClient.setQueryData([QueryKeys.endpoints], {
+    [EModelEndpoint.openAI]: { order: 0, type: EModelEndpoint.openAI },
+  });
   queryClient.setQueryData([QueryKeys.startupConfig, false, 'default'], {
     interface: { parameters },
   });
@@ -180,6 +182,39 @@ const attach = (container: HTMLElement, file: File) =>
 const image = () => new File(['image-bytes'], 'cat.png', { type: 'image/png' });
 
 describe('ChatForm attachments', () => {
+  beforeAll(() => {
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => document.querySelector('[contenteditable="true"]') ?? document.body,
+    });
+    HTMLElement.prototype.getBoundingClientRect = () =>
+      ({
+        x: 0,
+        y: 0,
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 0,
+        height: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    HTMLElement.prototype.getClientRects = () =>
+      ({
+        length: 0,
+        item: () => null,
+        [Symbol.iterator]: function* () {},
+      }) as DOMRectList;
+    Range.prototype.getBoundingClientRect = () =>
+      HTMLElement.prototype.getBoundingClientRect.call(document.body);
+    Range.prototype.getClientRects = () =>
+      ({
+        length: 0,
+        item: () => null,
+        [Symbol.iterator]: function* () {},
+      }) as DOMRectList;
+  });
+
   test('opens advanced parameters without depending on a mounted navigation button', async () => {
     localStorage.setItem('side:active-panel', 'conversations');
     renderComposer(null, true);
@@ -188,9 +223,8 @@ describe('ChatForm attachments', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Expand editor' }));
     await userEvent.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Advanced parameters' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('sidebar-state')).toHaveTextContent('parameters:true'),
-    );
+    const dialog = await screen.findByRole('dialog', { name: 'Advanced parameters' });
+    expect(within(dialog).getByText('Temperature')).toBeVisible();
     expect(screen.queryByRole('dialog', { name: 'Expand editor' })).not.toBeInTheDocument();
     expect(textarea).toHaveValue('Keep parameter draft');
   });
@@ -232,9 +266,23 @@ describe('ChatForm attachments', () => {
     expect(screen.getByRole('dialog', { name: 'Expand editor' })).toContainElement(textarea);
     expect(textarea).toHaveValue('Keep my draft');
     await userEvent.click(screen.getByRole('button', { name: 'Exit expanded editor' }));
-    expect(textarea).toHaveFocus();
+    expect(document.querySelector('[contenteditable="true"]')).toHaveFocus();
     expect(screen.queryByRole('dialog', { name: 'Expand editor' })).not.toBeInTheDocument();
     expect(textarea).toHaveValue('Keep my draft');
+  });
+
+  test('routes rich editor typing through the composer and saves Markdown in the draft', async () => {
+    renderComposer();
+    const textarea = await screen.findByTestId('text-input');
+    await userEvent.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
+    await userEvent.click(
+      await screen.findByRole('menuitemcheckbox', { name: 'Formatting tools' }),
+    );
+    const editor = await screen.findByRole('textbox', { name: 'Message input' });
+    await userEvent.type(editor, 'hello');
+
+    expect(editor).toHaveTextContent('hello');
+    expect(textarea).toHaveValue('hello');
   });
 
   test('places model selection inside the composer before the send button', async () => {
