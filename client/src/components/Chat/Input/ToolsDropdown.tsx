@@ -9,6 +9,7 @@ import {
   defaultAgentCapabilities,
 } from 'librechat-data-provider';
 import type { MenuItemProps } from '~/common';
+import type { ComposerMenuRenderer } from './ComposerMenu';
 import {
   useLocalize,
   useHasAccess,
@@ -24,10 +25,11 @@ import { cn } from '~/utils';
 import ToolHelp from './ToolHelp';
 
 interface ToolsDropdownProps {
+  renderMenu?: ComposerMenuRenderer;
   disabled?: boolean;
 }
 
-const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
+const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
   const localize = useLocalize();
   const { user } = useAuthContext();
   const context = useBadgeRowContext();
@@ -124,6 +126,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   if (fileSearchEnabled && canUseFileSearch) {
     dropdownItems.push({
       onClick: handleFileSearchToggle,
+      ariaChecked: Boolean(fileSearch?.toggleState),
       hideOnClick: false,
       render: (props) => (
         <div {...props}>
@@ -144,7 +147,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
               'hover:bg-surface-secondary hover:shadow-sm',
               !isFileSearchPinned && 'text-text-secondary hover:text-text-primary',
             )}
-            aria-label={isFileSearchPinned ? 'Unpin' : 'Pin'}
+            aria-label={isFileSearchPinned ? localize('com_ui_unpin') : localize('com_ui_pin')}
           >
             <div className="h-4 w-4">
               <PinIcon unpin={isFileSearchPinned} />
@@ -158,6 +161,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   if (canUseSkills && skillsEnabled) {
     dropdownItems.push({
       onClick: handleSkillsToggle,
+      ariaChecked: Boolean(skills?.toggleState),
       hideOnClick: false,
       render: (props) => (
         <div {...props} data-testid="tools-menu-skills">
@@ -192,6 +196,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   if (showMemory) {
     dropdownItems.push({
       onClick: handleMemoryToggle,
+      ariaChecked: Boolean(memory?.toggleState),
       hideOnClick: false,
       render: (props) => (
         <div {...props} data-testid="tools-menu-memory">
@@ -226,6 +231,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   if (canRunCode && codeEnabled) {
     dropdownItems.push({
       onClick: handleCodeInterpreterToggle,
+      ariaChecked: Boolean(codeInterpreter?.toggleState),
       hideOnClick: false,
       render: (props) => (
         <div {...props}>
@@ -247,7 +253,7 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
                 'hover:bg-surface-secondary hover:shadow-sm',
                 !isCodePinned && 'text-text-primary hover:text-text-primary',
               )}
-              aria-label={isCodePinned ? 'Unpin' : 'Pin'}
+              aria-label={isCodePinned ? localize('com_ui_unpin') : localize('com_ui_pin')}
             >
               <div className="h-4 w-4">
                 <PinIcon unpin={isCodePinned} />
@@ -282,6 +288,10 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
       hideOnClick: false,
       render: (props) => <MCPSubMenu {...props} placeholder={mcpPlaceholder} />,
     });
+  }
+
+  if (renderMenu) {
+    return renderMenu(dropdownItems);
   }
 
   if (dropdownItems.length === 0) {

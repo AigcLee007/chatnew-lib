@@ -12,17 +12,20 @@ import type { TConversation } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter } from '~/common';
 import { useGetFileConfig, useGetEndpointsQuery, useGetAgentByIdQuery } from '~/data-provider';
 import { useAgentsMapContext } from '~/Providers';
+import type { ComposerMenuRenderer } from '../ComposerMenu';
 import AttachFileMenu from './AttachFileMenu';
 import AttachFile from './AttachFile';
 
 function AttachFileChat({
   disableInputs,
+  renderMenu,
   conversation,
   files,
   setFiles,
   setFilesLoading,
 }: {
   disableInputs: boolean;
+  renderMenu?: ComposerMenuRenderer;
   conversation: TConversation | null;
   files: Map<string, ExtendedFile>;
   setFiles: FileSetter;
@@ -100,6 +103,7 @@ function AttachFileChat({
   if (isAssistants && endpointSupportsFiles && !isUploadDisabled) {
     return (
       <AttachFile
+        renderMenu={renderMenu}
         disabled={disableInputs}
         files={files}
         setFiles={setFiles}
@@ -111,6 +115,7 @@ function AttachFileChat({
     return (
       <AttachFileMenu
         endpoint={endpoint}
+        renderMenu={renderMenu}
         disabled={disableInputs}
         endpointType={endpointType}
         conversationId={conversationId}
@@ -124,7 +129,7 @@ function AttachFileChat({
       />
     );
   }
-  return null;
+  return renderMenu ? renderMenu([]) : null;
 }
 
 export default memo(AttachFileChat);

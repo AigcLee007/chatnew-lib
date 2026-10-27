@@ -1,9 +1,11 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
-import { TextareaAutosize } from '@librechat/client';
+import { Button, TextareaAutosize, TooltipAnchor } from '@librechat/client';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
 import {
   Constants,
+  isParamEndpoint,
   EModelEndpoint,
   getSettingsKeys,
   isAssistantsEndpoint,
@@ -32,6 +34,7 @@ import {
   useFocusChatEffect,
 } from '~/hooks';
 import {
+  BadgeRowProvider,
   useChatContext,
   useChatFormContext,
   useAddedChatContext,
@@ -57,6 +60,11 @@ import { mainTextareaId, BadgeItem } from '~/common';
 import PendingSteerChips from './PendingSteerChips';
 import PendingQuoteChips from './PendingQuoteChips';
 import AttachFileChat from './Files/AttachFileChat';
+import ComposerFormatting from './ComposerFormatting';
+import ComposerMenu from './ComposerMenu';
+import ToolsDropdown from './ToolsDropdown';
+import ToolDialogs from './ToolDialogs';
+import useSidebarToggle from '~/hooks/Nav/useSidebarToggle';
 import useSteering from '~/hooks/Chat/useSteering';
 import FileFormChat from './Files/FileFormChat';
 import InFlightSteers from './InFlightSteers';
@@ -103,12 +111,28 @@ const ChatForm = memo(function ChatForm({
   handleStopGenerating,
   stopGenerating,
 }: ChatFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   useFocusChatEffect(textAreaRef);
   const localize = useLocalize();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showFormatting, setShowFormatting] = useState(false);
+  const { setSidebarOpen } = useSidebarToggle();
+
+  useEffect(() => {
+    if (!isExpanded) {
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    textAreaRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isExpanded]);
   const [, setIsScrollable] = useState(false);
   const [visualRowCount, setVisualRowCount] = useState(1);
   const [isTextAreaFocused, setIsTextAreaFocused] = useState(false);
@@ -614,296 +638,440 @@ const ChatForm = memo(function ChatForm({
     return null;
   })();
 
+  const collapsedHeightClass = isCollapsed ? 'max-h-[52px]' : 'max-h-[45vh] md:max-h-[55vh]';
   const baseClasses = useMemo(
     () =>
       cn(
         'md:py-3.5 m-0 w-full resize-none py-[13px] placeholder:text-text-tertiary bg-transparent [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)]',
-        isCollapsed ? 'max-h-[52px]' : 'max-h-[45vh] md:max-h-[55vh]',
+        isExpanded ? 'h-full max-h-none flex-1' : collapsedHeightClass,
         isMoreThanThreeRows ? 'pl-5' : 'px-5',
       ),
-    [isCollapsed, isMoreThanThreeRows],
+    [collapsedHeightClass, isExpanded, isMoreThanThreeRows],
   );
 
+  const showTools =
+    !!endpoint && !hideBadgeRow && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint);
+  const canOpenParameters =
+    index === 0 &&
+    startupConfig?.interface?.parameters === true &&
+    isParamEndpoint(conversation?.endpoint ?? '', reasoningEndpointType ?? '') &&
+    !isAgentsEndpoint(endpoint) &&
+    !requiresKey;
+  const openParameters = () => {
+    setIsExpanded(false);
+    setSidebarOpen(true, () => {
+      window.setTimeout(() => {
+        const button = document.querySelector<HTMLButtonElement>(
+          '[data-testid="nav-panel-parameters"]',
+        );
+        if (button?.getAttribute('aria-pressed') !== 'true') {
+          button?.click();
+        }
+      }, 0);
+    });
+  };
+
   return (
-    <form
-      onSubmit={methods.handleSubmit((data) => {
-        // Answer mode: composer text answers the paused run instead of
-        // starting a new turn (submitText resets the composer itself).
-        // Dismissing the popover — or collapsing a batch, which answers in its
-        // own card — restores normal sends.
-        if (answerMode.active && answerMode.submitText(data.text)) {
-          return;
-        }
-        // During a run, a submit steers or queues per the effective action
-        // instead of starting a new turn (which would be dropped anyway).
-        if (steering.duringRunActive) {
-          if (steering.submitDuringRun(data.text)) {
-            methods.reset();
-          }
-          return;
-        }
-        return submitWithReasoning(data);
-      })}
-      className={cn(
-        'mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2',
-        maximizeChatSpace ? 'max-w-full' : 'md:max-w-3xl xl:max-w-4xl',
-        centerFormOnLanding &&
-          (conversationId == null || conversationId === Constants.NEW_CONVO) &&
-          !isSubmitting &&
-          conversation?.messages?.length === 0
-          ? 'transition-all duration-200 sm:mb-28'
-          : 'sm:mb-10',
-      )}
+    <BadgeRowProvider
+      conversationId={conversationId}
+      specName={conversation?.spec}
+      isSubmitting={isSubmitting}
     >
-      <div className="relative flex h-full flex-1 items-stretch md:flex-col">
-        {/* Primary composer owns the selection popup so split-view doesn't double it. */}
-        {index === 0 && quotesEnabled && <QuoteButton conversationId={conversationId} />}
-        {/* `relative` anchors the in-flight steer overlay, which floats above
+      <form
+        ref={formRef}
+        role={isExpanded ? 'dialog' : undefined}
+        aria-modal={isExpanded ? true : undefined}
+        aria-label={isExpanded ? localize('com_ui_expand_editor') : undefined}
+        onKeyDown={(event) => {
+          if (!isExpanded || event.defaultPrevented) {
+            return;
+          }
+          if (event.key === 'Escape') {
+            if ((event.target as HTMLElement).closest('[role="menu"], [role="listbox"]')) {
+              return;
+            }
+            event.preventDefault();
+            setIsExpanded(false);
+            return;
+          }
+          if (event.key !== 'Tab') {
+            return;
+          }
+          const controls = Array.from(
+            formRef.current?.querySelectorAll<HTMLElement>(
+              'button:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+            ) ?? [],
+          ).filter((element) => element.getClientRects().length > 0);
+          const first = controls[0];
+          const last = controls[controls.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }}
+        onSubmit={methods.handleSubmit((data) => {
+          // Answer mode: composer text answers the paused run instead of
+          // starting a new turn (submitText resets the composer itself).
+          // Dismissing the popover — or collapsing a batch, which answers in its
+          // own card — restores normal sends.
+          if (answerMode.active && answerMode.submitText(data.text)) {
+            return;
+          }
+          // During a run, a submit steers or queues per the effective action
+          // instead of starting a new turn (which would be dropped anyway).
+          if (steering.duringRunActive) {
+            if (steering.submitDuringRun(data.text)) {
+              methods.reset();
+            }
+            return;
+          }
+          return submitWithReasoning(data);
+        })}
+        className={cn(
+          'mx-auto flex w-full flex-row gap-3 transition-[max-width] duration-300 sm:px-2',
+          isExpanded && 'fixed inset-0 z-40 !m-0 h-dvh !max-w-none bg-surface-chat p-3 sm:p-8',
+          maximizeChatSpace ? 'max-w-full' : 'md:max-w-3xl xl:max-w-4xl',
+          centerFormOnLanding &&
+            (conversationId == null || conversationId === Constants.NEW_CONVO) &&
+            !isSubmitting &&
+            conversation?.messages?.length === 0
+            ? 'transition-all duration-200 sm:mb-28'
+            : 'sm:mb-10',
+        )}
+      >
+        <div className="relative flex h-full min-h-0 flex-1 items-stretch md:flex-col">
+          {/* Primary composer owns the selection popup so split-view doesn't double it. */}
+          {index === 0 && quotesEnabled && <QuoteButton conversationId={conversationId} />}
+          {/* `relative` anchors the in-flight steer overlay, which floats above
             the composer (`bottom-full`) over the bottom of the thread. */}
-        <div className="relative flex w-full flex-col">
-          {/* Run-scoped: `enabled` alone is any primary composer on a steerable
+          <div className="relative flex min-h-0 w-full flex-col">
+            {/* Run-scoped: `enabled` alone is any primary composer on a steerable
               endpoint, so a chip that outlives the run would strand a bubble. */}
-          {steering.enabled && isSubmitting && (
-            <InFlightSteers
-              steering={steering}
-              conversationId={conversationId}
-              onRestoreToComposer={restoreReclaimedSteer}
-            />
-          )}
-          <div className={cn('flex w-full items-center', isRTL && 'flex-row-reverse')}>
-            <Mention
-              index={index}
-              popoverAtom={plusPopoverAtom}
-              newConversation={generateConversation}
-              textAreaRef={textAreaRef}
-              commandChar="+"
-              placeholder="com_ui_add_model_preset"
-              includeAssistants={false}
-            />
-            <Mention
-              index={index}
-              popoverAtom={mentionPopoverAtom}
-              newConversation={newConversation}
-              textAreaRef={textAreaRef}
-            />
-            <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
-            {index === 0 && (
-              <AskUserQuestionPopover conversationId={conversationId} textAreaRef={textAreaRef} />
+            {steering.enabled && isSubmitting && (
+              <InFlightSteers
+                steering={steering}
+                conversationId={conversationId}
+                onRestoreToComposer={restoreReclaimedSteer}
+              />
             )}
-            <SkillsCommand
-              index={index}
-              textAreaRef={textAreaRef}
-              conversationId={conversationId}
-              agentId={conversation?.agent_id}
-            />
             <div
-              onClick={handleContainerClick}
               className={cn(
-                'relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
-                isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
-                isTemporary
-                  ? 'border-border-medium bg-surface-secondary'
-                  : 'border-border-light bg-surface-chat',
+                'flex w-full items-center',
+                isRTL && 'flex-row-reverse',
+                isExpanded && 'min-h-0 flex-1 items-stretch',
               )}
             >
-              {project ? <ProjectLandingChip project={project} /> : null}
-              <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
-              <PendingManualSkillsChips conversationId={conversationId} />
-              {quotesEnabled && <PendingQuoteChips conversationId={conversationId} />}
-              {steering.enabled && (
-                <PendingSteerChips
-                  conversationId={conversationId}
-                  steering={steering}
-                  onEditToComposer={editToComposer}
-                  onRestoreToComposer={restoreReclaimedSteer}
-                />
-              )}
-              {/* WIP */}
-              <EditBadges
-                isEditingChatBadges={isEditingBadges}
-                handleCancelBadges={handleCancelBadges}
-                handleSaveBadges={handleSaveBadges}
-                setBadges={setBadges}
+              <Mention
+                index={index}
+                popoverAtom={plusPopoverAtom}
+                newConversation={generateConversation}
+                textAreaRef={textAreaRef}
+                commandChar="+"
+                placeholder="com_ui_add_model_preset"
+                includeAssistants={false}
               />
-              <FileFormChat
-                conversation={conversation}
-                files={files}
-                setFiles={setFiles}
-                setFilesLoading={setFilesLoading}
+              <Mention
+                index={index}
+                popoverAtom={mentionPopoverAtom}
+                newConversation={newConversation}
+                textAreaRef={textAreaRef}
               />
-              {endpoint && (
-                <div className={cn('flex', isRTL ? 'flex-row-reverse' : 'flex-row')}>
-                  <div
-                    className="relative flex-1"
-                    style={
-                      isCollapsed
-                        ? {
-                            WebkitMaskImage:
-                              'linear-gradient(to bottom, black 60%, transparent 90%)',
-                            maskImage: 'linear-gradient(to bottom, black 60%, transparent 90%)',
-                          }
-                        : undefined
-                    }
-                  >
-                    <TextareaAutosize
-                      {...registerProps}
-                      ref={(e) => {
-                        ref(e);
-                        (
-                          textAreaRef as React.MutableRefObject<HTMLTextAreaElement | null>
-                        ).current = e;
-                      }}
-                      disabled={disableInputs || isNotAppendable || answerMode.composerLocked}
-                      onPaste={handlePaste}
-                      onKeyDown={(e) => {
-                        // Answer mode consumes option-navigation keys from the
-                        // empty composer; everything else follows the normal path.
-                        if (answerMode.handleComposerKeyDown(e)) {
-                          return;
-                        }
-                        handleKeyDown(e);
-                      }}
-                      onKeyUp={handleKeyUp}
-                      onCompositionStart={handleCompositionStart}
-                      onCompositionEnd={handleCompositionEnd}
-                      id={mainTextareaId}
-                      tabIndex={0}
-                      data-testid="text-input"
-                      rows={1}
-                      onFocus={handleTextareaFocus}
-                      onBlur={handleTextareaBlur}
-                      aria-label={localize('com_ui_message_input')}
-                      onClick={handleFocusOrClick}
-                      style={{ height: 44, overflowY: 'auto' }}
-                      className={cn(
-                        baseClasses,
-                        removeFocusRings,
-                        'scrollbar-hover transition-[max-height] duration-200 disabled:cursor-not-allowed',
-                      )}
-                    />
-                  </div>
-                  <div className="flex flex-col items-start justify-start pr-2.5 pt-1.5">
-                    <CollapseChat
-                      isCollapsed={isCollapsed}
-                      isScrollable={isMoreThanThreeRows}
-                      setIsCollapsed={setIsCollapsed}
-                    />
-                  </div>
-                </div>
+              <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
+              {index === 0 && (
+                <AskUserQuestionPopover conversationId={conversationId} textAreaRef={textAreaRef} />
               )}
+              <SkillsCommand
+                index={index}
+                textAreaRef={textAreaRef}
+                conversationId={conversationId}
+                agentId={conversation?.agent_id}
+              />
               <div
+                onClick={handleContainerClick}
                 className={cn(
-                  '@container flex flex-wrap items-center gap-1 pb-2',
-                  isRTL ? 'flex-row-reverse' : 'flex-row',
+                  'group/composer relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
+                  isExpanded && 'min-h-0 rounded-3xl',
+                  isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
+                  isTemporary
+                    ? 'border-border-medium bg-surface-secondary'
+                    : 'border-border-light bg-surface-chat',
                 )}
               >
-                <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
-                  <AttachFileChat
-                    conversation={conversation}
-                    disableInputs={disableInputs}
-                    files={files}
-                    setFiles={setFiles}
-                    setFilesLoading={setFilesLoading}
-                  />
-                </div>
-                <div className="order-last w-full px-2 pt-1 empty:hidden">
-                  <BadgeRow
-                    showEphemeralBadges={
-                      !!endpoint &&
-                      !hideBadgeRow &&
-                      !isAgentsEndpoint(endpoint) &&
-                      !isAssistantsEndpoint(endpoint)
-                    }
-                    isSubmitting={isSubmitting}
-                    conversationId={conversationId}
-                    specName={conversation?.spec}
-                    onChange={setBadges}
-                    isInChat={
-                      Array.isArray(conversation?.messages) && conversation.messages.length >= 1
-                    }
-                  />
-                </div>
-                <div className="flex shrink-0 items-center">
-                  <TokenUsage
-                    index={index}
-                    conversation={conversation}
-                    isSubmitting={isSubmitting}
-                  />
-                </div>
                 <div
-                  className="ms-auto flex min-w-0 max-w-[min(28rem,calc(100%-9rem))] items-center rounded-lg"
-                  role="group"
-                  data-chat-composer-index={index}
-                  aria-label={localize('com_ui_select_model')}
+                  className="absolute end-2 top-2 z-10"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <ModelSelector
-                    startupConfig={startupConfig}
-                    index={index}
-                    disabled={isSubmitting || answerMode.composerLocked}
+                  <TooltipAnchor
+                    description={localize(
+                      isExpanded ? 'com_ui_composer_restore' : 'com_ui_expand_editor',
+                    )}
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="bg-surface-chat sm:opacity-0 sm:group-focus-within/composer:opacity-100 sm:group-hover/composer:opacity-100"
+                        aria-label={localize(
+                          isExpanded ? 'com_ui_composer_restore' : 'com_ui_expand_editor',
+                        )}
+                        onClick={() => {
+                          setIsCollapsed(false);
+                          const nextExpanded = !isExpanded;
+                          setIsExpanded(nextExpanded);
+                          if (!nextExpanded) {
+                            textAreaRef.current?.focus();
+                          }
+                        }}
+                      >
+                        {isExpanded ? (
+                          <Minimize2 className="size-4" aria-hidden="true" />
+                        ) : (
+                          <Maximize2 className="size-4" aria-hidden="true" />
+                        )}
+                      </Button>
+                    }
                   />
-                  {reasoningSetting && !isAssistantsEndpoint(endpoint) && (
-                    <ReasoningControl
-                      compact
-                      setting={reasoningSetting}
-                      value={reasoningOverride}
-                      autoAllowed={reasoningCatalogCapability?.required !== true}
-                      descriptionId={`reasoning-override-description-${index}`}
-                      onChange={(override) =>
-                        setScopedReasoningOverride(
-                          override ? { targetKey: reasoningTargetKey, override } : undefined,
-                        )
-                      }
-                    />
-                  )}
                 </div>
-                {SpeechToText && (
-                  <AudioRecorder
-                    methods={methods}
-                    ask={submitWithReasoning}
-                    disabled={disableInputs || isNotAppendable}
-                    isSubmitting={isSubmitting}
+                {showFormatting && (
+                  <ComposerFormatting
+                    textAreaRef={textAreaRef}
+                    disabled={disableInputs || isNotAppendable || answerMode.composerLocked}
+                    onChange={(text) =>
+                      methods.setValue('text', text, { shouldDirty: true, shouldValidate: true })
+                    }
                   />
                 )}
-                {steering.duringRunActive &&
-                  steering.canControlGeneration &&
-                  (textValue?.trim() ?? '') !== '' && (
-                    <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
-                      <InterruptSteerButton
-                        steering={steering}
-                        getText={() => methods.getValues('text')}
-                        onConsumed={() => methods.reset()}
-                        disabled={filesLoading}
+                {project ? <ProjectLandingChip project={project} /> : null}
+                <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
+                <PendingManualSkillsChips conversationId={conversationId} />
+                {quotesEnabled && <PendingQuoteChips conversationId={conversationId} />}
+                {steering.enabled && (
+                  <PendingSteerChips
+                    conversationId={conversationId}
+                    steering={steering}
+                    onEditToComposer={editToComposer}
+                    onRestoreToComposer={restoreReclaimedSteer}
+                  />
+                )}
+                {/* WIP */}
+                <EditBadges
+                  isEditingChatBadges={isEditingBadges}
+                  handleCancelBadges={handleCancelBadges}
+                  handleSaveBadges={handleSaveBadges}
+                  setBadges={setBadges}
+                />
+                <FileFormChat
+                  conversation={conversation}
+                  files={files}
+                  setFiles={setFiles}
+                  setFilesLoading={setFilesLoading}
+                />
+                {endpoint && (
+                  <div
+                    className={cn(
+                      'flex',
+                      isRTL ? 'flex-row-reverse' : 'flex-row',
+                      isExpanded && 'min-h-0 flex-1',
+                    )}
+                  >
+                    <div
+                      className={cn('relative flex-1', isExpanded && 'flex min-h-0 flex-col')}
+                      style={
+                        isCollapsed
+                          ? {
+                              WebkitMaskImage:
+                                'linear-gradient(to bottom, black 60%, transparent 90%)',
+                              maskImage: 'linear-gradient(to bottom, black 60%, transparent 90%)',
+                            }
+                          : undefined
+                      }
+                    >
+                      <TextareaAutosize
+                        {...registerProps}
+                        ref={(e) => {
+                          ref(e);
+                          (
+                            textAreaRef as React.MutableRefObject<HTMLTextAreaElement | null>
+                          ).current = e;
+                        }}
+                        disabled={disableInputs || isNotAppendable || answerMode.composerLocked}
+                        onPaste={handlePaste}
+                        onKeyDown={(e) => {
+                          // Answer mode consumes option-navigation keys from the
+                          // empty composer; everything else follows the normal path.
+                          if (answerMode.handleComposerKeyDown(e)) {
+                            return;
+                          }
+                          handleKeyDown(e);
+                        }}
+                        onKeyUp={handleKeyUp}
+                        onCompositionStart={handleCompositionStart}
+                        onCompositionEnd={handleCompositionEnd}
+                        id={mainTextareaId}
+                        tabIndex={0}
+                        data-testid="text-input"
+                        rows={1}
+                        maxRows={isExpanded ? 100 : 15}
+                        onFocus={handleTextareaFocus}
+                        onBlur={handleTextareaBlur}
+                        aria-label={localize('com_ui_message_input')}
+                        onClick={handleFocusOrClick}
+                        style={{ height: isExpanded ? undefined : 44, overflowY: 'auto' }}
+                        className={cn(
+                          baseClasses,
+                          removeFocusRings,
+                          'scrollbar-hover transition-[max-height] duration-200 disabled:cursor-not-allowed',
+                          isExpanded && 'h-full',
+                        )}
                       />
                     </div>
-                  )}
-                <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
-                  {isSubmitting &&
-                  (showStopButton || steering.duringRunActive) &&
-                  !answerMode.composerAnswers
-                    ? duringRunSlot
-                    : endpoint && (
-                        <SendButton
-                          ref={submitButtonRef}
-                          control={methods.control}
-                          fileCount={submittableFileCount}
-                          disabled={
-                            filesLoading ||
-                            disableInputs ||
-                            isNotAppendable ||
-                            answerMode.composerLocked ||
-                            (isSubmitting && !answerMode.composerAnswers)
-                          }
-                        />
+                    <div
+                      className={cn(
+                        'flex flex-col items-start justify-start pr-2.5 pt-1.5',
+                        isExpanded && 'hidden',
                       )}
+                    >
+                      <CollapseChat
+                        isCollapsed={isCollapsed}
+                        isScrollable={isMoreThanThreeRows}
+                        setIsCollapsed={setIsCollapsed}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    '@container flex flex-wrap items-center gap-1 pb-2',
+                    isRTL ? 'flex-row-reverse' : 'flex-row',
+                  )}
+                >
+                  <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
+                    <AttachFileChat
+                      conversation={conversation}
+                      disableInputs={disableInputs || answerMode.composerLocked}
+                      files={files}
+                      setFiles={setFiles}
+                      setFilesLoading={setFilesLoading}
+                      renderMenu={(attachmentItems) => {
+                        const menu = (
+                          toolItems: React.ComponentProps<typeof ComposerMenu>['toolItems'],
+                        ) => (
+                          <ComposerMenu
+                            attachmentItems={attachmentItems}
+                            toolItems={toolItems}
+                            disabled={disableInputs || answerMode.composerLocked}
+                            formatting={showFormatting}
+                            onFormattingChange={setShowFormatting}
+                            onOpenParameters={canOpenParameters ? openParameters : undefined}
+                          />
+                        );
+                        return showTools ? <ToolsDropdown renderMenu={menu} /> : menu([]);
+                      }}
+                    />
+                  </div>
+                  <div className="order-last w-full px-2 pt-1 empty:hidden">
+                    <BadgeRow
+                      showEphemeralBadges={
+                        !!endpoint &&
+                        !hideBadgeRow &&
+                        !isAgentsEndpoint(endpoint) &&
+                        !isAssistantsEndpoint(endpoint)
+                      }
+                      isSubmitting={isSubmitting}
+                      conversationId={conversationId}
+                      specName={conversation?.spec}
+                      onChange={setBadges}
+                      isInChat={
+                        Array.isArray(conversation?.messages) && conversation.messages.length >= 1
+                      }
+                    />
+                  </div>
+                  <div className="flex shrink-0 items-center">
+                    <TokenUsage
+                      index={index}
+                      conversation={conversation}
+                      isSubmitting={isSubmitting}
+                    />
+                  </div>
+                  <div
+                    className="ms-auto flex min-w-0 max-w-[min(28rem,calc(100%-9rem))] items-center rounded-lg"
+                    role="group"
+                    data-chat-composer-index={index}
+                    aria-label={localize('com_ui_select_model')}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <ModelSelector
+                      startupConfig={startupConfig}
+                      index={index}
+                      disabled={isSubmitting || answerMode.composerLocked}
+                    />
+                    {reasoningSetting && !isAssistantsEndpoint(endpoint) && (
+                      <ReasoningControl
+                        compact
+                        setting={reasoningSetting}
+                        value={reasoningOverride}
+                        autoAllowed={reasoningCatalogCapability?.required !== true}
+                        descriptionId={`reasoning-override-description-${index}`}
+                        onChange={(override) =>
+                          setScopedReasoningOverride(
+                            override ? { targetKey: reasoningTargetKey, override } : undefined,
+                          )
+                        }
+                      />
+                    )}
+                  </div>
+                  {SpeechToText && (
+                    <AudioRecorder
+                      methods={methods}
+                      ask={submitWithReasoning}
+                      disabled={disableInputs || isNotAppendable}
+                      isSubmitting={isSubmitting}
+                    />
+                  )}
+                  {steering.duringRunActive &&
+                    steering.canControlGeneration &&
+                    (textValue?.trim() ?? '') !== '' && (
+                      <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
+                        <InterruptSteerButton
+                          steering={steering}
+                          getText={() => methods.getValues('text')}
+                          onConsumed={() => methods.reset()}
+                          disabled={filesLoading}
+                        />
+                      </div>
+                    )}
+                  <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
+                    {isSubmitting &&
+                    (showStopButton || steering.duringRunActive) &&
+                    !answerMode.composerAnswers
+                      ? duringRunSlot
+                      : endpoint && (
+                          <SendButton
+                            ref={submitButtonRef}
+                            control={methods.control}
+                            fileCount={submittableFileCount}
+                            disabled={
+                              filesLoading ||
+                              disableInputs ||
+                              isNotAppendable ||
+                              answerMode.composerLocked ||
+                              (isSubmitting && !answerMode.composerAnswers)
+                            }
+                          />
+                        )}
+                  </div>
                 </div>
+                {TextToSpeech && automaticPlayback && <StreamAudio index={index} />}
               </div>
-              {TextToSpeech && automaticPlayback && <StreamAudio index={index} />}
             </div>
           </div>
         </div>
-      </div>
-    </form>
+      </form>
+      <ToolDialogs />
+    </BadgeRowProvider>
   );
 });
 ChatForm.displayName = 'ChatForm';

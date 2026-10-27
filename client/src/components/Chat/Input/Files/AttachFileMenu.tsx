@@ -31,6 +31,7 @@ import type {
   MimeUploadCapability,
 } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter } from '~/common';
+import type { ComposerMenuRenderer } from '../ComposerMenu';
 import {
   useAgentToolPermissions,
   useAgentCapabilities,
@@ -70,6 +71,7 @@ const fileTypeCapabilities: Record<FileUploadType, MimeUploadCapability> = {
 };
 
 interface AttachFileMenuProps {
+  renderMenu?: ComposerMenuRenderer;
   agentId?: string | null;
   endpoint?: string | null;
   disabled?: boolean | null;
@@ -84,6 +86,7 @@ interface AttachFileMenuProps {
 }
 
 const AttachFileMenu = ({
+  renderMenu,
   agentId,
   endpoint,
   disabled,
@@ -339,18 +342,22 @@ const AttachFileMenu = ({
           toolResourceRef.current = undefined;
         }}
       >
-        <DropdownPopup
-          menuId="attach-file-menu"
-          className="overflow-visible"
-          isOpen={isPopoverActive}
-          setIsOpen={setIsPopoverActive}
-          modal={false}
-          portal={true}
-          unmountOnHide={true}
-          trigger={menuTrigger}
-          items={dropdownItems}
-          iconClassName="mr-0"
-        />
+        {renderMenu ? (
+          renderMenu(dropdownItems)
+        ) : (
+          <DropdownPopup
+            menuId="attach-file-menu"
+            className="overflow-visible"
+            isOpen={isPopoverActive}
+            setIsOpen={setIsPopoverActive}
+            modal={false}
+            portal={true}
+            unmountOnHide={true}
+            trigger={menuTrigger}
+            items={dropdownItems}
+            iconClassName="mr-0"
+          />
+        )}
       </FileUpload>
       <SharePointPickerDialog
         isOpen={isSharePointDialogOpen}

@@ -146,6 +146,25 @@ const attach = (container: HTMLElement, file: File) =>
 const image = () => new File(['image-bytes'], 'cat.png', { type: 'image/png' });
 
 describe('ChatForm attachments', () => {
+  test('exposes formatting through the plus menu and preserves the draft when expanding', async () => {
+    renderComposer();
+    const textarea = await screen.findByTestId('text-input');
+    await userEvent.type(textarea, 'Keep my draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
+    await userEvent.click(
+      await screen.findByRole('menuitemcheckbox', { name: 'Formatting tools' }),
+    );
+    expect(screen.getByRole('toolbar', { name: 'Formatting tools' })).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Expand editor' }));
+    expect(screen.getByRole('dialog', { name: 'Expand editor' })).toContainElement(textarea);
+    expect(textarea).toHaveValue('Keep my draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Exit expanded editor' }));
+    expect(textarea).toHaveFocus();
+    expect(screen.queryByRole('dialog', { name: 'Expand editor' })).not.toBeInTheDocument();
+    expect(textarea).toHaveValue('Keep my draft');
+  });
+
   test('places model selection inside the composer before the send button', async () => {
     renderComposer();
     const textarea = await screen.findByTestId('text-input');
