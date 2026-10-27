@@ -192,8 +192,10 @@ const ChatForm = memo(function ChatForm({
   const blockedReasoningParameters = useMemo(
     () =>
       startupConfig?.modelSpecs?.enforce === true && modelSpec
-        ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'].filter(
-            (key) => modelSpec.preset[key as keyof typeof modelSpec.preset] != null,
+        ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget', 'thinking'].filter(
+            (key) =>
+              (key !== 'thinking' || modelSpec.preset.thinking === false) &&
+              modelSpec.preset[key as keyof typeof modelSpec.preset] != null,
           )
         : [],
     [startupConfig?.modelSpecs?.enforce, modelSpec],
@@ -202,6 +204,7 @@ const ChatForm = memo(function ChatForm({
     () =>
       resolveReasoningSetting({
         endpoint: reasoningEndpointType ?? reasoningEndpointName,
+        endpointName: reasoningEndpointName,
         model: reasoningModel,
         provider:
           endpointConfiguration?.provider ??

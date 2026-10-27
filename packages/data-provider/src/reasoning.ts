@@ -7,6 +7,7 @@ import {
   ReasoningParameterFormat,
   reasoningOverrideSchema,
 } from './schemas';
+import { supportsAdaptiveThinking } from './bedrock';
 
 export type ReasoningCatalogCapability = {
   values?: string[];
@@ -15,6 +16,7 @@ export type ReasoningCatalogCapability = {
 
 export type ReasoningTarget = {
   endpoint: string;
+  endpointName?: string;
   model: string;
   provider?: string;
   parameterDefinitions?: SettingDefinition[];
@@ -27,9 +29,21 @@ export type ReasoningTarget = {
 
 const reasoningKeys = ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'];
 
-function inferReasoningKey({ endpoint, model, provider }: ReasoningTarget): string | undefined {
-  const modelId = model.toLowerCase().replace(/^models\//, '');
-  const effectiveEndpoint = provider ?? endpoint;
+export function isThinkingParameter(key: string | number): boolean {
+  return key === 'effort' || key === 'thinkingLevel' || key === 'thinkingBudget';
+}
+
+function getReasoningProvider({ endpoint, endpointName, provider }: ReasoningTarget): string {
+  const declaredProvider = provider?.toLowerCase();
+  if (declaredProvider && declaredProvider !== EModelEndpoint.custom) {
+    return declaredProvider;
+  }
+  return (endpoint === EModelEndpoint.custom ? (endpointName ?? endpoint) : endpoint).toLowerCase();
+}
+
+function inferReasoningKey(target: ReasoningTarget): string | undefined {
+  const modelId = target.model.toLowerCase().replace(/^models\//, '');
+  const effectiveEndpoint = getReasoningProvider(target);
 
   if (effectiveEndpoint === EModelEndpoint.google || effectiveEndpoint === 'vertexai') {
     if (/^(gemini-3|gemini-4|gemma-4)(?:[.-]|$)/.test(modelId)) {
@@ -42,7 +56,7 @@ function inferReasoningKey({ endpoint, model, provider }: ReasoningTarget): stri
   }
 
   if (effectiveEndpoint === EModelEndpoint.anthropic) {
-    if (/^claude-(?:opus|sonnet|haiku)-4[-.][6-9](?:[.-]|$)/.test(modelId)) {
+    if (supportsAdaptiveThinking(modelId)) {
       return 'effort';
     }
     if (/^claude-(?:3[.-]7|(?:opus|sonnet|haiku)-[4-9])(?:[.-]|$)/.test(modelId)) {
@@ -51,11 +65,15 @@ function inferReasoningKey({ endpoint, model, provider }: ReasoningTarget): stri
     return undefined;
   }
 
-  if (effectiveEndpoint === EModelEndpoint.openAI) {
-    if (/^(?:o[134](?:[.-]|$)|gpt-5(?:[.-]|$))/.test(modelId)) {
+  if (effectiveEndpoint === EModelEndpoint.openAI.toLowerCase()) {
+    if (/^(?:o[134](?:[.-]|$)|gpt-[56](?:[.-]|$))/.test(modelId) && !/-chat(?:-|$)/.test(modelId)) {
       return 'reasoning_effort';
     }
     return undefined;
+  }
+
+  if (effectiveEndpoint === 'xai') {
+    return /^grok-(?:3-mini|4[.-][567])(?:[.-]|$)/.test(modelId) ? 'reasoning_effort' : undefined;
   }
 
   if (
@@ -69,7 +87,7 @@ function inferReasoningKey({ endpoint, model, provider }: ReasoningTarget): stri
     if (/^(?:moonshot|moonshotai|zai)\./.test(modelId)) {
       return 'reasoning_effort';
     }
-    if (/^anthropic\.claude-(?:opus|sonnet|haiku)-4[-.][6-9](?:[.-]|$)/.test(modelId)) {
+    if (supportsAdaptiveThinking(modelId)) {
       return 'effort';
     }
     if (/^anthropic\.claude-(?:3[.-]7|(?:opus|sonnet|haiku)-[4-9])(?:[.-]|$)/.test(modelId)) {
@@ -78,6 +96,45 @@ function inferReasoningKey({ endpoint, model, provider }: ReasoningTarget): stri
   }
 
   return undefined;
+}
+
+function restrictReasoningOptions(
+  setting: SettingDefinition,
+  target: ReasoningTarget,
+): SettingDefinition {
+  if (setting.type !== 'enum') {
+    return setting;
+  }
+  const model = target.model.toLowerCase().replace(/^models\//, '');
+  const provider = getReasoningProvider(target);
+  let supported: string[] | undefined;
+  if (provider === EModelEndpoint.openAI.toLowerCase() && /^gpt-6(?:[.-]|$)/.test(model)) {
+    supported = /-luna(?:-|$)/.test(model)
+      ? ['none', 'low', 'medium', 'high', 'xhigh', 'max']
+      : ['low', 'medium', 'high', 'xhigh', 'max'];
+  } else if (provider === 'xai') {
+    supported = ['low', 'medium', 'high'];
+    if (/^grok-3-mini(?:-|$)/.test(model)) {
+      supported = ['low', 'high'];
+    } else if (/^grok-4[.-][67](?:[.-]|$)/.test(model)) {
+      supported.push('xhigh');
+    }
+  } else if (setting.key === 'effort' && /claude-(?:sonnet|opus)-4[-.]6(?:[.-]|$)/.test(model)) {
+    supported = ['low', 'medium', 'high', 'max'];
+  } else if (setting.key === 'thinkingLevel') {
+    if (/^gemini-3-pro(?:-|$)/.test(model)) {
+      supported = ['low', 'high'];
+    } else if (/^gemini-(?:4|3[.-]8|3[.-]1-pro)(?:[.-]|$)/.test(model)) {
+      supported = ['low', 'medium', 'high'];
+    }
+  }
+  if (!supported) {
+    return setting;
+  }
+  return {
+    ...setting,
+    options: setting.options?.filter((value) => value === '' || supported.includes(value)),
+  };
 }
 
 function isReasoningDefinition(setting: SettingDefinition): boolean {
@@ -124,7 +181,12 @@ export function resolveReasoningSetting(target: ReasoningTarget): SettingDefinit
   if (!setting) {
     return undefined;
   }
-  if (dropParams.includes(setting.key) || blockedParameters.includes(setting.key)) {
+  if (
+    dropParams.includes(setting.key) ||
+    blockedParameters.includes(setting.key) ||
+    (isThinkingParameter(setting.key) &&
+      (dropParams.includes('thinking') || blockedParameters.includes('thinking')))
+  ) {
     return undefined;
   }
 
@@ -147,7 +209,7 @@ export function resolveReasoningSetting(target: ReasoningTarget): SettingDefinit
     }
   }
 
-  return setting;
+  return restrictReasoningOptions(setting, target);
 }
 
 export function isSupportedReasoningOverride(
@@ -205,7 +267,10 @@ export function filterReasoningSettings(
   target: ReasoningTarget,
 ): SettingDefinition[] {
   const active = resolveReasoningSetting({ ...target, settings });
-  return settings.filter(
-    (setting) => !reasoningParameterKeys.has(setting.key) || setting.key === active?.key,
-  );
+  return settings.flatMap((setting) => {
+    if (setting.key === active?.key) {
+      return [active];
+    }
+    return reasoningParameterKeys.has(setting.key) ? [] : [setting];
+  });
 }

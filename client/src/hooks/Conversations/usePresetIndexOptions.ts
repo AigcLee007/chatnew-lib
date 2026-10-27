@@ -1,3 +1,4 @@
+import { isThinkingParameter } from 'librechat-data-provider';
 import type { TPreset } from 'librechat-data-provider';
 import type { TSetOptionsPayload, TSetExample, TSetOption, TSetOptions } from '~/common';
 import { useChatContext } from '~/Providers/ChatContext';
@@ -28,6 +29,9 @@ const usePresetIndexOptions: TUsePresetOptions = (_preset) => {
   const setOption: TSetOption = (param) => (newValue) => {
     const update = {};
     update[param] = newValue;
+    if (isThinkingParameter(param) && newValue !== '') {
+      update['thinking'] = true;
+    }
     setPreset((prevState) =>
       cleanupPreset({
         preset: {

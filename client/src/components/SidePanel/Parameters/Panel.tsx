@@ -77,12 +77,15 @@ export default function Parameters() {
     );
     const blockedParameters =
       startupConfig?.modelSpecs?.enforce === true && modelSpec
-        ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'].filter(
-            (key) => modelSpec.preset[key as keyof typeof modelSpec.preset] != null,
+        ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget', 'thinking'].filter(
+            (key) =>
+              (key !== 'thinking' || modelSpec.preset.thinking === false) &&
+              modelSpec.preset[key as keyof typeof modelSpec.preset] != null,
           )
         : [];
     return filterReasoningSettings(resolvedParams as TSettingDefinition[], {
       endpoint: endpointType ?? provider,
+      endpointName: provider,
       model,
       provider:
         endpointsConfig[provider]?.provider ??

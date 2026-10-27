@@ -2,8 +2,31 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { SettingDefinition } from 'librechat-data-provider';
 import ReasoningControl, { getScopedReasoningOverride } from '../ReasoningControl';
 
+beforeAll(() => {
+  HTMLElement.prototype.scrollIntoView = jest.fn();
+});
+
 describe('ReasoningControl', () => {
-  it('emits a selected enum value and supports returning to auto', () => {
+  it('does not let the composer steal focus when opening its control', () => {
+    const focusComposer = jest.fn();
+    render(
+      <div onClick={focusComposer}>
+        <ReasoningControl
+          setting={{
+            key: 'thinkingLevel',
+            type: 'enum',
+            options: ['low', 'high'],
+            component: 'slider',
+          }}
+          onChange={jest.fn()}
+        />
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('combobox'));
+    expect(focusComposer).not.toHaveBeenCalled();
+  });
+
+  it('emits a selected enum value and supports returning to auto', async () => {
     const onChange = jest.fn();
     const setting: SettingDefinition = {
       key: 'reasoning_effort',
@@ -13,11 +36,21 @@ describe('ReasoningControl', () => {
       enumMappings: { low: 'com_ui_low', high: 'com_ui_high' },
       component: 'slider',
     };
-    render(<ReasoningControl setting={setting} onChange={onChange} />);
+    const { rerender } = render(<ReasoningControl setting={setting} onChange={onChange} />);
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'high' } });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: 'High' }));
     expect(onChange).toHaveBeenLastCalledWith({ key: 'reasoning_effort', value: 'high' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
+    rerender(
+      <ReasoningControl
+        setting={setting}
+        value={{ key: 'reasoning_effort', value: 'high' }}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole('combobox')).toHaveTextContent('High');
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Auto' }));
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 
@@ -41,7 +74,7 @@ describe('ReasoningControl', () => {
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 
-  it('does not offer Auto when the provider requires a reasoning effort', () => {
+  it('does not offer Auto when the provider requires a reasoning effort', async () => {
     render(
       <ReasoningControl
         setting={{
@@ -54,6 +87,8 @@ describe('ReasoningControl', () => {
         onChange={jest.fn()}
       />,
     );
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    expect(await screen.findByRole('option', { name: 'low' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Auto' })).not.toBeInTheDocument();
   });
 

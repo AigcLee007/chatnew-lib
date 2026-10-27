@@ -2,6 +2,19 @@ import { EModelEndpoint, ReasoningParameterFormat } from 'librechat-data-provide
 import { createOpenRouterReasoningCatalog, validateReasoningOverride } from './reasoning';
 
 describe('validateReasoningOverride', () => {
+  it.each([
+    ['OpenAI', 'gpt-6.1-sol', 'reasoning_effort', 'xhigh'],
+    ['xAI', 'grok-4.7', 'reasoning_effort', 'xhigh'],
+    ['anthropic', 'claude-opus-5-5', 'effort', 'max'],
+  ])('validates deployed %s reasoning parameters', (endpointName, model, key, value) => {
+    const override = { key, value };
+    const endpoint =
+      endpointName === 'anthropic' ? EModelEndpoint.anthropic : EModelEndpoint.custom;
+    expect(validateReasoningOverride({ endpoint, endpointName, model, override })).toEqual({
+      valid: true,
+      override,
+    });
+  });
   it('accepts supported OpenAI effort and rejects unknown effort values', () => {
     const input = {
       endpoint: EModelEndpoint.openAI,

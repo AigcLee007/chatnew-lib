@@ -205,6 +205,77 @@ describe('buildEndpointOption - defaultParamsEndpoint parsing', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('enables Claude adaptive thinking when applying a one-message effort level', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({ anthropic: { type: EModelEndpoint.anthropic } });
+    const req = createReq(
+      {
+        endpoint: EModelEndpoint.anthropic,
+        model: 'claude-opus-5-5',
+        reasoningOverride: { key: 'effort', value: 'max' },
+      },
+      { modelSpecs: null },
+    );
+    req.baseUrl = '/api/agents/chat';
+    const next = jest.fn();
+    await buildEndpointOption(req, createRes(), next);
+    expect(next).toHaveBeenCalled();
+    expect(req.body.endpointOption.model_parameters).toEqual({ effort: 'max', thinking: true });
+  });
+
+  it.each([true, false])(
+    'honors enforced thinking=%s without locking an unspecified effort',
+    async (thinking) => {
+      mockGetEndpointsConfig.mockResolvedValue({ anthropic: { type: EModelEndpoint.anthropic } });
+      const spec = {
+        name: 'claude',
+        preset: { endpoint: EModelEndpoint.anthropic, model: 'claude-opus-5-5', thinking },
+      };
+      const req = createReq(
+        {
+          endpoint: EModelEndpoint.anthropic,
+          model: 'claude-opus-5-5',
+          spec: 'claude',
+          reasoningOverride: { key: 'effort', value: 'max' },
+        },
+        { modelSpecs: { enforce: true, list: [spec] } },
+      );
+      req.baseUrl = '/api/agents/chat';
+      const next = jest.fn();
+      const res = createRes();
+      await buildEndpointOption(req, res, next);
+      if (thinking) {
+        expect(next).toHaveBeenCalled();
+        expect(req.body.endpointOption.model_parameters).toEqual(
+          expect.objectContaining({ effort: 'max', thinking: true }),
+        );
+      } else {
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(400);
+      }
+    },
+  );
+
+  it.each([
+    ['OpenAI', 'gpt-6.1-sol'],
+    ['xAI', 'grok-4.7'],
+  ])('accepts reasoning overrides for deployed custom endpoint %s', async (endpoint, model) => {
+    mockGetEndpointsConfig.mockResolvedValue({ [endpoint]: { type: EModelEndpoint.custom } });
+    const req = createReq(
+      {
+        endpoint,
+        endpointType: EModelEndpoint.custom,
+        model,
+        reasoningOverride: { key: 'reasoning_effort', value: 'xhigh' },
+      },
+      { modelSpecs: null },
+    );
+    req.baseUrl = '/api/agents/chat';
+    const next = jest.fn();
+    await buildEndpointOption(req, createRes(), next);
+    expect(next).toHaveBeenCalled();
+    expect(req.body.endpointOption.model_parameters).toEqual({ reasoning_effort: 'xhigh' });
+  });
+
   it('validates saved Agent overrides against the loaded Agent provider and model', async () => {
     mockGetEndpointsConfig.mockResolvedValue({
       openAI: { type: EModelEndpoint.openAI },

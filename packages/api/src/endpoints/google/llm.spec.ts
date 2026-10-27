@@ -3,8 +3,36 @@ import { AuthKeys, ThinkingLevel } from 'librechat-data-provider';
 import type { GoogleClientOptions } from '@librechat/agents';
 import type * as t from '~/types';
 import { getGoogleConfig, getSafetySettings, knownGoogleParams } from './llm';
+import { getReasoningOverrideParameters } from '../reasoning';
 
 describe('getGoogleConfig', () => {
+  it('enables a one-message Gemini level despite a persisted disabled thinking setting', () => {
+    const result = getGoogleConfig(
+      { [AuthKeys.GOOGLE_API_KEY]: 'test-key' },
+      {
+        modelOptions: {
+          model: 'gemini-4-argon-high',
+          thinking: false,
+          ...getReasoningOverrideParameters({ key: 'thinkingLevel', value: 'high' }),
+        },
+      },
+    );
+    expect(result.llmConfig.thinkingConfig).toEqual(
+      expect.objectContaining({ thinkingLevel: 'HIGH' }),
+    );
+  });
+  it.each([ThinkingLevel.low, ThinkingLevel.medium, ThinkingLevel.high])(
+    'serializes Gemini Argon thinking level %s',
+    (thinkingLevel) => {
+      const result = getGoogleConfig(
+        { [AuthKeys.GOOGLE_API_KEY]: 'test-key' },
+        { modelOptions: { model: 'gemini-4-argon-high', thinkingLevel } },
+      );
+      expect(result.llmConfig.thinkingConfig).toEqual(
+        expect.objectContaining({ thinkingLevel: thinkingLevel.toUpperCase() }),
+      );
+    },
+  );
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -1771,9 +1799,13 @@ describe('getGoogleConfig', () => {
     });
 
     it('accepts a raw shared gateway API key string', () => {
-      const result = getGoogleConfig('sk-gateway-key', {
-        modelOptions: { model: 'gemini-3.5-flash-preview' },
-      }, true);
+      const result = getGoogleConfig(
+        'sk-gateway-key',
+        {
+          modelOptions: { model: 'gemini-3.5-flash-preview' },
+        },
+        true,
+      );
 
       expect(result.llmConfig).toMatchObject({ apiKey: 'sk-gateway-key' });
     });

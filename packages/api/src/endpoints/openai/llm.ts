@@ -121,13 +121,13 @@ function isOpenAIEndpoint(endpoint?: EModelEndpoint | string | null): boolean {
 }
 
 /**
- * GPT-5.6 models reject function tools combined with `reasoning_effort` in
+ * GPT-5.6 and GPT-6 models reject function tools combined with `reasoning_effort` in
  * `/v1/chat/completions` (400: "To use function tools, use /v1/responses or
  * set reasoning_effort to 'none'"). Reasoning without tools still works on
  * Chat Completions, but tools are bound after config time, so GPT-5.6
  * reasoning requests default to the Responses API to avoid tool failures.
  */
-const responsesApiRequiredPattern = /\bgpt-5\.6\b/;
+const responsesApiRequiredPattern = /\bgpt-(?:5\.6|6(?:\.\d+)?)\b/;
 
 function requiresResponsesApiForReasoning({
   model,

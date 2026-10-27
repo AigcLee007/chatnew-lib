@@ -7,7 +7,11 @@ export * from './models';
 export * from './openai';
 export * from './pricing';
 export * from './tokenConfig';
-export { createOpenRouterReasoningCatalog, validateReasoningOverride } from './reasoning';
+export {
+  createOpenRouterReasoningCatalog,
+  getReasoningOverrideParameters,
+  validateReasoningOverride,
+} from './reasoning';
 export type {
   OpenRouterReasoningCatalogOptions,
   OpenRouterCatalogRequest,

@@ -3,6 +3,7 @@ import {
   TConversation,
   EModelEndpoint,
   tConvoUpdateSchema,
+  isThinkingParameter,
 } from 'librechat-data-provider';
 import type { TSetExample, TSetOption, TSetOptionsPayload } from '~/common';
 import usePresetIndexOptions from './usePresetIndexOptions';
@@ -22,6 +23,9 @@ const useSetIndexOptions: TUseSetOptions = (preset = false) => {
   const setOption: TSetOption = (param) => (newValue) => {
     const update = {};
     update[param] = newValue;
+    if (isThinkingParameter(param) && newValue !== '') {
+      update['thinking'] = true;
+    }
 
     if (param === 'presetOverride') {
       const currentOverride = conversation?.presetOverride || {};

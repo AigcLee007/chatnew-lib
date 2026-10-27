@@ -5,6 +5,7 @@ const {
   isModelSpecEndpointMatch,
   resolveModelSpecPromptPrefixVariables,
   validateReasoningOverride,
+  getReasoningOverrideParameters,
 } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const {
@@ -164,12 +165,15 @@ async function buildEndpointOption(req, res, next) {
       });
       const blockedParameters =
         appConfig.modelSpecs?.enforce === true && resolvedModelSpec
-          ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget'].filter(
-              (key) => resolvedModelSpec.preset?.[key] != null,
+          ? ['reasoning_effort', 'effort', 'thinkingLevel', 'thinkingBudget', 'thinking'].filter(
+              (key) =>
+                (key !== 'thinking' || resolvedModelSpec.preset?.thinking === false) &&
+                resolvedModelSpec.preset?.[key] != null,
             )
           : [];
       const validation = validateReasoningOverride({
         endpoint: providerType,
+        endpointName: providerName,
         model,
         provider: providerConfig.provider,
         defaultParamsEndpoint:
@@ -188,7 +192,7 @@ async function buildEndpointOption(req, res, next) {
 
       endpointOption.model_parameters = {
         ...(endpointOption.model_parameters ?? {}),
-        [validation.override.key]: validation.override.value,
+        ...getReasoningOverrideParameters(validation.override),
       };
     }
 

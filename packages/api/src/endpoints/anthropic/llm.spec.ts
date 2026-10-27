@@ -1,5 +1,6 @@
 import { AnthropicEffort, ThinkingDisplay } from 'librechat-data-provider';
 import type * as t from '~/types';
+import { getReasoningOverrideParameters } from '../reasoning';
 import { FINE_GRAINED_TOOL_STREAMING_BETA } from './helpers';
 import { getLLMConfig } from './llm';
 
@@ -8,6 +9,22 @@ jest.mock('https-proxy-agent', () => ({
 }));
 
 describe('getLLMConfig', () => {
+  it.each([
+    AnthropicEffort.low,
+    AnthropicEffort.medium,
+    AnthropicEffort.high,
+    AnthropicEffort.xhigh,
+    AnthropicEffort.max,
+  ])('preserves a one-message Claude 5.5 %s override in the provider request', (effort) => {
+    const result = getLLMConfig('test-key', {
+      modelOptions: {
+        model: 'claude-opus-5-5',
+        ...getReasoningOverrideParameters({ key: 'effort', value: effort }),
+      },
+    });
+    expect(result.llmConfig.thinking).toEqual(expect.objectContaining({ type: 'adaptive' }));
+    expect(result.llmConfig.invocationKwargs?.output_config).toEqual({ effort });
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });

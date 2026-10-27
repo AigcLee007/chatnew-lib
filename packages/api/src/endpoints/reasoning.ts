@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import {
   getSettingsKeys,
+  isThinkingParameter,
   isSupportedReasoningOverride,
   paramSettings,
   reasoningOverrideSchema,
@@ -13,6 +14,7 @@ import type {
 
 export type ReasoningOverrideValidationInput = {
   endpoint: string;
+  endpointName?: string;
   model: string;
   override: unknown;
   provider?: string;
@@ -169,6 +171,7 @@ export function validateReasoningOverride(
   const [combinedKey, endpointKey] = getSettingsKeys(paramsEndpoint, input.model);
   const target = {
     endpoint: input.endpoint,
+    endpointName: input.endpointName,
     model: input.model,
     provider: input.provider,
     settings: paramSettings[combinedKey] ?? paramSettings[endpointKey] ?? [],
@@ -184,4 +187,13 @@ export function validateReasoningOverride(
   }
 
   return { valid: true, override: parsedOverride.data };
+}
+
+export function getReasoningOverrideParameters(
+  override: TReasoningOverride,
+): Record<string, string | number | boolean> {
+  return {
+    [override.key]: override.value,
+    ...(isThinkingParameter(override.key) && override.value !== '' ? { thinking: true } : {}),
+  };
 }
