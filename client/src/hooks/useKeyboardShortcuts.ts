@@ -722,6 +722,7 @@ export function useShortcutActions(): ShortcutAction[] {
 
   const handleUploadFile = useCallback(() => {
     const btn =
+      document.querySelector<HTMLButtonElement>('#attach-file-direct-trigger') ??
       document.querySelector<HTMLButtonElement>('#attach-file-menu-button') ??
       document.querySelector<HTMLButtonElement>('#attach-file');
     return clickTarget(btn);

@@ -38,19 +38,35 @@ const AttachFile = ({
   return (
     <FileUpload ref={inputRef} handleFileChange={handleFileChange}>
       {renderMenu ? (
-        renderMenu([
-          {
-            label: localize('com_sidepanel_attach_files'),
-            disabled: isUploadDisabled,
-            icon: <AttachmentIcon />,
-            onClick: () => {
+        <>
+          <button
+            id="attach-file-direct-trigger"
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="sr-only"
+            disabled={isUploadDisabled}
+            onClick={() => {
               if (inputRef.current) {
                 inputRef.current.value = '';
                 inputRef.current.click();
               }
+            }}
+          />
+          {renderMenu([
+            {
+              label: localize('com_sidepanel_attach_files'),
+              disabled: isUploadDisabled,
+              icon: <AttachmentIcon />,
+              onClick: () => {
+                if (inputRef.current) {
+                  inputRef.current.value = '';
+                  inputRef.current.click();
+                }
+              },
             },
-          },
-        ])
+          ])}
+        </>
       ) : (
         <TooltipAnchor
           description={tooltipDescription}
