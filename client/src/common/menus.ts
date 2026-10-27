@@ -17,6 +17,8 @@ export interface MenuItemProps {
   dialog?: React.ReactElement;
   ariaLabel?: string;
   ariaChecked?: boolean;
+  isPinned?: boolean;
+  onPinChange?: (value: boolean) => void;
   ref?: React.Ref<any>;
   className?: string;
   render?:

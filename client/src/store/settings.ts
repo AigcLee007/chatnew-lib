@@ -24,6 +24,19 @@ const normalizeSavedSpeechEngine = (
 
 // Static atoms without localStorage
 const staticAtoms = {
+  activePanel: atom<string>({
+    key: 'activePanel',
+    default: 'conversations',
+    effects_UNSTABLE: [
+      ({ setSelf, onSet }) => {
+        const saved = localStorage.getItem('side:active-panel');
+        if (saved) {
+          setSelf(saved);
+        }
+        onSet((panel) => localStorage.setItem('side:active-panel', panel));
+      },
+    ],
+  }),
   abortScroll: atom<boolean>({ key: 'abortScroll', default: false }),
   optionSettings: atom<TOptionSettings>({ key: 'optionSettings', default: {} }),
   currentSettingsView: atom<SettingsViews>({

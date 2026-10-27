@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import ComposerMenu from '../ComposerMenu';
 
 const items = [{ label: 'Upload image', onClick: jest.fn() }];
@@ -58,5 +58,41 @@ describe('ComposerMenu', () => {
     } finally {
       window.matchMedia = original;
     }
+  });
+
+  it('shows available tools and separates enable from pin actions', async () => {
+    const toggle = jest.fn();
+    const pin = jest.fn();
+    render(
+      <ComposerMenu
+        attachmentItems={items}
+        toolItems={[
+          {
+            id: 'fileSearch',
+            label: 'File search',
+            ariaChecked: true,
+            isPinned: false,
+            onPinChange: pin,
+            onClick: toggle,
+            hideOnClick: false,
+          },
+        ]}
+        formatting={false}
+        onFormattingChange={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Tools' }));
+    expect((await screen.findAllByText(/Available tools|可用工具/)).length).toBeGreaterThan(0);
+    const enabled = screen.getByRole('menuitemcheckbox', { name: 'File search' });
+    expect(within(enabled).getByTestId('tool-state')).toHaveAttribute('data-active', 'true');
+    const pinButton = screen.getByRole('button', { name: /Pin File search|固定 File search/ });
+    expect(enabled.parentElement).toContainElement(pinButton);
+    fireEvent.click(pinButton);
+    expect(pin).toHaveBeenCalledWith(true);
+    expect(toggle).not.toHaveBeenCalled();
+    expect(enabled).toBeVisible();
+    fireEvent.click(enabled);
+    expect(toggle).toHaveBeenCalledTimes(1);
   });
 });

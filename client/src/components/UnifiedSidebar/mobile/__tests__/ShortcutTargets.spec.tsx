@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { RecoilRoot } from 'recoil';
 import { BarChart3, MessagesSquare, NotebookPen } from 'lucide-react';
 import type { NavLink } from '~/common';
 import { ActivePanelProvider } from '~/Providers/ActivePanelContext';
@@ -19,13 +20,15 @@ const renderTargets = ({
   routeActiveId?: string;
 } = {}) =>
   render(
-    <ActivePanelProvider>
-      <ShortcutTargets
-        links={targetLinks}
-        onLeaveInsights={onLeaveInsights}
-        routeActiveId={routeActiveId}
-      />
-    </ActivePanelProvider>,
+    <RecoilRoot>
+      <ActivePanelProvider>
+        <ShortcutTargets
+          links={targetLinks}
+          onLeaveInsights={onLeaveInsights}
+          routeActiveId={routeActiveId}
+        />
+      </ActivePanelProvider>
+    </RecoilRoot>,
   );
 
 describe('ShortcutTargets', () => {

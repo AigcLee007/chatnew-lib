@@ -2,7 +2,7 @@ import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
 import { Button, TextareaAutosize, TooltipAnchor } from '@librechat/client';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import { useRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
+import { useRecoilState, useRecoilValue, useRecoilCallback, useSetRecoilState } from 'recoil';
 import {
   Constants,
   isParamEndpoint,
@@ -121,6 +121,7 @@ const ChatForm = memo(function ChatForm({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFormatting, setShowFormatting] = useState(false);
   const { setSidebarOpen } = useSidebarToggle();
+  const setActivePanel = useSetRecoilState(store.activePanel);
 
   useEffect(() => {
     if (!isExpanded) {
@@ -659,16 +660,7 @@ const ChatForm = memo(function ChatForm({
     !requiresKey;
   const openParameters = () => {
     setIsExpanded(false);
-    setSidebarOpen(true, () => {
-      window.setTimeout(() => {
-        const button = document.querySelector<HTMLButtonElement>(
-          '[data-testid="nav-panel-parameters"]',
-        );
-        if (button?.getAttribute('aria-pressed') !== 'true') {
-          button?.click();
-        }
-      }, 0);
-    });
+    setSidebarOpen(true, () => setActivePanel('parameters'));
   };
 
   return (
@@ -792,7 +784,7 @@ const ChatForm = memo(function ChatForm({
               <div
                 onClick={handleContainerClick}
                 className={cn(
-                  'group/composer relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
+                  'group/composer relative flex w-full flex-grow flex-col overflow-hidden rounded-[20px] border pb-2 text-text-primary transition-all duration-200 sm:pb-0',
                   isExpanded && 'min-h-0 rounded-3xl',
                   isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
                   isTemporary
@@ -873,6 +865,7 @@ const ChatForm = memo(function ChatForm({
                   <div
                     className={cn(
                       'flex',
+                      'min-h-[58px] px-3.5 pb-1.5',
                       isRTL ? 'flex-row-reverse' : 'flex-row',
                       isExpanded && 'min-h-0 flex-1',
                     )}
@@ -1008,7 +1001,7 @@ const ChatForm = memo(function ChatForm({
                     />
                   </div>
                   <div
-                    className="ms-auto flex min-w-0 max-w-[min(28rem,calc(100%-9rem))] items-center rounded-lg"
+                    className="ms-auto flex min-w-0 max-w-[min(28rem,calc(100%-9rem))] items-center gap-0.5 rounded-lg"
                     role="group"
                     data-chat-composer-index={index}
                     aria-label={localize('com_ui_select_model')}
@@ -1020,18 +1013,24 @@ const ChatForm = memo(function ChatForm({
                       disabled={isSubmitting || answerMode.composerLocked}
                     />
                     {reasoningSetting && !isAssistantsEndpoint(endpoint) && (
-                      <ReasoningControl
-                        compact
-                        setting={reasoningSetting}
-                        value={reasoningOverride}
-                        autoAllowed={reasoningCatalogCapability?.required !== true}
-                        descriptionId={`reasoning-override-description-${index}`}
-                        onChange={(override) =>
-                          setScopedReasoningOverride(
-                            override ? { targetKey: reasoningTargetKey, override } : undefined,
-                          )
-                        }
-                      />
+                      <>
+                        <div
+                          aria-hidden="true"
+                          className="mx-1 h-[23px] w-px shrink-0 bg-border-light"
+                        />
+                        <ReasoningControl
+                          compact
+                          setting={reasoningSetting}
+                          value={reasoningOverride}
+                          autoAllowed={reasoningCatalogCapability?.required !== true}
+                          descriptionId={`reasoning-override-description-${index}`}
+                          onChange={(override) =>
+                            setScopedReasoningOverride(
+                              override ? { targetKey: reasoningTargetKey, override } : undefined,
+                            )
+                          }
+                        />
+                      </>
                     )}
                   </div>
                   {steering.duringRunActive &&

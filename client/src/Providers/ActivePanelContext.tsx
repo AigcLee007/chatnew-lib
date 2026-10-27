@@ -1,12 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react';
-
-const STORAGE_KEY = 'side:active-panel';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
+import { useRecoilState } from 'recoil';
+import store from '~/store';
 export const DEFAULT_PANEL = 'conversations';
-
-function getInitialActivePanel(): string {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved ? saved : DEFAULT_PANEL;
-}
 
 interface ActivePanelContextType {
   active: string;
@@ -16,12 +11,7 @@ interface ActivePanelContextType {
 const ActivePanelContext = createContext<ActivePanelContextType | undefined>(undefined);
 
 export function ActivePanelProvider({ children }: { children: ReactNode }) {
-  const [active, _setActive] = useState<string>(getInitialActivePanel);
-
-  const setActive = useCallback((id: string) => {
-    localStorage.setItem(STORAGE_KEY, id);
-    _setActive(id);
-  }, []);
+  const [active, setActive] = useRecoilState(store.activePanel);
 
   const value = useMemo(() => ({ active, setActive }), [active, setActive]);
 

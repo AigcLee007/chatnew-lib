@@ -125,6 +125,11 @@ const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
 
   if (fileSearchEnabled && canUseFileSearch) {
     dropdownItems.push({
+      id: 'fileSearch',
+      label: localize('com_assistants_file_search'),
+      icon: <VectorIcon className="size-[17px]" />,
+      isPinned: isFileSearchPinned,
+      onPinChange: setIsFileSearchPinned,
       onClick: handleFileSearchToggle,
       ariaChecked: Boolean(fileSearch?.toggleState),
       hideOnClick: false,
@@ -160,6 +165,11 @@ const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
 
   if (canUseSkills && skillsEnabled) {
     dropdownItems.push({
+      id: 'skills',
+      label: localize('com_ui_skills_menu_label'),
+      icon: <ScrollText className="size-[17px]" aria-hidden="true" />,
+      isPinned: isSkillsPinned,
+      onPinChange: setIsSkillsPinned,
       onClick: handleSkillsToggle,
       ariaChecked: Boolean(skills?.toggleState),
       hideOnClick: false,
@@ -195,6 +205,11 @@ const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
 
   if (showMemory) {
     dropdownItems.push({
+      id: 'memory',
+      label: localize('com_ui_memory'),
+      icon: <Brain className="size-[17px]" aria-hidden="true" />,
+      isPinned: isMemoryPinned,
+      onPinChange: setIsMemoryPinned,
       onClick: handleMemoryToggle,
       ariaChecked: Boolean(memory?.toggleState),
       hideOnClick: false,
@@ -230,6 +245,11 @@ const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
 
   if (canRunCode && codeEnabled) {
     dropdownItems.push({
+      id: 'runCode',
+      label: localize('com_ui_run_code'),
+      icon: <TerminalSquareIcon className="size-[17px]" aria-hidden="true" />,
+      isPinned: isCodePinned,
+      onPinChange: setIsCodePinned,
       onClick: handleCodeInterpreterToggle,
       ariaChecked: Boolean(codeInterpreter?.toggleState),
       hideOnClick: false,
@@ -267,6 +287,12 @@ const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
 
   if (artifactsEnabled && setIsArtifactsPinned != null) {
     dropdownItems.push({
+      id: 'artifacts',
+      label: localize('com_ui_artifacts'),
+      icon: <Settings2 className="size-[17px]" aria-hidden="true" />,
+      ariaChecked: Boolean(artifacts?.toggleState),
+      isPinned: isArtifactsPinned,
+      onPinChange: setIsArtifactsPinned,
       hideOnClick: false,
       render: (props) => (
         <ArtifactsSubMenu
@@ -285,13 +311,21 @@ const ToolsDropdown = ({ disabled, renderMenu }: ToolsDropdownProps) => {
   const { availableMCPServers } = mcpServerManager ?? {};
   if (canUseMcp && availableMCPServers && availableMCPServers.length > 0) {
     dropdownItems.push({
+      id: 'mcpServers',
+      label: mcpPlaceholder || localize('com_ui_tools'),
+      icon: <Settings2 className="size-[17px]" aria-hidden="true" />,
+      ariaChecked: (mcpServerManager?.mcpValues.length ?? 0) > 0,
+      isPinned: mcpServerManager?.isPinned,
+      onPinChange: mcpServerManager?.setIsPinned,
       hideOnClick: false,
       render: (props) => <MCPSubMenu {...props} placeholder={mcpPlaceholder} />,
     });
   }
 
   if (renderMenu) {
-    return renderMenu(dropdownItems);
+    return renderMenu(
+      dropdownItems.map((item) => (item.onPinChange ? { ...item, render: undefined } : item)),
+    );
   }
 
   if (dropdownItems.length === 0) {

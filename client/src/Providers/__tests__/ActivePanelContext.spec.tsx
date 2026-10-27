@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { RecoilRoot } from 'recoil';
+import { render as renderComponent, fireEvent, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect';
 import {
   ActivePanelProvider,
@@ -8,6 +9,8 @@ import {
 } from '~/Providers/ActivePanelContext';
 
 const STORAGE_KEY = 'side:active-panel';
+const render = (component: React.ReactElement) =>
+  renderComponent(<RecoilRoot>{component}</RecoilRoot>);
 
 function TestConsumer() {
   const { active, setActive } = useActivePanel();

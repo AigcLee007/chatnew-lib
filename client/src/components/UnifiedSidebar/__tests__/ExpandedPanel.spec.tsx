@@ -30,6 +30,7 @@ jest.mock('~/store', () => {
   return {
     __esModule: true,
     default: {
+      activePanel: jest.requireActual('~/store/settings').default.activePanel,
       conversationByIndex: () =>
         atom({ key: `mock-conversationByIndex-${counter++}`, default: null }),
       conversationIdByIndex: () =>

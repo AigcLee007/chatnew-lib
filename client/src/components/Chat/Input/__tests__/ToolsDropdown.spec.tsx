@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { PermissionTypes } from 'librechat-data-provider';
 import ToolsDropdown from '../ToolsDropdown';
 import ComposerMenu from '../ComposerMenu';
@@ -86,7 +86,7 @@ describe('ToolsDropdown inside the composer menu', () => {
     const skill = await screen.findByRole('menuitemcheckbox', { name: 'Skills' });
     await user.click(skill);
     expect(mockContext.skills.debouncedChange).toHaveBeenCalledWith({ value: true });
-    await user.click(within(skill).getByRole('button', { name: 'Pin' }));
+    await user.click(screen.getByRole('button', { name: 'Pin Skills' }));
     expect(mockContext.skills.setIsPinned).toHaveBeenCalledWith(true);
     expect(mockContext.skills.debouncedChange).toHaveBeenCalledTimes(1);
     expect(skill).toBeVisible();
@@ -100,7 +100,22 @@ describe('ToolsDropdown inside the composer menu', () => {
     await user.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Tools' }));
     expect(await screen.findByRole('menuitemcheckbox', { name: 'File Search' })).toBeVisible();
-    expect(screen.queryByTestId('tools-menu-skills')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Skills' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitemcheckbox', { name: /Run code/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the compact tool heading and independent status and pin controls', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
+    const toolsGroup = await screen.findByRole('menuitem', { name: 'Tools' });
+    expect(toolsGroup).toHaveTextContent(/0 enabled|0 启用/);
+    await user.click(toolsGroup);
+    expect(await screen.findByText('Available tools')).toBeVisible();
+    const skill = await screen.findByRole('menuitemcheckbox', { name: 'Skills' });
+    expect(screen.getAllByTestId('tool-state')[1]).toHaveAttribute('data-active', 'false');
+    await user.click(screen.getByRole('button', { name: 'Pin Skills' }));
+    expect(mockContext.skills.setIsPinned).toHaveBeenCalledWith(true);
+    expect(skill).toBeVisible();
   });
 });
