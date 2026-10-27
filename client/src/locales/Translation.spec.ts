@@ -11,6 +11,7 @@ import English from './en/translation.json';
 import Spanish from './es/translation.json';
 import French from './fr/translation.json';
 import SimplifiedChinese from './zh-Hans/translation.json';
+import TraditionalChinese from './zh-Hant/translation.json';
 import { TranslationKeys } from '~/hooks';
 import i18n from './i18n';
 
@@ -55,15 +56,26 @@ describe('i18next translation tests', () => {
     expect(missingKeys).toEqual([]);
   });
 
+  it('should localize composer controls in both Chinese locales', () => {
+    expect(SimplifiedChinese.com_ui_reasoning_label).toBe('思考');
+    expect(SimplifiedChinese.com_ui_composer_attachments).toBe('附件');
+    expect(SimplifiedChinese.com_ui_composer_formatting).toBe('格式工具');
+    expect(SimplifiedChinese.com_ui_composer_parameters).toBe('高级参数');
+    expect(SimplifiedChinese.com_ui_composer_restore).toBe('退出展开编辑器');
+    expect(TraditionalChinese.com_ui_reasoning_label).toBe('思考');
+    expect(TraditionalChinese.com_ui_composer_attachments).toBe('附件');
+    expect(TraditionalChinese.com_ui_composer_formatting).toBe('格式工具');
+    expect(TraditionalChinese.com_ui_composer_parameters).toBe('進階參數');
+    expect(TraditionalChinese.com_ui_composer_restore).toBe('退出展開編輯器');
+  });
+
   it('should keep context usage labels in simplified Chinese', () => {
     expect(SimplifiedChinese.com_ui_context_unknown).toBe('上下文大小未知');
     expect(SimplifiedChinese.com_ui_context_usage).toBe('上下文使用量');
     expect(SimplifiedChinese.com_ui_context_usage_label).toBe(
       '上下文窗口：已使用 {{0}} / {{1}} 个 Token（{{2}}%）',
     );
-    expect(SimplifiedChinese.com_ui_context_usage_snapshot).toBe(
-      '上下文 {{0}} / {{1}}（{{2}}%）',
-    );
+    expect(SimplifiedChinese.com_ui_context_usage_snapshot).toBe('上下文 {{0}} / {{1}}（{{2}}%）');
     expect(SimplifiedChinese.com_ui_context_subagents).toBe('子智能体');
     expect(SimplifiedChinese.com_ui_context_totals).toBe('总计');
   });

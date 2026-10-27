@@ -1,10 +1,11 @@
 import React, { useId, useMemo, useRef } from 'react';
-import { Button, TooltipAnchor } from '@librechat/client';
+import { ChevronDown } from 'lucide-react';
+import { Button } from '@librechat/client';
 import { getConfigDefaults, isAgentsEndpoint, isAssistantsEndpoint } from 'librechat-data-provider';
 import type { ModelSelectorProps } from '~/common';
 import { renderEndpoints, renderModelSpecs, renderSearchResults } from './components';
 import { ModelSelectorProvider, useModelSelectorContext } from './ModelSelectorContext';
-import { useShortcutAriaKey, useShortcutHint } from '~/hooks/useKeyboardShortcuts';
+import { useShortcutAriaKey } from '~/hooks/useKeyboardShortcuts';
 import { ModelSelectorChatProvider } from './ModelSelectorChatContext';
 import { getSelectedIcon, getDisplayValue } from './utils';
 import { modelDisplayInfo } from './catalog';
@@ -20,7 +21,6 @@ const defaultInterface = getConfigDefaults().interface;
 function ModelSelectorContent({ disabled }: { disabled?: boolean }) {
   const searchId = useId();
   const localize = useLocalize();
-  const modelSelectorHint = useShortcutHint('openModelSelector', localize('com_ui_select_model'));
   const modelSelectorAriaKey = useShortcutAriaKey('openModelSelector');
   const { mappedEndpoints } = useModelSelectorContext();
 
@@ -104,45 +104,25 @@ function ModelSelectorContent({ disabled }: { disabled?: boolean }) {
   );
 
   const trigger = (
-    <TooltipAnchor
+    <Button
+      variant="ghost"
+      size="sm"
+      type="button"
+      disabled={disabled}
+      ref={modelTriggerRef}
+      data-testid="model-selector-button"
+      aria-keyshortcuts={modelSelectorAriaKey}
+      className="h-8 min-w-0 max-w-full gap-1 px-1.5 text-xs text-text-secondary"
       aria-label={localize('com_ui_select_model')}
-      description={[
-        selectedValues.endpoint,
-        selectedDisplayValue,
-        modelDisplayInfo(
-          selectedValues.model || '',
-          mappedEndpoints?.find((endpoint) => endpoint.value === selectedValues.endpoint) ?? {
-            value: '',
-            label: '',
-            hasModels: false,
-            icon: null,
-          },
-        ).description,
-        modelSelectorHint,
-      ]
-        .filter(Boolean)
-        .join(' · ')}
-      render={
-        <Button
-          variant="ghost"
-          size="sm"
-          type="button"
-          disabled={disabled}
-          ref={modelTriggerRef}
-          data-testid="model-selector-button"
-          aria-keyshortcuts={modelSelectorAriaKey}
-          className="h-8 min-w-0 max-w-full gap-1 px-1.5 text-xs text-text-secondary"
-          aria-label={localize('com_ui_select_model')}
-        >
-          {selectedIcon && React.isValidElement(selectedIcon) && (
-            <div className="hidden size-4 shrink-0 items-center justify-center overflow-hidden sm:flex">
-              {selectedIcon}
-            </div>
-          )}
-          <span className="truncate text-left">{selectedDisplayValue}</span>
-        </Button>
-      }
-    />
+    >
+      {selectedIcon && React.isValidElement(selectedIcon) && (
+        <div className="hidden size-4 shrink-0 items-center justify-center overflow-hidden sm:flex">
+          {selectedIcon}
+        </div>
+      )}
+      <span className="truncate text-left">{selectedDisplayValue}</span>
+      <ChevronDown className="size-3.5 shrink-0 text-text-tertiary" aria-hidden="true" />
+    </Button>
   );
 
   return (

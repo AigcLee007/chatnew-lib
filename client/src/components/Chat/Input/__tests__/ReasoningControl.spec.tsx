@@ -16,10 +16,10 @@ afterEach(async () => {
 
 describe('ReasoningControl', () => {
   it.each([
-    ['zh-Hans', '思考等级'],
-    ['zh-Hant', '思考等級'],
-    ['en', 'Reasoning level'],
-  ])('localizes the reasoning tooltip in %s', async (locale, label) => {
+    ['zh-Hans', '思考等级', '思考', '自动'],
+    ['zh-Hant', '思考等級', '思考', '自動'],
+    ['en', 'Reasoning level', 'Thinking', 'Auto'],
+  ])('localizes the reasoning control in %s', async (locale, label, thinkingLabel, autoLabel) => {
     await changeLanguageSafely(locale);
     render(
       <ReasoningControl
@@ -30,10 +30,27 @@ describe('ReasoningControl', () => {
     );
 
     const control = screen.getByRole('combobox');
-    expect(control).toHaveAttribute('title', label);
+    expect(control).not.toHaveAttribute('title');
+    expect(control).toHaveTextContent(autoLabel);
     expect(control).toHaveAccessibleName(label);
+    expect(screen.getByText(thinkingLabel)).toBeVisible();
     await act(() => changeLanguageSafely(locale === 'en' ? 'zh-Hans' : 'en'));
-    expect(control).toHaveAttribute('title', locale === 'en' ? '思考等级' : 'Reasoning level');
+    expect(control).toHaveAccessibleName(locale === 'en' ? '思考等级' : 'Reasoning level');
+  });
+
+  it('shows the localized thinking label and dropdown affordance without a hover tooltip', async () => {
+    await changeLanguageSafely('zh-Hans');
+    render(
+      <ReasoningControl
+        compact
+        setting={{ key: 'reasoning_effort', type: 'enum', options: ['high'], component: 'slider' }}
+        onChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('思考')).toBeVisible();
+    expect(screen.getByRole('combobox')).not.toHaveAttribute('title');
+    expect(screen.getByRole('combobox').querySelector('svg')).toBeInTheDocument();
   });
 
   it.each([
@@ -48,7 +65,8 @@ describe('ReasoningControl', () => {
         onChange={jest.fn()}
       />,
     );
-    expect(screen.getByRole(role)).toHaveAttribute('title', expected);
+    expect(screen.getByRole(role)).toHaveAccessibleName(expected);
+    expect(screen.getByRole(role)).not.toHaveAttribute('title');
   });
 
   it('offers a compact, labelled reasoning trigger without a separate bordered field', () => {
@@ -61,7 +79,7 @@ describe('ReasoningControl', () => {
     );
     expect(screen.getByRole('combobox')).toHaveClass('border-0', 'shadow-none');
     expect(screen.getByRole('combobox')).toHaveTextContent('Auto');
-    expect(screen.getByRole('combobox')).toHaveAttribute('title', 'Reasoning level');
+    expect(screen.getByRole('combobox')).toHaveAccessibleName('Reasoning level');
   });
 
   it('does not let the composer steal focus when opening its control', () => {

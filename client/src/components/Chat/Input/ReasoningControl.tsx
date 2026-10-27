@@ -44,6 +44,7 @@ export default function ReasoningControl({
   const label = localize(
     (setting.label ?? 'com_ui_reasoning_level') as Parameters<typeof localize>[0],
   );
+  const thinkingLabel = localize('com_ui_reasoning_label');
   return (
     <div
       className="flex max-w-[190px] shrink-0 items-center gap-1.5 text-xs text-text-secondary"
@@ -51,6 +52,7 @@ export default function ReasoningControl({
     >
       {!compact && <BrainCircuit aria-hidden="true" className="size-4 shrink-0" />}
       <span className="sr-only">{label}</span>
+      <span className="shrink-0 text-text-secondary">{thinkingLabel}</span>
       {setting.type === 'enum' ? (
         <Select
           value={typeof value?.value === 'string' && value.value !== '' ? value.value : '__auto__'}
@@ -64,7 +66,6 @@ export default function ReasoningControl({
         >
           <SelectTrigger
             aria-label={label}
-            title={label}
             aria-describedby={descriptionId}
             className={cn(
               'h-8 w-auto min-w-24 gap-2 text-xs',
@@ -90,7 +91,6 @@ export default function ReasoningControl({
         <>
           <Input
             aria-label={label}
-            title={label}
             aria-describedby={descriptionId}
             className="h-8 w-24 rounded-md border border-border-medium bg-surface-chat px-2 text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-heavy"
             type="number"

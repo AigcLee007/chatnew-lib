@@ -747,7 +747,7 @@ const ChatForm = memo(function ChatForm({
           {index === 0 && quotesEnabled && <QuoteButton conversationId={conversationId} />}
           {/* `relative` anchors the in-flight steer overlay, which floats above
             the composer (`bottom-full`) over the bottom of the thread. */}
-          <div className="relative flex min-h-0 w-full flex-col">
+          <div className={cn('relative flex min-h-0 w-full flex-col', isExpanded && 'flex-1')}>
             {/* Run-scoped: `enabled` alone is any primary composer on a steerable
               endpoint, so a chip that outlives the run would strand a bubble. */}
             {steering.enabled && isSubmitting && (

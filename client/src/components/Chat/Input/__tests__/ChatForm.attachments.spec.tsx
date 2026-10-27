@@ -166,6 +166,10 @@ describe('ChatForm attachments', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Expand editor' }));
     expect(screen.getByRole('dialog', { name: 'Expand editor' })).toContainElement(comparison);
+    expect(textarea.closest('[class*="group/composer"]')?.parentElement).toHaveClass('flex-1');
+    expect(screen.getByRole('button', { name: 'Exit expanded editor' })).not.toHaveAttribute(
+      'title',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByText('+ comparison-model')).not.toBeInTheDocument();
     expect(textarea).toHaveValue('Keep comparison draft');

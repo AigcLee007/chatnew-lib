@@ -138,6 +138,19 @@ describe('model catalog menu', () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
+  it('shows the selected model with a dropdown arrow and no hover description', async () => {
+    render(<ModelSelector startupConfig={getConfigDefaults() as unknown as TStartupConfig} />);
+    const trigger = screen.getByTestId('model-selector-button');
+    expect(trigger).toHaveTextContent('gemini-3.5-flash-preview');
+    expect(trigger.querySelector('svg')).toBeInTheDocument();
+    expect(trigger).not.toHaveAttribute('title');
+    await userEvent.setup().hover(trigger);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(
+      screen.queryByText('Fast responses with low latency for everyday conversations.'),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows provider rows first with no API-key settings', async () => {
     await openSelector();
     expect(await screen.findByRole('option', { name: /Gemini 1/i })).toBeVisible();
