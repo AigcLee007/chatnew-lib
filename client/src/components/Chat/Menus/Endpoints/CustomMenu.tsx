@@ -13,7 +13,8 @@ export interface CustomMenuProps extends Ariakit.MenuButtonProps<'div'> {
   trigger?: Ariakit.MenuButtonProps['render'];
   finalFocus?: React.RefObject<HTMLElement | null>;
   defaultOpen?: boolean;
-  presentation?: 'default' | 'catalog';
+  presentation?: 'default' | 'catalog' | 'composer';
+  placement?: Ariakit.MenuStoreProps['placement'];
 }
 
 export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(function CustomMenu(
@@ -30,6 +31,7 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
     finalFocus,
     defaultOpen,
     presentation = 'default',
+    placement,
     ...props
   },
   ref,
@@ -39,7 +41,7 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
 
   const menuStore = Ariakit.useMenuStore({
     showTimeout: 100,
-    placement: parent ? 'right' : 'left',
+    placement: parent ? 'right' : (placement ?? 'left'),
     defaultOpen: defaultOpen,
   });
   const isOpen = menuStore.useState('open');
@@ -77,6 +79,15 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
         <Ariakit.MenuButtonArrow className="stroke-1 text-base opacity-75" />
       </Ariakit.MenuButton>
       <Ariakit.Menu
+        wrapperProps={
+          presentation === 'composer'
+            ? {
+                className:
+                  'max-sm:!fixed max-sm:!inset-x-2 max-sm:!bottom-2 max-sm:!top-auto max-sm:!w-auto max-sm:!transform-none',
+              }
+            : undefined
+        }
+        onClick={presentation === 'composer' ? (event) => event.stopPropagation() : undefined}
         open={isOpen}
         portal
         overlap
@@ -86,15 +97,17 @@ export const CustomMenu = React.forwardRef<HTMLDivElement, CustomMenuProps>(func
         className={cn(
           parent ? 'animate-popover-left ml-3' : 'animate-popover',
           'outline-none! z-40 flex max-h-[min(450px,var(--popover-available-height))] w-full',
-          presentation === 'catalog'
+          presentation !== 'default'
             ? 'w-[320px] min-w-[min(320px,calc(100vw-1rem))] flex-col overflow-auto rounded-2xl border border-border-light'
             : 'w-[var(--menu-width,auto)] min-w-[300px] flex-col overflow-auto rounded-xl border border-border-light',
           'bg-presentation text-sm text-text-primary shadow-lg',
           parent ? 'px-0.5 py-0.5' : 'px-3 py-2',
-          presentation === 'catalog'
+          presentation !== 'default'
             ? 'max-h-[min(28rem,var(--popover-available-height))] max-w-[calc(100vw-1rem)]'
             : 'max-w-[calc(100vw-4rem)] sm:max-h-[calc(65vh)] sm:max-w-[400px]',
           searchable && 'p-0',
+          presentation === 'composer' &&
+            'max-sm:max-h-[min(28rem,60dvh)] max-sm:w-full max-sm:max-w-none',
         )}
       >
         <SearchableContext.Provider value={searchable}>

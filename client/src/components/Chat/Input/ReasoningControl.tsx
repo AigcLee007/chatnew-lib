@@ -11,6 +11,7 @@ import {
 import type { TReasoningOverride } from 'librechat-data-provider';
 import type { SettingDefinition } from 'librechat-data-provider';
 import useLocalize from '~/hooks/useLocalize';
+import { cn } from '~/utils';
 
 export type ScopedReasoningOverride = {
   targetKey: string;
@@ -28,12 +29,14 @@ export default function ReasoningControl({
   setting,
   value,
   autoAllowed = true,
+  compact = false,
   descriptionId = 'reasoning-override-description',
   onChange,
 }: {
   setting: SettingDefinition;
   value?: TReasoningOverride;
   autoAllowed?: boolean;
+  compact?: boolean;
   descriptionId?: string;
   onChange: (override: TReasoningOverride | undefined) => void;
 }) {
@@ -43,10 +46,10 @@ export default function ReasoningControl({
   );
   return (
     <div
-      className="flex max-w-[190px] items-center gap-1.5 text-xs text-text-secondary"
+      className="flex max-w-[190px] shrink-0 items-center gap-1.5 text-xs text-text-secondary"
       onClick={(event) => event.stopPropagation()}
     >
-      <BrainCircuit aria-hidden="true" className="size-4 shrink-0" />
+      {!compact && <BrainCircuit aria-hidden="true" className="size-4 shrink-0" />}
       <span className="sr-only">{label}</span>
       {setting.type === 'enum' ? (
         <Select
@@ -62,11 +65,14 @@ export default function ReasoningControl({
           <SelectTrigger
             aria-label={label}
             aria-describedby={descriptionId}
-            className="h-8 w-auto min-w-24 gap-2 text-xs"
+            className={cn(
+              'h-8 w-auto min-w-24 gap-2 text-xs',
+              compact && 'min-w-0 gap-1 border-0 px-1.5 shadow-none',
+            )}
           >
             <SelectValue placeholder={localize('com_ui_auto')} />
           </SelectTrigger>
-          <SelectContent side="top" align="start">
+          <SelectContent side="top" align="end" position="popper">
             {autoAllowed && <SelectItem value="__auto__">{localize('com_ui_auto')}</SelectItem>}
             {(setting.options ?? []).filter(Boolean).map((option) => (
               <SelectItem key={option} value={option}>

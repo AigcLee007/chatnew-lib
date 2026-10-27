@@ -7,6 +7,18 @@ beforeAll(() => {
 });
 
 describe('ReasoningControl', () => {
+  it('offers a compact, labelled reasoning trigger without a separate bordered field', () => {
+    render(
+      <ReasoningControl
+        compact
+        setting={{ key: 'reasoning_effort', type: 'enum', options: ['high'], component: 'slider' }}
+        onChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole('combobox')).toHaveClass('border-0', 'shadow-none');
+    expect(screen.getByRole('combobox')).toHaveTextContent('Auto');
+  });
+
   it('does not let the composer steal focus when opening its control', () => {
     const focusComposer = jest.fn();
     render(

@@ -22,4 +22,6 @@ export interface SelectedValues {
 
 export interface ModelSelectorProps {
   startupConfig: TStartupConfig | undefined;
+  index?: number;
+  disabled?: boolean;
 }

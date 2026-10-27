@@ -265,6 +265,38 @@ describe('global shortcut dispatch', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
+  it('opens the model selector in the focused composer pane', () => {
+    renderHarness();
+    const primaryComposer = document.createElement('div');
+    primaryComposer.dataset.chatComposerIndex = '0';
+    const primarySelector = document.createElement('button');
+    primarySelector.dataset.testid = 'model-selector-button';
+    primarySelector.onclick = jest.fn();
+    primaryComposer.append(primarySelector);
+    const primaryInput = document.createElement('textarea');
+    primaryInput.id = 'prompt-textarea';
+    primaryComposer.append(primaryInput);
+    document.body.append(primaryComposer);
+
+    const secondaryComposer = document.createElement('div');
+    secondaryComposer.dataset.chatComposerIndex = '1';
+    const secondarySelector = document.createElement('button');
+    secondarySelector.dataset.testid = 'model-selector-button';
+    secondarySelector.onclick = jest.fn();
+    secondaryComposer.append(secondarySelector);
+    const secondaryInput = document.createElement('textarea');
+    secondaryInput.id = 'prompt-textarea-1';
+    secondaryComposer.append(secondaryInput);
+    document.body.append(secondaryComposer);
+    secondaryInput.focus();
+
+    const event = dispatchKey({ key: 'm', ctrlKey: true, shiftKey: true }, secondaryInput);
+
+    expect(primarySelector.onclick).not.toHaveBeenCalled();
+    expect(secondarySelector.onclick).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it('ignores shortcuts while focus is inside an open menu overlay', () => {
     const { getByTestId } = renderHarness();
     const before = getByTestId('sidebar').textContent;

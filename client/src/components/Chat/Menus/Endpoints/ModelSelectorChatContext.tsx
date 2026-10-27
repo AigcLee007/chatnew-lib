@@ -3,6 +3,7 @@ import { useRecoilValue } from 'recoil';
 import type { EModelEndpoint, TConversation } from 'librechat-data-provider';
 import type { ConvoGenerator } from '~/common';
 import { useGetConversation, useNewConvo } from '~/hooks';
+import { useGenerateConvo } from '~/hooks/Conversations/useGenerateConvo';
 import store from '~/store';
 
 interface ModelSelectorChatContextValue {
@@ -19,20 +20,32 @@ const ModelSelectorChatContext = createContext<ModelSelectorChatContextValue | u
   undefined,
 );
 
-export function ModelSelectorChatProvider({ children }: { children: React.ReactNode }) {
-  const getConversation = useGetConversation(0);
-  const { newConversation: nextNewConversation } = useNewConvo();
+export function ModelSelectorChatProvider({
+  children,
+  index = 0,
+}: {
+  children: React.ReactNode;
+  index?: number;
+}) {
+  const getConversation = useGetConversation(index);
+  const { newConversation: nextNewConversation } = useNewConvo(index);
+  const { setConversation } = store.useSetConversationAtom(index);
+  const { generateConversation } = useGenerateConvo({
+    index,
+    rootIndex: 0,
+    setConversation: index > 0 ? setConversation : undefined,
+  });
 
-  const spec = useRecoilValue(store.conversationSpecByIndex(0));
-  const model = useRecoilValue(store.conversationModelByIndex(0));
-  const agent_id = useRecoilValue(store.conversationAgentIdByIndex(0));
-  const endpoint = useRecoilValue(store.conversationEndpointByIndex(0));
-  const assistant_id = useRecoilValue(store.conversationAssistantIdByIndex(0));
+  const spec = useRecoilValue(store.conversationSpecByIndex(index));
+  const model = useRecoilValue(store.conversationModelByIndex(index));
+  const agent_id = useRecoilValue(store.conversationAgentIdByIndex(index));
+  const endpoint = useRecoilValue(store.conversationEndpointByIndex(index));
+  const assistant_id = useRecoilValue(store.conversationAssistantIdByIndex(index));
 
-  const newConversationRef = useRef(nextNewConversation);
-  newConversationRef.current = nextNewConversation;
+  const newConversationRef = useRef(index > 0 ? generateConversation : nextNewConversation);
+  newConversationRef.current = index > 0 ? generateConversation : nextNewConversation;
   const newConversation = useCallback<ConvoGenerator>(
-    (params) => newConversationRef.current(params),
+    (params) => newConversationRef.current({ ...params, keepAddedConvos: true }),
     [],
   );
 

@@ -146,6 +146,17 @@ const attach = (container: HTMLElement, file: File) =>
 const image = () => new File(['image-bytes'], 'cat.png', { type: 'image/png' });
 
 describe('ChatForm attachments', () => {
+  test('places model selection inside the composer before the send button', async () => {
+    renderComposer();
+    const textarea = await screen.findByTestId('text-input');
+    const model = screen.getByTestId('model-selector-button');
+    expect(textarea.closest('form')).toContainElement(model);
+    expect(
+      model.compareDocumentPosition(sendButton()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(model).toHaveAttribute('type', 'button');
+  });
+
   beforeEach(() => {
     localStorage.clear();
     decodes = true;

@@ -44,6 +44,7 @@ import {
   useGetReasoningCapabilityQuery,
   useGetStartupConfig,
 } from '~/data-provider';
+import ModelSelector from '../Menus/Endpoints/ModelSelector';
 import ReasoningControl, { getScopedReasoningOverride } from './ReasoningControl';
 import { cn, getModelSpec, hasIncompleteFiles, removeFocusRings } from '~/utils';
 import PendingManualSkillsChips from './PendingManualSkillsChips';
@@ -701,7 +702,7 @@ const ChatForm = memo(function ChatForm({
                 'relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
                 isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
                 isTemporary
-                  ? 'border-violet-800/60 bg-violet-950/10'
+                  ? 'border-border-medium bg-surface-secondary'
                   : 'border-border-light bg-surface-chat',
               )}
             >
@@ -792,7 +793,7 @@ const ChatForm = memo(function ChatForm({
               )}
               <div
                 className={cn(
-                  '@container items-between flex gap-2 pb-2',
+                  '@container flex flex-wrap items-center gap-1 pb-2',
                   isRTL ? 'flex-row-reverse' : 'flex-row',
                 )}
               >
@@ -805,36 +806,57 @@ const ChatForm = memo(function ChatForm({
                     setFilesLoading={setFilesLoading}
                   />
                 </div>
-                <BadgeRow
-                  showEphemeralBadges={
-                    !!endpoint &&
-                    !hideBadgeRow &&
-                    !isAgentsEndpoint(endpoint) &&
-                    !isAssistantsEndpoint(endpoint)
-                  }
-                  isSubmitting={isSubmitting}
-                  conversationId={conversationId}
-                  specName={conversation?.spec}
-                  onChange={setBadges}
-                  isInChat={
-                    Array.isArray(conversation?.messages) && conversation.messages.length >= 1
-                  }
-                />
-                {reasoningSetting && !isAssistantsEndpoint(endpoint) && (
-                  <ReasoningControl
-                    setting={reasoningSetting}
-                    value={reasoningOverride}
-                    autoAllowed={reasoningCatalogCapability?.required !== true}
-                    descriptionId={`reasoning-override-description-${index}`}
-                    onChange={(override) =>
-                      setScopedReasoningOverride(
-                        override ? { targetKey: reasoningTargetKey, override } : undefined,
-                      )
+                <div className="order-last w-full px-2 pt-1 empty:hidden">
+                  <BadgeRow
+                    showEphemeralBadges={
+                      !!endpoint &&
+                      !hideBadgeRow &&
+                      !isAgentsEndpoint(endpoint) &&
+                      !isAssistantsEndpoint(endpoint)
+                    }
+                    isSubmitting={isSubmitting}
+                    conversationId={conversationId}
+                    specName={conversation?.spec}
+                    onChange={setBadges}
+                    isInChat={
+                      Array.isArray(conversation?.messages) && conversation.messages.length >= 1
                     }
                   />
-                )}
-                <div className="mx-auto flex" />
-                <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
+                </div>
+                <div className="flex shrink-0 items-center">
+                  <TokenUsage
+                    index={index}
+                    conversation={conversation}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
+                <div
+                  className="ms-auto flex min-w-0 max-w-[min(28rem,calc(100%-9rem))] items-center rounded-lg"
+                  role="group"
+                  data-chat-composer-index={index}
+                  aria-label={localize('com_ui_select_model')}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <ModelSelector
+                    startupConfig={startupConfig}
+                    index={index}
+                    disabled={isSubmitting || answerMode.composerLocked}
+                  />
+                  {reasoningSetting && !isAssistantsEndpoint(endpoint) && (
+                    <ReasoningControl
+                      compact
+                      setting={reasoningSetting}
+                      value={reasoningOverride}
+                      autoAllowed={reasoningCatalogCapability?.required !== true}
+                      descriptionId={`reasoning-override-description-${index}`}
+                      onChange={(override) =>
+                        setScopedReasoningOverride(
+                          override ? { targetKey: reasoningTargetKey, override } : undefined,
+                        )
+                      }
+                    />
+                  )}
+                </div>
                 {SpeechToText && (
                   <AudioRecorder
                     methods={methods}

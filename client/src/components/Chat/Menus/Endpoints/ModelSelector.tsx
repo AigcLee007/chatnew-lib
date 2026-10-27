@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from 'react';
-import { TooltipAnchor } from '@librechat/client';
+import React, { useId, useMemo, useRef } from 'react';
+import { Button, TooltipAnchor } from '@librechat/client';
 import { getConfigDefaults, isAgentsEndpoint, isAssistantsEndpoint } from 'librechat-data-provider';
 import type { ModelSelectorProps } from '~/common';
 import { renderEndpoints, renderModelSpecs, renderSearchResults } from './components';
@@ -17,16 +17,17 @@ import { buildModelCatalog } from './catalog';
 
 const defaultInterface = getConfigDefaults().interface;
 
-function ModelSelectorContent() {
+function ModelSelectorContent({ disabled }: { disabled?: boolean }) {
+  const searchId = useId();
   const localize = useLocalize();
   const modelSelectorHint = useShortcutHint('openModelSelector', localize('com_ui_select_model'));
   const modelSelectorAriaKey = useShortcutAriaKey('openModelSelector');
+  const { mappedEndpoints } = useModelSelectorContext();
 
   const {
     // LibreChat
     agentsMap,
     modelSpecs,
-    mappedEndpoints,
     endpointsConfig,
     // State
     searchValue,
@@ -105,30 +106,55 @@ function ModelSelectorContent() {
   const trigger = (
     <TooltipAnchor
       aria-label={localize('com_ui_select_model')}
-      description={modelSelectorHint}
+      description={[
+        selectedValues.endpoint,
+        selectedDisplayValue,
+        modelDisplayInfo(
+          selectedValues.model || '',
+          mappedEndpoints?.find((endpoint) => endpoint.value === selectedValues.endpoint) ?? {
+            value: '',
+            label: '',
+            hasModels: false,
+            icon: null,
+          },
+        ).description,
+        modelSelectorHint,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       render={
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          disabled={disabled}
           ref={modelTriggerRef}
           data-testid="model-selector-button"
           aria-keyshortcuts={modelSelectorAriaKey}
-          className="my-1 flex h-9 max-w-full items-center gap-2 rounded-xl border border-border-light bg-presentation px-3 py-2 text-sm text-text-primary hover:bg-surface-active-alt"
+          className="h-8 min-w-0 max-w-full gap-1 px-1.5 text-xs text-text-secondary"
           aria-label={localize('com_ui_select_model')}
         >
           {selectedIcon && React.isValidElement(selectedIcon) && (
-            <div className="flex flex-shrink-0 items-center justify-center overflow-hidden">
+            <div className="hidden size-4 shrink-0 items-center justify-center overflow-hidden sm:flex">
               {selectedIcon}
             </div>
           )}
           <span className="truncate text-left">{selectedDisplayValue}</span>
-        </button>
+        </Button>
       }
     />
   );
 
   return (
-    <div className="relative flex min-w-0 max-w-[60vw] flex-col items-center gap-2 sm:max-w-xs">
+    <div
+      className="relative flex min-w-0 max-w-full flex-col"
+      onClick={(event) => event.stopPropagation()}
+    >
       <Menu
-        presentation="catalog"
+        presentation="composer"
+        placement="top-end"
+        disabled={disabled}
+        className="h-8 min-w-0 gap-1 border-0 bg-transparent px-1.5 py-1 shadow-none"
         values={selectedValues}
         onValuesChange={(values: Record<string, any>) => {
           setSelectedValues({
@@ -140,7 +166,8 @@ function ModelSelectorContent() {
         onSearch={(value) => setSearchValue(value)}
         combobox={
           <input
-            id="model-search"
+            id={searchId}
+            aria-label={localize('com_ui_select_model')}
             placeholder={localize('com_ui_search_models_count', { 0: modelCount })}
           />
         }
@@ -158,7 +185,7 @@ function ModelSelectorContent() {
   );
 }
 
-export default function ModelSelector({ startupConfig }: ModelSelectorProps) {
+export default function ModelSelector({ startupConfig, index = 0, disabled }: ModelSelectorProps) {
   const interfaceConfig = startupConfig?.interface ?? defaultInterface;
   const modelSpecs = startupConfig?.modelSpecs?.list ?? [];
 
@@ -168,9 +195,9 @@ export default function ModelSelector({ startupConfig }: ModelSelectorProps) {
   }
 
   return (
-    <ModelSelectorChatProvider>
+    <ModelSelectorChatProvider index={index}>
       <ModelSelectorProvider startupConfig={startupConfig}>
-        <ModelSelectorContent />
+        <ModelSelectorContent disabled={disabled} />
       </ModelSelectorProvider>
     </ModelSelectorChatProvider>
   );

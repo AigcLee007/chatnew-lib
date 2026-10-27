@@ -22,7 +22,7 @@ import { useGetEndpointsQuery } from '~/data-provider';
 import { mainTextareaId } from '~/common';
 import store from '~/store';
 
-const useGenerateConvo = ({
+export const useGenerateConvo = ({
   index = 0,
   rootIndex,
   setConversation,

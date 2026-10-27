@@ -117,6 +117,27 @@ describe('model catalog menu', () => {
     jest.clearAllMocks();
   });
 
+  it('opens inside the composer without focusing or submitting the composer', async () => {
+    const focusComposer = jest.fn();
+    const submit = jest.fn((event: React.FormEvent) => event.preventDefault());
+    const user = userEvent.setup();
+    render(
+      <form onSubmit={submit} onClick={focusComposer}>
+        <ModelSelector startupConfig={getConfigDefaults() as unknown as TStartupConfig} />
+      </form>,
+    );
+    await user.click(screen.getByTestId('model-selector-button'));
+    expect(await screen.findByRole('combobox')).toBeVisible();
+    expect(focusComposer).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    await user.type(screen.getByRole('combobox'), 'reasoning');
+    await user.click(await screen.findByRole('option', { name: /Gemini 1/i }));
+    await user.click(await screen.findByText('Gemini 3.1 Pro'));
+    expect(mockSelectModel).toHaveBeenCalledWith(mockEndpoints[0], 'gemini-3.1-pro-preview');
+    expect(focusComposer).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
   it('shows provider rows first with no API-key settings', async () => {
     await openSelector();
     expect(await screen.findByRole('option', { name: /Gemini 1/i })).toBeVisible();

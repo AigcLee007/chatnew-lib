@@ -295,6 +295,7 @@ export type ShortcutActionId = keyof typeof shortcutDefinitions;
 export const EDITING_ALLOWED_SHORTCUTS: ReadonlySet<ShortcutActionId> = new Set([
   'focusChat',
   'focusSearch',
+  'openModelSelector',
   'showShortcuts',
   'submitMessage',
   'escalateSteer',
@@ -537,10 +538,20 @@ export function useShortcutActions(): ShortcutAction[] {
     return true;
   }, [toggleSidebar]);
 
-  const handleOpenModelSelector = useCallback(
-    () => clickElement('[data-testid="model-selector-button"]'),
-    [],
-  );
+  const handleOpenModelSelector = useCallback(() => {
+    const mainTextarea = document.getElementById(mainTextareaId);
+    const activeComposer =
+      document.activeElement?.closest('[data-chat-composer-index]') ??
+      mainTextarea?.closest('[data-chat-composer-index]') ??
+      Array.from(document.querySelectorAll<HTMLElement>('[data-chat-composer-index]')).at(-1);
+    const activeTrigger = activeComposer?.querySelector<HTMLElement>(
+      '[data-testid="model-selector-button"]',
+    );
+    if (activeTrigger) {
+      return clickTarget(activeTrigger);
+    }
+    return clickElement('[data-testid="model-selector-button"]');
+  }, []);
 
   const handleFocusSearch = useCallback(() => {
     const focusSearchInput = () => {
