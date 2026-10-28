@@ -62,6 +62,15 @@ describe('ComposerFormatting', () => {
     expect(screen.getByLabelText('Markdown draft')).toHaveTextContent('hello');
   });
 
+  it('shows the localized placeholder for an empty rich editor', () => {
+    render(<Harness initialText="" />);
+    const editor = screen.getByRole('textbox', { name: 'Message input' });
+    const emptyParagraph = editor.querySelector('.is-empty');
+
+    expect(emptyParagraph).toHaveAttribute('data-placeholder');
+    expect(editor).toHaveClass('focus-visible:outline-none');
+  });
+
   it('renders existing Markdown formatting and exposes active format state', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Harness initialText="**hello world**" />);

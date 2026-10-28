@@ -3,6 +3,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import { Markdown } from '@tiptap/markdown';
 import { Mathematics } from '@tiptap/extension-mathematics';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
+import { Placeholder } from '@tiptap/extensions/placeholder';
 import StarterKit from '@tiptap/starter-kit';
 import {
   Bold,
@@ -130,6 +131,11 @@ export default function ComposerFormatting({
     extensions: [
       StarterKit,
       Markdown,
+      Placeholder.configure({
+        placeholder: localize('com_endpoint_message_new', {
+          0: localize('com_endpoint_ai'),
+        }),
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Mathematics.configure({ katexOptions: { throwOnError: false } }),
@@ -137,11 +143,8 @@ export default function ComposerFormatting({
     editorProps: {
       attributes: {
         'aria-label': localize('com_ui_message_input'),
-        'data-placeholder': localize('com_endpoint_message_new', {
-          0: localize('com_endpoint_ai'),
-        }),
         class:
-          'min-h-11 max-h-[45vh] overflow-y-auto px-5 py-[13px] text-sm text-text-primary outline-none empty:before:pointer-events-none empty:before:text-text-tertiary empty:before:content-[attr(data-placeholder)] [&_blockquote]:border-s-2 [&_blockquote]:border-border-medium [&_blockquote]:ps-3 [&_code]:rounded [&_code]:bg-surface-secondary [&_code]:px-1 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-surface-secondary [&_pre]:p-3 [&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6 [&_u]:underline [&_.ProseMirror-selectednode]:outline [&_[data-type=taskList]]:list-none [&_[data-type=taskList]]:ps-0',
+          'min-h-11 max-h-[45vh] overflow-y-auto px-5 py-[13px] text-sm text-text-primary outline-none focus-visible:outline-none [&_.is-empty::before]:pointer-events-none [&_.is-empty::before]:float-left [&_.is-empty::before]:h-0 [&_.is-empty::before]:text-text-tertiary [&_.is-empty::before]:content-[attr(data-placeholder)] [&_blockquote]:border-s-2 [&_blockquote]:border-border-medium [&_blockquote]:ps-3 [&_code]:rounded [&_code]:bg-surface-secondary [&_code]:px-1 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-surface-secondary [&_pre]:p-3 [&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6 [&_u]:underline [&_.ProseMirror-selectednode]:outline [&_[data-type=taskList]]:list-none [&_[data-type=taskList]]:ps-0',
       },
       handleDOMEvents: {
         keydown: (_view, event) => {

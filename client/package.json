@@ -63,6 +63,7 @@
     "@tanstack/react-table": "^8.11.7",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-mathematics": "3.32.0",
+    "@tiptap/extensions": "3.32.0",
     "@tiptap/markdown": "3.32.0",
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",

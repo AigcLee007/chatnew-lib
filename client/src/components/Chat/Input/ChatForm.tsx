@@ -720,7 +720,7 @@ const ChatForm = memo(function ChatForm({
       isSubmitting={isSubmitting}
     >
       <Dialog open={parametersOpen && canOpenParameters} onOpenChange={setParametersOpen}>
-        <DialogContent className="max-h-[85dvh] overflow-y-auto">
+        <DialogContent className="max-h-[85dvh] w-11/12 max-w-5xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{localize('com_ui_composer_parameters')}</DialogTitle>
           </DialogHeader>
@@ -934,9 +934,10 @@ const ChatForm = memo(function ChatForm({
                 />
                 {endpoint && (
                   <div
+                    data-testid="composer-textarea-row"
                     className={cn(
                       'flex',
-                      'min-h-[58px] px-3.5 pb-1.5',
+                      showFormatting ? 'min-h-0 p-0' : 'min-h-[58px] px-3.5 pb-1.5',
                       isRTL ? 'flex-row-reverse' : 'flex-row',
                       isExpanded && 'min-h-0 flex-1',
                     )}
@@ -1010,7 +1011,7 @@ const ChatForm = memo(function ChatForm({
                     <div
                       className={cn(
                         'flex flex-col items-start justify-start pr-2.5 pt-1.5',
-                        isExpanded && 'hidden',
+                        (isExpanded || showFormatting) && 'hidden',
                       )}
                     >
                       <CollapseChat

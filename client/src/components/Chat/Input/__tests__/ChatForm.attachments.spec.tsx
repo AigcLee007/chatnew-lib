@@ -224,6 +224,7 @@ describe('ChatForm attachments', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add attachments and tools' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Advanced parameters' }));
     const dialog = await screen.findByRole('dialog', { name: 'Advanced parameters' });
+    expect(dialog).toHaveClass('w-11/12', 'max-w-5xl');
     expect(within(dialog).getByText('Temperature')).toBeVisible();
     expect(screen.queryByRole('dialog', { name: 'Expand editor' })).not.toBeInTheDocument();
     expect(textarea).toHaveValue('Keep parameter draft');
@@ -261,6 +262,9 @@ describe('ChatForm attachments', () => {
       await screen.findByRole('menuitemcheckbox', { name: 'Formatting tools' }),
     );
     expect(screen.getByRole('toolbar', { name: 'Formatting tools' })).toBeVisible();
+    const textareaRow = screen.getByTestId('composer-textarea-row');
+    expect(textareaRow).toHaveClass('min-h-0', 'p-0');
+    expect(textareaRow).not.toHaveClass('min-h-[58px]');
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('button', { name: 'Expand editor' }));
     expect(screen.getByRole('dialog', { name: 'Expand editor' })).toContainElement(textarea);
