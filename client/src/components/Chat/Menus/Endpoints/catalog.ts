@@ -23,6 +23,12 @@ export type CatalogEntry = {
 };
 
 const MODEL_INFO: Record<string, { name: string; description: string; group: CatalogGroup }> = {
+  'gemini-4-carbon': {
+    name: 'Gemini 4 Carbon',
+    description:
+      '谷歌最新旗舰，擅长复杂工程、长周期 Agent 任务与安全审计，支持百万级上下文与多模态理解。特惠体验价，0.3/次。',
+    group: 'GEMINI',
+  },
   'gemini-4-argon-high': {
     name: 'Gemini 4 Argon High',
     description: '谷歌官方 Key 线路，稳定，价格较高。',
@@ -175,6 +181,9 @@ function localizeDescription(description: string, localize?: CatalogLocalize) {
 }
 
 const DESCRIPTION_TRANSLATIONS: Record<string, { zh: string }> = {
+  com_model_desc_gemini_carbon: {
+    zh: '谷歌最新旗舰，擅长复杂工程、长周期 Agent 任务与安全审计，支持百万级上下文与多模态理解。特惠体验价，0.3/次。',
+  },
   com_model_desc_gemini_argon_high: { zh: '谷歌官方 Key 线路，稳定，价格较高。' },
   com_model_desc_gemini_flash: { zh: '响应快速、延迟低，适合日常对话与内容生成。' },
   com_model_desc_gemini_pro: { zh: '擅长复杂分析与长文档理解，适合需要深入推理的任务。' },

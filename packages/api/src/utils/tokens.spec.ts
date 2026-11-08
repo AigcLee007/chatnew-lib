@@ -63,11 +63,11 @@ describe('Claude Fable 5.1 token maps', () => {
   });
 });
 
-describe('Gemini 4 Argon', () => {
+describe.each(['gemini-4-argon', 'gemini-4-carbon'])('%s context', (modelId) => {
   it.each([EModelEndpoint.google, EModelEndpoint.agents, EModelEndpoint.custom])(
     'uses the documented context window for %s and model aliases',
     (endpoint) => {
-      for (const model of ['gemini-4-argon', 'models/gemini-4-argon', 'google/gemini-4-argon']) {
+      for (const model of [modelId, `models/${modelId}`, `google/${modelId}`]) {
         expect(getModelMaxTokens(model, endpoint)).toBe(1048576);
       }
     },
